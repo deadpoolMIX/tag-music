@@ -1,37 +1,35 @@
 # 当前交接
 
-- 2026-10-30 00:40 恢复准备：用户要求继续。+7 应用源码/安装包不变；已提交的新卡片辅助检查会核对切歌前后 opened 样本不同，避免只凭原有 PLAYING 误判成功，脚本 AST 通过。新批次交互确认已发出但尚未收到明确回复；未执行任何新设备输入。状态仍开发中，锁屏卡片复验和 Windows 后台播放验证仍待执行。
+- 更新：2026-10-30 00:55 北京时间。当前 **R1，开发中**。+7 通知卡片播放失败已真机复现；+8 候选已完成19项测试和双端发布构建，**未安装、未真机验证**。不进入R2。
+- 当前源码 **0.2.0+8**，基于2c83b32，收尾提交见本文件所在HEAD。包内标识 **2c83b32-dirty**，不能改称后续提交构建。仅本地Git；密钥/SDK/产物不提交。
+- 手机仍 **0.2.0+7**，固定app.tagmusic.player，原签名，首次安装2026-10-29 20:14:50；此前主题和两个SAF授权保留。最后已条件暂停，停在通知中心。旧Windows+7测试窗口已恢复并通过Alt+F4退出，随后进程查询为空。
+- 用户明确Windows只需软件内操作后放后台继续播放，不需软件外媒体卡片/SMTC/系统媒体键/托盘播放按钮；Android通知/锁屏需求保持。PLAN已记录范围变更，原始归档不改。
 
-- 更新：2026-10-30 00:32 北京时间。当前只推进 **R1**，状态 **开发中**。+6 手机体验验收失败；+7 修复已构建并安装，但针对 Android 锁屏卡片的偶发问题尚未真机复验，不得称自动验证全部通过或双端通过，不进入R2。
-- 当前源码/手机版本 **0.2.0+7**，源码基于064f2b6，收尾提交见本文件所在HEAD。双端包内标识 **064f2b6-dirty**，不改称后续收尾提交构建。仅本地Git。
-- 用户+6反馈：其他项正常；Android锁屏切歌标题/歌手先一行后两行跳动、点击播放偶发无响应须切歌恢复、图标与声音不同步。已澄清为实际播放显示▶或实际暂停显示Ⅱ，是真实失败反馈，不是正常暂停图标语义。phone-acceptance-6-feedback.json保存反馈，android6-feedback/为随后只读诊断，不是故障瞬间复现。
-- 用户最新 Windows 范围：只需软件内操作后放后台继续播放；不需软件外媒体卡片/播放按钮、SMTC、系统媒体键或托盘播放按钮。Android通知/锁屏控制保留。已修改docs/PLAN.md并说明原因，原始归档不改；Windows后台持续输出仍须验证，不能把Android卡片作为Windows要求。
+## 失败复现与候选修复
 
-## 本次修复与检查
+- 用户+6反馈锁屏切歌标题/歌手先一行后两行跳动、播放偶发无响应须切歌恢复、实际播放显示▶或实际暂停显示Ⅱ；其他验收项正常。
+- +7已修复切歌临时idle导致停服、残缺新媒体信息先发布、点击排队前读取旧状态；18项测试和基础六格式/进度/30次切歌通过，但不等于卡片问题全部解决。
+- 本批获用户交互明确允许继续已安装+7验证后，实际点击通知Play，4秒后仍PAUSED且Dart无mediaCommand。相同卡片Next立即送达next，打开OGG并PLAYING。Play原生PendingIntent requestCode91显示sent=true、canceled=false。失败证据不覆盖为通过。
+- audio_service0.18.19把通知play映射KEYCODE_MUTE91。AOSP Android16 MediaController.dispatchMediaButtonEvent过滤非媒体键，KeyEvent.isMediaSessionKey不含MUTE；与真机无回调而Next有效相吻合。证据为源码及链路推断，修复仍需实际按钮复验。源码链接保存android7/notification-button-root-cause.json及R1日志。
+- +8将通知主按钮改为标准 **MediaAction.playPause（键码85）**，保留随实际状态变化的Play/Pause图标和标签，沿用+7队列内toggle判断；显式play/pause入口仍保留。没有改第三方缓存、原生库、权限或依赖。
+- 新增传输动作/图标/标签合约测试，全套 **19项测试**、分析/格式、双端release、签名/API29/版本、包内原生哈希/运行文件及8份许可检查通过；26项应用/manifest文件与构建快照一致。构建通过不能代替真机。
 
-- +7增加changingTrack阶段：切歌途中系统会话保持loading，不发布idle以免audio_service停服；旧完整媒体信息保留，新曲标题/歌手准备好后一起发布，明确displayTitle/displaySubtitle。真正停止仍发布idle。
-- 硬件媒体点击和软件内播放按钮在同一串行队列中，按执行时真实状态决定播放/暂停，避免排队前读旧状态；显式play/pause仍幂等。增加mediaCommand收到/完成/耗时和mediaState日志，便于复现定位。
-- 锁定audio_service0.18.19源码确认idle会stop、默认click在入队前决定动作；受控测试覆盖慢metadata不发布idle/残缺新元数据、慢play双击最终play→pause。首次测试替身类型推断编译失败，已修正，历史失败日志保留。全套 **18项测试**、格式及静态分析通过；不能据此声称真机偶发问题已解决。
-- Android +7 release原签名覆盖安装成功，固定ID app.tagmusic.player，首次安装时间仍2026-10-29 20:14:50，两个SAF授权保留。六格式中文元数据/播放状态、应用内拖动/暂停稳定/恢复/停止重开、30次交替切歌通过。切歌受管FD播放1卸载0；总FD234–240，首236末236；切歌日志窗口未见idle或仅文件名的媒体项。
-- Windows +7原生Debug六格式/进度/暂停/坏文件恢复/20次切歌通过，20秒默认WH-1000XM3回环检测440Hz，截图已查看。Release启动和界面文本正常；截图仍FrameArrived超时，不把Debug截图当Release。后台持续播放尚未针对最新范围复验。
+## 已有证据与当前批次
 
-## 停止边界与设备状态
+- +7基础：手机六格式、应用内seek/暂停/继续/停止重开、30次切歌通过，受管FD播放1卸载0，总FD234–240、首尾236；切歌采样无idle/残缺媒体项。Windows原生Debug六格式/进度/暂停/坏文件/20次切歌和20秒回环440Hz通过，Release启动/文本正常。上述均保持+7边界，不冒充+8。
+- 最新+7卡片失败：artifacts/R1/android7/shade-card-check.log、shade-cycle-1-play-session.txt、shade-card-logcat.log、shade-next-after-play-failure.log、pending-intents-failure.txt、audio-service-button-mapping.txt、notification-button-root-cause.json、shade-card-recording.mp4；截图android-7-shade-play-failure.png。
+- 用户最新授权“允许本批+7继续验证”，记录device-batch-7-continue-authorization.json；该批未授权安装+8。已发出+8双端验证交互确认，**尚未收到明确答复**。等待回复前不安装或操作新批次设备。
+- Android+8通知/锁屏反复按钮、图标/文字布局/短录屏、六格式/切歌/坏文件恢复/重启授权与主题/样本只读哈希全部未验证。Windows+8实际运行及最小化后持续输出未验证。系统卡片进度条此前未显示，不称拖动通过。
 
-- 用户交互允许+7双端批次，授权device-batch-7-authorization.json；随后Computer Use报告用户按实体Esc停止。立即结束本批，不再发设备输入；手机脚本此时已正常完成30次，最后日志playing=false，未再输入去停止/切页。
-- 最后观察手机+7暂停在样本页；Windows+7发布窗口仍开着，关闭请求被Esc中断，不能声称已经关闭。device-batch-7-stop.json。今后的设备操作必须重新交互确认；用户之后对Windows需求的澄清不视作恢复设备操作的许可。
-- Android锁屏/通知卡片反复点击与短录屏 **未执行**。已准备scripts/verify-android-media-card.ps1，仅通过AST，未经实际界面执行。+7坏文件手机恢复、重启授权/主题/通知权限保持、样本只读哈希最终复核也尚未重跑；+6历史通过不冒充+7。
+## +8产物
 
-## 产物与证据
+- APK：artifacts/R1/tag-music-0.2.0+8.apk；SHA256 **1d7618506deda3eefc2e562df8e04a7c39629e4ee9d31155c13c29d6a76101e6**。
+- Windows：artifacts/R1/tag-music-windows-0.2.0+8.zip；SHA256 **192caebfb8b144294bdc4ce234fd76414b1045c04b6f25084eb2bba8e15b00be**。
+- build-{android,windows}-8.log/json、apk-signature-8.txt、apk-manifest-8.txt、package-audit-8.json、source-manifest-8.json、source-comparison-8.txt、test-8.log、analyze-8.log、format-8.log、final-validation-8.txt、SHA256SUMS.txt。签名与R0一致；未卸载/清数据。
+- 总报告artifacts/R1/REPORT.md；7项清单docs/rounds/R1-ACCEPTANCE.md；手机卡片辅助脚本verify-android-media-card.ps1已真机执行并正确报告+7失败，切歌检查还要求opened样本变化。
 
-- APK：artifacts/R1/tag-music-0.2.0+7.apk；SHA256 1ba9a8b2b3177b89fff0df3a839d915363e25ad2158edb04adde8968da509225。
-- Windows：artifacts/R1/tag-music-windows-0.2.0+7.zip；SHA256 90720b24e47db16bdf90feb945d7552ec79dbdd479c3ad1758ecbced345b74a3。
-- 构建：build-android-7.log、build-windows-7.log、build-all-7.json；签名apk-signature-7.txt与R0一致，apk-manifest-7.txt；package-audit-7.json核对原生哈希、运行文件和8份许可文本，SHA256SUMS.txt。
-- 源码：source-manifest-7.json、source-comparison-7.txt（26项应用/manifest哈希一致）；test-7.log、analyze-7.log、format-7.log；test-media-7.log保留最初失败，test-media-7-retry.log为修正后的定向检查。final-validation-7.txt。
-- 手机：android7/下六格式会话、controls-logcat.log、switches-logcat.log、operations.jsonl、descriptor-media-audit.json；android-package-7.txt。
-- Windows：windows7/integration-playback.log、output-loopback.json/wav、windows-native-playback.png、release-window-text.txt。总报告artifacts/R1/REPORT.md，验收清单docs/rounds/R1-ACCEPTANCE.md。
+## 下一步
 
-## 后续入口
-
-- 新设备批次确认后，优先Android通知/锁屏反复切歌、点击暂停/恢复、快速点击及图标和声音同步，保留真实媒体命令/状态日志和短录屏；失败先修复。补足+7手机坏文件/重启授权/主题/只读回归后，再请用户体验验收。
-- Windows只验证后台持续播放，不实现外部播放卡片。当前无R1全部通过反馈。Android10、其他手机、Windows11未覆盖；复杂Android音频焦点/蓝牙后续R7处理。
-- R1只有临时曲目列表和目录授权；持久曲库、标签和歌单未实现。只读FD桥接规则及工具链见轮次日志/TOOLCHAIN。原生库含LGPL3+，不整体称MIT；Windows完整对应源码/子依赖通知、Android helper固定源码缺口仍见THIRD_PARTY，R9核全。
+- 收到+8批次明确允许后原签名覆盖升级，优先复测真正通知/锁屏按钮的响应、切歌文本/图标同步，保存命令和状态日志/短录屏；补足其余手机回归，Windows只测软件内操作和最小化后台持续输出。系统授权/解锁由用户完成。
+- 自动检查及运行验证都通过后，再请用户做手机体验验收；当前没有+8通过反馈，不能标双端通过。R1只有临时曲目列表及目录授权，没有持久曲库/标签/歌单。
+- Android10/其他手机/Windows11未覆盖；复杂Android音频焦点/蓝牙后续R7。原生库含LGPL3+，完整对应源码/子依赖通知及helper固定源码缺口见THIRD_PARTY，R9继续核全。所有历史失败、包、日志保留。

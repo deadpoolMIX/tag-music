@@ -9,9 +9,9 @@ Windows / Android 本地音乐播放器，Flutter + Material 3。R0 已双端通
 ```powershell
 pwsh -File scripts/bootstrap.ps1
 pwsh -File scripts/check.ps1
-pwsh -File scripts/build.ps1 -Target all -BuildNumber 7 -Round R1
-pwsh -File scripts/verify-apk.ps1 -BuildNumbers 7 -Version 0.2.0 -Round R1
-pwsh -File scripts/install-android.ps1 -BuildNumber 7 -Version 0.2.0 -Round R1
+pwsh -File scripts/build.ps1 -Target all -BuildNumber 8 -Round R1
+pwsh -File scripts/verify-apk.ps1 -BuildNumbers 8 -Version 0.2.0 -Round R1
+pwsh -File scripts/install-android.ps1 -BuildNumber 8 -Version 0.2.0 -Round R1
 ```
 
 使用项目内 SDK 时，运行 Flutter 命令前先 `. ./scripts/env.ps1`，执行 `& ./scripts/restore.ps1` 恢复锁定依赖并准备 Windows 插件目录，再运行 Flutter 命令。测试与构建须串行。R1 从已验收的 `0.1.0+2` 原签名覆盖升级，保留主题与首次安装时间。历史包验证可显式传入 `-Round R0 -Version 0.1.0 -BuildNumbers 1,2`。

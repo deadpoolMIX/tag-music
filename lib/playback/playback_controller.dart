@@ -366,7 +366,12 @@ class TagAudioHandler extends BaseAudioHandler {
       PlaybackState(
         controls: [
           MediaControl.skipToPrevious,
-          playing ? MediaControl.pause : MediaControl.play,
+          // audio_service maps separate play to KEYCODE_MUTE, which Android's
+          // MediaController filters out. The standard toggle key is supported
+          // and click() decides against the serialized, actual player state.
+          (playing ? MediaControl.pause : MediaControl.play).copyWith(
+            action: MediaAction.playPause,
+          ),
           MediaControl.stop,
           MediaControl.skipToNext,
         ],

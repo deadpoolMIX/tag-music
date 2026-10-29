@@ -215,7 +215,48 @@ void main() {
       await Future.wait([first, second]);
       expect(player.commands, ['play', 'pause']);
       expect(handler.playbackState.value.playing, isFalse);
-      expect(handler.playbackState.value.controls[1], MediaControl.play);
+      expect(
+        handler.playbackState.value.controls[1].action,
+        MediaAction.playPause,
+      );
+      expect(
+        handler.playbackState.value.controls[1].androidIcon,
+        MediaControl.play.androidIcon,
+      );
+    },
+  );
+
+  test(
+    'notification uses standard toggle transport with truthful play/pause icon',
+    () {
+      final controller = HandlerController();
+      final handler = TagAudioHandler(controller);
+      addTearDown(controller.dispose);
+      expect(
+        handler.playbackState.value.controls[1].action,
+        MediaAction.playPause,
+      );
+      expect(
+        handler.playbackState.value.controls[1].androidIcon,
+        MediaControl.pause.androidIcon,
+      );
+      expect(
+        handler.playbackState.value.controls[1].label,
+        MediaControl.pause.label,
+      );
+      controller.emit(controller.player.state.copyWith(playing: false));
+      expect(
+        handler.playbackState.value.controls[1].action,
+        MediaAction.playPause,
+      );
+      expect(
+        handler.playbackState.value.controls[1].androidIcon,
+        MediaControl.play.androidIcon,
+      );
+      expect(
+        handler.playbackState.value.controls[1].label,
+        MediaControl.play.label,
+      );
     },
   );
 

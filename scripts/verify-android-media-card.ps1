@@ -1,6 +1,6 @@
 #Requires -Version 7.0
 # Only run with a confirmed batch, Tag Music's sample card visible and paused.
-param([ValidateSet('shade','lock')][string]$Surface, [int]$BuildNumber=7, [ValidateRange(1,10)][int]$Cycles=6)
+param([ValidateSet('shade','lock')][string]$Surface, [int]$BuildNumber=8, [ValidateRange(1,10)][int]$Cycles=6)
 . "$PSScriptRoot/android-ui.ps1"
 $evidence=Join-Path $ProjectRoot "artifacts/R1/android$BuildNumber"
 $packageText=(& $R1Adb shell dumpsys package app.tagmusic.player) -join "`n"
