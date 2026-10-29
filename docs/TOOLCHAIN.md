@@ -24,6 +24,8 @@
 
 本机没有普通进程创建符号链接的权限。`scripts/prepare-windows.ps1` 按 Flutter 生成的依赖清单，在 `windows/flutter/ephemeral/.plugin_symlinks` 内创建 NTFS junction，Flutter 可识别并复用，无需修改系统开发者模式。`check.ps1`、`build.ps1` 已集成；手动使用 `flutter run -d windows` 前也需先执行此脚本。新增/升级插件时若 Flutter 自身在更新链接时失败，先准备链接并重试；不要修改 SDK 源码。
 
+本机 Pub 缓存在 C 盘、项目在 D 盘，首次 Kotlin 增量缓存报 `this and base files have different roots`。项目级 `android/gradle.properties` 关闭 `kotlin.incremental`，保留普通编译与 Gradle 其他缓存；配置依据 [Kotlin 官方文档](https://kotlinlang.org/docs/gradle-compilation-and-caches.html)。
+
 Flutter SDK 使用官方发布索引锁定，不自动升级。Dart 包精确直接依赖写在 `pubspec.yaml`，传递依赖锁在 `pubspec.lock`。音频、Drift 和原生组件在 R1/R2 实际接入时锁定并验证，不为 R0 空壳提前打包解码器。
 
 首次环境缺失时：运行 bootstrap；若缺 Visual Studio C++，安装上述工作负载；通过 Android Studio SDK Manager 安装 SDK Platform、Build Tools、Command-line Tools。执行 `flutter doctor -v`，依据结果补齐，不把未验证项当通过。新机器可通过 `flutter doctor --android-licenses` 阅读并接受所需 SDK 协议。

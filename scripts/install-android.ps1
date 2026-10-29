@@ -14,4 +14,16 @@ if (!$Serial) {
 if ($Serial -notin $connected) { throw '指定设备未连接或未授权。' }
 Invoke-Checked $adb @('-s',$Serial,'install','-r',$apk) "$report/install-$BuildNumber.log"
 Invoke-Checked $adb @('-s',$Serial,'shell','am','start','-n','app.tagmusic.player/.MainActivity') "$report/launch-$BuildNumber.log"
-& $adb -s $Serial logcat -d -t 1200 | Set-Content "$report/android-$BuildNumber.log"
+$appPid = $null
+for ($attempt = 0; $attempt -lt 4; $attempt++) {
+    $appPid = [string](& $adb -s $Serial shell pidof -s app.tagmusic.player)
+    $appPid = $appPid.Trim()
+    if ($appPid) { break }
+    Start-Sleep -Milliseconds 500
+}
+if (!$appPid) {
+    & $adb -s $Serial shell dumpsys activity exit-info app.tagmusic.player | Set-Content "$report/android-exit-$BuildNumber.log"
+    throw '应用启动后未找到进程，请检查本应用退出记录。'
+}
+Invoke-Checked $adb @('-s',$Serial,'logcat','-d',"--pid=$appPid",'-t','1200') "$report/android-$BuildNumber.log"
+& $adb -s $Serial shell dumpsys package app.tagmusic.player | Select-String 'versionCode=|versionName=|firstInstallTime=|lastUpdateTime=' | Set-Content "$report/android-package-$BuildNumber.txt"
