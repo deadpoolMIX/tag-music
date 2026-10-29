@@ -8,6 +8,7 @@
 | Dart | SDK 随附 3.13.7 |
 | SDK ZIP SHA256 | `11e19ea3409808fe3b3765ea8149640c299e58cce6eda7c9f38fc1b4a193eb6e` |
 | Flutter 位置 | `.tools/flutter`（由 bootstrap 下载并校验） |
+| SDK 安装包缓存 | `.tools/downloads/flutter-sdk.zip`；历史下载分段在 `.tools/downloads/partial/` |
 | Java | Android Studio 内置 OpenJDK 21.0.10 |
 | Android SDK | 默认 `%LOCALAPPDATA%/Android/Sdk`，可设 `ANDROID_HOME` |
 | Android Command-line Tools | 23.0，官方包 `commandlinetools-win-16111833_latest.zip` |

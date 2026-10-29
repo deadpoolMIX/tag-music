@@ -3,7 +3,9 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $tools = Join-Path $root '.tools'
 New-Item -ItemType Directory -Force $tools | Out-Null
-$archive = Join-Path $tools 'flutter-sdk.zip'
+$downloads = Join-Path $tools 'downloads'
+New-Item -ItemType Directory -Force $downloads | Out-Null
+$archive = Join-Path $downloads 'flutter-sdk.zip'
 $expected = '11e19ea3409808fe3b3765ea8149640c299e58cce6eda7c9f38fc1b4a193eb6e'
 if (!(Test-Path (Join-Path $tools 'flutter/bin/flutter.bat'))) {
     if (!(Test-Path $archive)) {
