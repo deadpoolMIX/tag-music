@@ -1,5 +1,5 @@
 #Requires -Version 7.0
-param([int[]]$BuildNumbers = @(6), [string]$Version = '0.2.0', [ValidatePattern('^R[0-9]+$')][string]$Round = 'R1')
+param([int[]]$BuildNumbers = @(7), [string]$Version = '0.2.0', [ValidatePattern('^R[0-9]+$')][string]$Round = 'R1')
 . "$PSScriptRoot/env.ps1"
 $report = Join-Path $ProjectRoot "artifacts/$Round"
 $buildTools = Get-ChildItem (Join-Path $env:ANDROID_HOME 'build-tools') -Directory | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1

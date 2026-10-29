@@ -1,5 +1,5 @@
 #Requires -Version 7.0
-param([string]$Serial, [int]$BuildNumber = 6, [string]$Version = '0.2.0', [ValidatePattern('^R[0-9]+$')][string]$Round = 'R1')
+param([string]$Serial, [int]$BuildNumber = 7, [string]$Version = '0.2.0', [ValidatePattern('^R[0-9]+$')][string]$Round = 'R1')
 . "$PSScriptRoot/env.ps1"
 $adb = Join-Path $env:ANDROID_HOME 'platform-tools/adb.exe'
 $report = Join-Path $ProjectRoot "artifacts/$Round"

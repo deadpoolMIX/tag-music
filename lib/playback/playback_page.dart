@@ -212,9 +212,7 @@ class PlaybackPage extends ConsumerWidget {
                           IconButton.filled(
                             key: const ValueKey('play-pause'),
                             tooltip: state.playing ? '暂停' : '播放',
-                            onPressed: state.playing
-                                ? controller.pause
-                                : controller.play,
+                            onPressed: controller.togglePlayPause,
                             icon: Icon(
                               state.playing ? Icons.pause : Icons.play_arrow,
                             ),

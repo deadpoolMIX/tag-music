@@ -21,7 +21,9 @@ class PlaybackController extends ChangeNotifier {
       player.stream.buffering.listen((_) => _publish()),
       player.stream.completed.listen((completed) {
         _publish();
-        if (completed && index + 1 < tracks.length) unawaited(next());
+        if (completed && !changingTrack && index + 1 < tracks.length) {
+          unawaited(next());
+        }
       }),
       player.stream.error.listen((message) {
         error = '播放失败：$message。可选择其他歌曲重试。';
@@ -45,6 +47,7 @@ class PlaybackController extends ChangeNotifier {
   String? error;
   String? metadataWarning;
   bool busy = false;
+  bool changingTrack = false;
   bool notificationsEnabled = true;
   bool requestingNotifications = false;
   String? notificationMessage;
@@ -176,22 +179,23 @@ class PlaybackController extends ChangeNotifier {
 
   Future<void> _select(int target) async {
     if (target < 0 || target >= tracks.length) return;
+    changingTrack = true;
     error = null;
     metadataWarning = null;
-    await _unload();
-    index = target;
-    metadata = null;
     _publish();
-    final track = tracks[target];
     try {
-      metadata = await documents.metadata(track);
-      debugPrint(
-        'R1 ${jsonEncode({'event': 'metadata', 'name': track.name, 'title': metadata?.title, 'artist': metadata?.artist})}',
-      );
-    } catch (e) {
-      metadataWarning = '元数据不可读，使用文件名：$e';
-    }
-    try {
+      await _unload();
+      index = target;
+      metadata = null;
+      final track = tracks[target];
+      try {
+        metadata = await documents.metadata(track);
+        debugPrint(
+          'R1 ${jsonEncode({'event': 'metadata', 'name': track.name, 'title': metadata?.title, 'artist': metadata?.artist})}',
+        );
+      } catch (e) {
+        metadataWarning = '元数据不可读，使用文件名：$e';
+      }
       final location = documents.android
           ? 'fd://${_playbackFd = await documents.open(track.location)}'
           : track.location;
@@ -203,6 +207,9 @@ class PlaybackController extends ChangeNotifier {
     } catch (_) {
       await _unload();
       rethrow;
+    } finally {
+      changingTrack = false;
+      _publish();
     }
   }
 
@@ -227,17 +234,32 @@ class PlaybackController extends ChangeNotifier {
   }
 
   Future<void> play() => _serial(() async {
+    await _resume();
+  });
+
+  Future<void> _resume() async {
     if (current == null) return;
     if (player.state.playlist.medias.isEmpty) {
       await _select(index);
     } else {
       await _play();
     }
-  });
+  }
 
-  Future<void> pause() => _serial(() async {
+  Future<void> _pause() async {
     await player.pause();
     await session?.setActive(false);
+  }
+
+  Future<void> pause() => _serial(_pause);
+
+  // Decide at execution time, after any queued switch or earlier click.
+  Future<void> togglePlayPause() => _serial(() async {
+    if (player.state.playing) {
+      await _pause();
+    } else {
+      await _resume();
+    }
   });
   Future<void> stop() => _serial(() async {
     await _unload();
@@ -278,12 +300,20 @@ class TagAudioHandler extends BaseAudioHandler {
   void _broadcast() {
     final current = controller.current;
     final state = controller.player.state;
-    if (current != null) {
+    final previous = playbackState.value;
+    var mediaChanged = false;
+    // Keep the last complete title/artist during stop -> read -> open. Publishing
+    // a filename-only item here makes the native card change its text layout.
+    if (!controller.changingTrack && current != null) {
+      final title = controller.metadata?.title ?? current.name;
       final item = MediaItem(
         id: current.location,
-        title: controller.metadata?.title ?? current.name,
+        title: title,
         artist: controller.metadata?.artist,
         album: controller.metadata?.album,
+        displayTitle: title,
+        displaySubtitle: controller.metadata?.artist,
+        displayDescription: controller.metadata?.album,
         duration: state.duration > Duration.zero
             ? state.duration
             : controller.metadata?.duration,
@@ -295,12 +325,20 @@ class TagAudioHandler extends BaseAudioHandler {
           _lastMediaItem?.duration != item.duration) {
         _lastMediaItem = item;
         mediaItem.add(item);
+        mediaChanged = true;
       }
-    } else if (_lastMediaItem != null) {
+    } else if (!controller.changingTrack &&
+        current == null &&
+        _lastMediaItem != null) {
       _lastMediaItem = null;
       mediaItem.add(null);
+      mediaChanged = true;
     }
-    final processing = controller.error != null
+    // audio_service tears down the native service on idle. A track transition
+    // must remain loading until the replacement player and metadata are ready.
+    final processing = controller.changingTrack
+        ? AudioProcessingState.loading
+        : controller.error != null
         ? AudioProcessingState.error
         : state.playlist.medias.isEmpty
         ? AudioProcessingState.idle
@@ -309,9 +347,10 @@ class TagAudioHandler extends BaseAudioHandler {
         : state.buffering
         ? AudioProcessingState.buffering
         : AudioProcessingState.ready;
-    final previous = playbackState.value;
+    final playing = controller.changingTrack ? previous.playing : state.playing;
     if (_sentState &&
-        previous.playing == state.playing &&
+        !mediaChanged &&
+        previous.playing == playing &&
         previous.processingState == processing &&
         previous.speed == state.rate &&
         previous.errorMessage == controller.error &&
@@ -320,18 +359,21 @@ class TagAudioHandler extends BaseAudioHandler {
       return;
     }
     _sentState = true;
+    debugPrint(
+      'R1 ${jsonEncode({'event': 'mediaState', 'processing': processing.name, 'playing': playing, 'changingTrack': controller.changingTrack, 'name': current?.name, 'title': _lastMediaItem?.title, 'artist': _lastMediaItem?.artist, 'position': state.position.inMilliseconds})}',
+    );
     playbackState.add(
       PlaybackState(
         controls: [
           MediaControl.skipToPrevious,
-          state.playing ? MediaControl.pause : MediaControl.play,
+          playing ? MediaControl.pause : MediaControl.play,
           MediaControl.stop,
           MediaControl.skipToNext,
         ],
         systemActions: const {MediaAction.seek},
         androidCompactActionIndices: const [0, 1, 3],
         processingState: processing,
-        playing: state.playing,
+        playing: playing,
         updatePosition: state.position,
         bufferedPosition: state.buffer,
         speed: state.rate,
@@ -342,17 +384,35 @@ class TagAudioHandler extends BaseAudioHandler {
   }
 
   @override
-  Future<void> play() => controller.play();
+  Future<void> play() => _command('play', controller.play);
   @override
-  Future<void> pause() => controller.pause();
+  Future<void> pause() => _command('pause', controller.pause);
+  @override
+  Future<void> click([MediaButton button = MediaButton.media]) =>
+      switch (button) {
+        MediaButton.media => _command('toggle', controller.togglePlayPause),
+        MediaButton.next => skipToNext(),
+        MediaButton.previous => skipToPrevious(),
+      };
   @override
   Future<void> seek(Duration position) => controller.seek(position);
   @override
-  Future<void> stop() => controller.stop();
+  Future<void> stop() => _command('stop', controller.stop);
   @override
-  Future<void> skipToNext() => controller.next();
+  Future<void> skipToNext() => _command('next', controller.next);
   @override
-  Future<void> skipToPrevious() => controller.previous();
+  Future<void> skipToPrevious() => _command('previous', controller.previous);
   @override
   Future<void> onTaskRemoved() => stop();
+
+  Future<void> _command(String name, Future<void> Function() action) async {
+    final timer = Stopwatch()..start();
+    debugPrint(
+      'R1 ${jsonEncode({'event': 'mediaCommand', 'command': name, 'phase': 'received'})}',
+    );
+    await action();
+    debugPrint(
+      'R1 ${jsonEncode({'event': 'mediaCommand', 'command': name, 'phase': 'completed', 'elapsedMs': timer.elapsedMilliseconds, 'playing': controller.player.state.playing, 'error': controller.error})}',
+    );
+  }
 }

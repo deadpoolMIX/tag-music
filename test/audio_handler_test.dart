@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -32,6 +35,8 @@ class HandlerController extends ChangeNotifier implements PlaybackController {
   String? error;
   @override
   bool busy = false;
+  @override
+  bool changingTrack = false;
   @override
   List<ProbeTrack> tracks = [];
   @override
@@ -68,7 +73,152 @@ class HandlerController extends ChangeNotifier implements PlaybackController {
       throw UnsupportedError('Unused fake controller method');
 }
 
+class TransitionStreams implements PlayerStream {
+  final changes = StreamController<bool>.broadcast(sync: true);
+  @override
+  Stream<bool> get playing => changes.stream;
+  @override
+  Stream<Duration> get position => const Stream.empty();
+  @override
+  Stream<Duration> get duration => const Stream.empty();
+  @override
+  Stream<bool> get buffering => const Stream.empty();
+  @override
+  Stream<bool> get completed => const Stream.empty();
+  @override
+  Stream<String> get error => const Stream.empty();
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnsupportedError('Unused fake stream');
+}
+
+class TransitionPlayer extends HandlerPlayer {
+  @override
+  final TransitionStreams stream = TransitionStreams();
+  Completer<void>? playGate;
+  final commands = <String>[];
+
+  @override
+  Future<void> stop() async {
+    state = PlayerState();
+    stream.changes.add(false);
+  }
+
+  @override
+  Future<void> open(Playable playable, {bool play = true}) async {
+    state = state.copyWith(
+      playlist: Playlist([playable as Media]),
+      duration: const Duration(seconds: 24),
+    );
+    stream.changes.add(false);
+  }
+
+  @override
+  Future<void> play() async {
+    commands.add('play');
+    await playGate?.future;
+    state = state.copyWith(playing: true);
+    stream.changes.add(true);
+  }
+
+  @override
+  Future<void> pause() async {
+    commands.add('pause');
+    state = state.copyWith(playing: false);
+    stream.changes.add(false);
+  }
+
+  @override
+  Future<void> dispose() => stream.changes.close();
+}
+
+class TransitionDocuments extends DocumentAccess {
+  TransitionDocuments() : super(android: false);
+  Completer<TrackMetadata>? metadataGate;
+  @override
+  Future<TrackMetadata> metadata(ProbeTrack track) async =>
+      await metadataGate?.future ??
+      const TrackMetadata(title: '完整标题', artist: '完整歌手');
+}
+
 void main() {
+  test('switch never publishes idle or partial new metadata', () async {
+    final player = TransitionPlayer();
+    final documents = TransitionDocuments();
+    final controller = PlaybackController(player, documents)
+      ..tracks = [
+        const ProbeTrack(location: 'test://first', name: 'first.flac'),
+        const ProbeTrack(location: 'test://second', name: 'second.flac'),
+      ];
+    final handler = TagAudioHandler(controller);
+    addTearDown(controller.shutdown);
+    await controller.select(0);
+    final states = <PlaybackState>[];
+    final items = <MediaItem?>[];
+    final stateSubscription = handler.playbackState.listen(states.add);
+    final itemSubscription = handler.mediaItem.listen(items.add);
+    addTearDown(stateSubscription.cancel);
+    addTearDown(itemSubscription.cancel);
+    await Future<void>.delayed(Duration.zero);
+    documents.metadataGate = Completer<TrackMetadata>();
+    final switching = handler.skipToNext();
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.changingTrack, isTrue);
+    expect(
+      handler.playbackState.value.processingState,
+      AudioProcessingState.loading,
+    );
+    expect(handler.mediaItem.value?.id, 'test://first');
+    documents.metadataGate!.complete(
+      const TrackMetadata(title: '第二首完整标题', artist: '第二首歌手'),
+    );
+    await switching;
+    await Future<void>.delayed(Duration.zero);
+    expect(
+      states.every((s) => s.processingState != AudioProcessingState.idle),
+      isTrue,
+    );
+    final secondItems = items.where((i) => i?.id == 'test://second').toList();
+    expect(secondItems, hasLength(1));
+    expect(secondItems.single?.title, '第二首完整标题');
+    expect(secondItems.single?.displaySubtitle, '第二首歌手');
+    expect(handler.playbackState.value.playing, isTrue);
+    await handler.pause();
+    expect(handler.playbackState.value.playing, isFalse);
+    await handler.play();
+    expect(handler.playbackState.value.playing, isTrue);
+    await handler.stop();
+    expect(
+      handler.playbackState.value.processingState,
+      AudioProcessingState.idle,
+    );
+  });
+
+  test(
+    'two hardware clicks during delayed play execute as play then pause',
+    () async {
+      final player = TransitionPlayer();
+      final controller = PlaybackController(player, TransitionDocuments())
+        ..tracks = [
+          const ProbeTrack(location: 'test://first', name: 'first.flac'),
+        ]
+        ..index = 0;
+      player.state = player.state.copyWith(playing: false);
+      final handler = TagAudioHandler(controller);
+      addTearDown(controller.shutdown);
+      player.playGate = Completer<void>();
+      final first = handler.click();
+      final second = handler.click();
+      await Future<void>.delayed(Duration.zero);
+      expect(player.commands, ['play']);
+      player.playGate!.complete();
+      await Future.wait([first, second]);
+      expect(player.commands, ['play', 'pause']);
+      expect(handler.playbackState.value.playing, isFalse);
+      expect(handler.playbackState.value.controls[1], MediaControl.play);
+    },
+  );
+
   testWidgets(
     'natural progress does not repost metadata; seek, pause and error still publish',
     (tester) async {
