@@ -1,9 +1,9 @@
 #Requires -Version 7.0
-param([string]$Serial, [int]$BuildNumber = 1)
+param([string]$Serial, [int]$BuildNumber = 5, [string]$Version = '0.2.0', [ValidatePattern('^R[0-9]+$')][string]$Round = 'R1')
 . "$PSScriptRoot/env.ps1"
 $adb = Join-Path $env:ANDROID_HOME 'platform-tools/adb.exe'
-$report = Join-Path $ProjectRoot 'artifacts/R0'
-$apk = Join-Path $report "tag-music-0.1.0+$BuildNumber.apk"
+$report = Join-Path $ProjectRoot "artifacts/$Round"
+$apk = Join-Path $report "tag-music-$Version+$BuildNumber.apk"
 if (!(Test-Path $apk)) { throw "找不到 $apk，请先构建。" }
 $devices = & $adb devices
 $connected = @($devices | Where-Object { $_ -match '^([^\s]+)\s+device$' } | ForEach-Object { ($_ -split '\s+')[0] })

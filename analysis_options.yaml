@@ -3,4 +3,5 @@ analyzer:
     - build/**
     - android/**
     - windows/**
+    - artifacts/**
 include: package:flutter_lints/flutter.yaml

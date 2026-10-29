@@ -1,4 +1,4 @@
-# R0 工具链
+# 工具链
 
 以实际 `artifacts/R0/doctor.log`、锁文件和构建报告为准。不要求修改系统 PATH，`scripts/env.ps1` 只设置当前进程环境。
 
@@ -32,6 +32,16 @@ Flutter SDK 使用官方发布索引锁定，不自动升级。Dart 包精确直
 首次环境缺失时：运行 bootstrap；若缺 Visual Studio C++，安装上述工作负载；通过 Android Studio SDK Manager 安装 SDK Platform、Build Tools、Command-line Tools。执行 `flutter doctor -v`，依据结果补齐，不把未验证项当通过。新机器可通过 `flutter doctor --android-licenses` 阅读并接受所需 SDK 协议。
 
 ## 本地持久签名
+
+### R1 工具链修复与样本
+
+Flutter 3.47.8 使用 hooks_runner 1.5.0；原生构建钩子的 Windows `Process.start(runInShell: true)` 在“含空格 SDK 路径 + 含空格参数 + 工作目录”组合下把路径截断为 `D:\.projects\Tag`。最小探针见 `artifacts/R1/probe_process*.txt`。单改 `.exe` 后缀无效，已还原该尝试。
+
+受限例外：`scripts/prepare-flutter.ps1` 将该版本 hooks_runner 复制到忽略目录 `.tools/patches/`，仅对 `.bat/.cmd` 保留 shell，对原生 exe 直接创建进程；本地 Flutter 工具 pubspec 指向该副本，原配置备份于 `.tools/backups/`。env 自动准备，不修改系统 Pub 缓存或应用依赖。官方 SDK ZIP 原件不变，但本地工具依赖已含此补丁；不能声称本地 SDK 全部源码仍未修改。上文 R0 “不要修改 SDK”针对 junction 故障，本次是另一项已复现缺陷的受限例外。
+
+Flutter 的 `--no-pub` 还会跳过按构建模式重新生成插件注册文件，普通 pub get 生成的 integration_test 引用与 release Gradle 排除开发插件冲突。build 改为先 enforce-lockfile，再允许构建自身 pub/生成注册，最后复核锁文件 SHA256 不变。检查、测试、构建须串行，避免共享生成文件互相覆盖。
+
+测试音由本机 FFmpeg CLI 生成：`make-audio-fixtures.ps1`，原创 440 Hz 合成音（CC0），六种格式及坏 MP3；FFmpeg 工具不随应用交付。Windows 回环工具在 `.tools/audio-test/` 单独安装 soundcard 0.4.5、soundfile 0.13.1 及实际依赖，记录 `artifacts/R1/loopback-dependencies.log`。回环仅采默认输出，不采麦克风；运行仍需本批设备操作确认。
 
 `scripts/signing.ps1` 生成 `.secrets/tag-music-local.jks` 和 `android/key.properties`。密码随机生成，不写日志、不入 Git。配置与密钥仅一项存在时脚本拒绝生成，须恢复原文件。
 

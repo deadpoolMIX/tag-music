@@ -1,7 +1,8 @@
 #Requires -Version 7.0
+param([ValidatePattern('^R[0-9]+$')][string]$Round = 'R1')
 . "$PSScriptRoot/env.ps1"
 Set-Location $ProjectRoot
-$report = Join-Path $ProjectRoot 'artifacts/R0'
+$report = Join-Path $ProjectRoot "artifacts/$Round"
 New-Item -ItemType Directory -Force $report | Out-Null
 $log = Join-Path $report 'pub-get.log'
 for ($attempt = 0; $attempt -lt 2; $attempt++) {

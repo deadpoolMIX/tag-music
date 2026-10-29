@@ -7,6 +7,9 @@ if (!(Test-Path $Flutter)) {
     if (!$command) { throw 'Flutter 未安装：请先运行 scripts/bootstrap.ps1。' }
     $Flutter = $command.Source
 }
+if ($Flutter.StartsWith((Join-Path $ProjectRoot '.tools'), [StringComparison]::OrdinalIgnoreCase)) {
+    & "$PSScriptRoot/prepare-flutter.ps1" -SdkRoot (Split-Path (Split-Path $Flutter))
+}
 if (!$env:ANDROID_HOME) { $env:ANDROID_HOME = Join-Path $env:LOCALAPPDATA 'Android/Sdk' }
 if (!$env:JAVA_HOME) { $env:JAVA_HOME = 'C:/Program Files/Android/Android Studio/jbr' }
 $env:PATH = "$(Split-Path $Flutter);$env:JAVA_HOME/bin;$env:ANDROID_HOME/platform-tools;$env:PATH"

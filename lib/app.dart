@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/diagnostics.dart';
 import 'core/settings.dart';
+import 'playback/playback_page.dart';
 
 class TagMusicApp extends ConsumerWidget {
   const TagMusicApp({super.key});
@@ -59,7 +60,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           actions: const [
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Chip(label: Text('R0 · 起点')),
+              child: Chip(label: Text('R1 · 播放验证')),
             ),
           ],
         ),
@@ -101,6 +102,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                   Expanded(
                     child: _selected == 3
                         ? const SettingsPage()
+                        : _selected == 0
+                        ? const PlaybackPage()
                         : EmptyPage(index: _selected),
                   ),
                 ],
@@ -269,7 +272,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       const SizedBox(height: 8),
                       SelectableText('版本 ${info.version}+${info.buildNumber}'),
                       const SizedBox(height: 8),
-                      const Text('R0 · 工程与交接底座'),
+                      const Text('R1 · 双端播放技术验证'),
                       const SizedBox(height: 12),
                       TextButton.icon(
                         key: const ValueKey('copy-diagnostics'),

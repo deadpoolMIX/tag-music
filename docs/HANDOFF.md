@@ -1,26 +1,18 @@
 # 当前交接
 
-- 轮次：R0，工程与交接底座。
-- 状态：**双端通过**。R0 自动验证通过，用户已通过交互式选项确认 `0.1.0+2` 的 7 项手机体验全部通过；R0 已完成。
-- 本轮日志：`docs/rounds/R0.md`。
-- 文档入口：`docs/README.md`；给人看的简明开发日志为 `docs/开发日志.md`，顶部注明每行一项、北京时间精确到分钟的写入规则，后续完成工作时追加。
-- 现状：双端平台工程已生成，Material 3 中文空壳、主题持久化、版本诊断、签名与脚本均已实现；尚不提供音乐导入或播放。
-- 工具链：Flutter 3.47.8 / Dart 3.13.7 官方 SHA256 已验证；Visual Studio Community 2022 17.14.43 + C++、Android SDK / Command-line Tools 23.0 均就绪。`doctor.log` 全部通过。
-- 验证：格式、静态分析、6 项单元/界面测试、PowerShell 语法检查通过；新机器首次插件清单恢复/junction 自动准备通过。Windows 原生集成测试通过（实际设置写入、重新初始化恢复、版本、诊断复制），截图已检查。双端 +1、+2 发布构建完成；Android 实际发布版已验证安装启动、主题保存、真实进程重启恢复、覆盖升级保留主题与首次安装时间。
-- 版本与产物：两端当前均为 `0.1.0+2`。Windows ZIP：`artifacts/R0/tag-music-windows-0.1.0+2.zip`，构建提交 `f28bbd0`；Android APK：`artifacts/R0/tag-music-0.1.0+2.apk`，构建提交 `41cea26`。两平台于不同阶段构建，共用 Dart 应用代码一致；逐平台准确元数据见 `verified-{windows,android}-2.json`，SHA256 见 `SHA256SUMS.txt`。历史 `build-2.json` 只记录最后一次构建，后续脚本已改逐目标文件名。
-- 手机：V2309A / Android 16 / arm64，已安装 +2；7 项用户体验验收全部通过。本批手机操作已结束，再操作需新的交互确认。首次安装时间 20:14:50，升级时间 20:19:05，未卸载/清数据。USB 安装系统确认由用户在手机手动允许，已实际完成。
-- 签名：已创建 `.secrets/tag-music-local.jks`，配置 `android/key.properties`；两者及 SDK、产物均已确认 Git 忽略。固定应用 ID `app.tagmusic.player`，最低 API 29，debug/release 沿用同一签名。
-- 证据总入口：`artifacts/R0/REPORT.md`。目录内有 doctor、SDK/Gradle 校验、检查日志、双端构建、Windows 原生测试、APK 签名/manifest、手机进程日志、两端截图、升级无障碍断言与逐平台元数据。手机验收说明：`docs/rounds/R0-ACCEPTANCE.md`。
-- 工具故障：computer-use 窗口截图超时、元素缓存点击失败；已使用真实原生集成测试导出画面并检查，不声称该点击成功。Windows 插件通过项目内 NTFS junction 准备，无需开启系统开发者模式。
-- 电脑/手机操作约束：影响用户使用或需要请示时，必须用交互式选项确认并等待明确回复，覆盖前台应用启动/关闭、窗口/鼠标键盘、手机安装/升级与界面测试。仅授权已说明的本批操作，下一批须重新确认，不能超时默认同意。此要求已写入 AGENTS；本轮所有已确认的操作批次均已结束。
-- 验收证据：用户交互式选项原文为“7项全部通过”，对应 `docs/rounds/R0-ACCEPTANCE.md` 中 `0.1.0+2` 的 1–7 项，无失败或未测项。记录见 `artifacts/R0/phone-acceptance.json`，最终逐项完成审查见 `artifacts/R0/completion-audit.md`；重新计算的四个构建产物 SHA256 全部一致。
-- 未验证边界：Android 没有执行 Flutter integration_test，实际执行发布版 ADB 生命周期/升级检查并由用户完成 7 项体验验收。Android 10 和 Windows 11 未实机验证，R0 优先验收的当前电脑和手机均已通过。R0 没有音乐导入/播放，不宣称具备播放能力。
-- 下一步：本对话止于已完成的 R0。新对话可执行 R1“双端播放技术验证”，先读本规范、计划、本交接和 R0 日志；R1 必须在目标手机验证目录授权、元数据、播放及基本后台能力，并核对实际原生音频库许可。影响设备使用的操作仍须新的交互式确认。
-- Git：本地 main，无远程；`b472e58` 初始工程，`f28bbd0` Windows 链接/证据修复，`f3abd01` Kotlin 跨盘修复，`41cea26` 双设备交互确认规则，`7ce5ee1` 最终锁定恢复/工作流。最后一次交接提交见本文件所在 HEAD。密钥和产物未入 Git，写入 Git 元数据需执行权限。
-
-## R0 完成后的目录维护
-
-用户要求新增简明日志并整理目录。原始计划已原样移至 `docs/archive/PLAN.original.md`，R0 验收文件移至 `docs/rounds/R0-ACCEPTANCE.md`；当前有效入口与链接已更新。历史日志和产物报告中的旧路径保留为当时记录，映射见文档目录。
-
-工具安装包集中到 `.tools/downloads/`，下载分段放 `partial/`、清单备份放 `.tools/backups/`，SDK 仍在 `.tools/flutter`。bootstrap 已同步读取新的完整 SDK 安装包位置；原始计划、SDK 和 Gradle 安装包移动前后 SHA256 一致。仅调整文档、下载缓存位置和对应脚本路径，已验收应用、签名和产物均沿用原文件。
-
+- 当前轮次：**R1 双端播放技术验证**；产品状态 **开发中**，用户体验 **待手机验收**。R0 0.1.0+2 已双端通过；不进入 R2。
+- 用户最新指令：完成手头工作后停止，额度不足。当前描述符修复、测试、双端构建、产物审计和交接已收尾；执行目标按该指令暂停。不要自动继续测试或推进后续轮次。
+- 最新源码/构建：**0.2.0+5**，Android和Windows release均构建成功；本轮源码在本文件所在本地HEAD，构建时仍标识 `635b43c-dirty`，不能把产物声明为带有新提交号。无远程；密钥、SDK、产物不提交。
+- 手机实际安装：V2309A / Android16 / arm64，仍为 **0.2.0+4**，已原签名从+2→+3→+4覆盖升级，首次安装时间保持2026-10-29 20:14:50，深色保留；从未卸载/清数据。固定ID app.tagmusic.player、最低API29、原有签名沿用。
+- 最新产物：artifacts/R1/tag-music-0.2.0+5.apk、tag-music-windows-0.2.0+5.zip；SHA256SUMS.txt。package-audit-5.json已核对实际包内原生库SHA256、运行文件和8份原生许可文本；APK签名/版本验证日志apk-signature-5.txt、apk-manifest-5.txt。+3/+4失败与中间包保留。
+- 源码匹配：source-manifest-5.json记录独立Windows构建的97文件快照；source-comparison-5.txt确认应用/manifest文件仍匹配。Windows旧+4窗口未关闭，+5在忽略目录.tools/windows-build-5独立构建，隔离记录windows-build-isolation-5.json。没有安装或启动+5，不声称+5实跑通过。
+- 已实现：Windows目录选择；Android SAF只读持久授权/递归读取；元数据异步读取；单播放器/串行切歌/进度/暂停/停止/错误恢复；audio_service基本后台通知与audio_session；运行诊断与原生许可入口。R1只保存目录位置/授权，歌曲是临时列表；没有R2持久曲库、UUID、标签或歌单。
+- 最新检查：格式、静态分析、**13项单元/界面测试**通过；脚本AST/Python语法与源码空白检查通过。新增借用描述符适配器的seek/EOF/关闭/拒绝写入及六格式元数据解析测试；源为内存描述符，不能替代Android libc/SAF实测。
+- 本轮新发现：+4 MP3系统媒体会话实际PLAYING、24秒时长和进度可观察，通知图标资源ID有效，无旧CustomAction图标错误；managedDescriptors=1、persistedReadGrants=2。**但元数据重新打开/proc/self/fd被PathAccessException拒绝**，只能退回文件名；该真机关卡失败，不能记作R1通过。证据android-4-mp3-playing.png、android-4-first-playback.log、android-4-mp3-session.txt。
+- +5修复：DescriptorFile/RandomAccessFile只读适配器直接通过libc pread64读取已授权FD、lseek64取长度，不打开proc路径、不复制整首音乐、不推导真实路径。原始PFD由Kotlin外层finally关闭；适配器只借用。每次读取上限16MiB，写入拒绝。ffi2.2.0为精确直接依赖，版本未新增。NDK API29 arm64符号核对android-descriptor-symbols.txt。
+- 设备停留：助手已用媒体暂停停止测试音，android-4-paused-at-stop.txt观察PAUSED；手机可能仍为+4曲库播放面板，Windows+4发布版可能仍开着。未按自动化去关闭用户前台窗口。此前用户以实体Esc结束过Computer Use；本次又收到完成收尾后停止的明确请求。
+- 已有Windows证据：早前原生Debug集成测试六格式、seek/暂停/坏文件恢复/20次交替切歌通过，windows-native-playback.png已查看；20秒默认WH-1000XM3输出回环检测440Hz，windows-loopback.json/wav。不冒充+5或Release截图。+4Release已启动且无障碍文本正常，窗口截图两次超时；不重复无效截图尝试。
+- 工具链：Flutter3.47.8/Dart3.13.7；空格路径native hook用本地hooks_runner1.5.0副本受限修复，原配置备份.tools/backups，官方SDK ZIP不变，本地工具依赖已改，详见TOOLCHAIN。build先enforce-lockfile、再允许按模式重建注册文件、复核lockfile；Flutter检查/测试/构建串行。NTFS junction无需修改系统开发者模式。
+- 原生许可：Windows mpv v0.36.0-403-g652a1dd907 / FFmpeg n6.0；Android mpv0.35.1-dirty / FFmpeg构建6.0；FFmpeg实际LGPL3+，禁GPL/nonfree。assets/licenses/native保留文本；历史Windows完整对应源码/静态子依赖通知、Android helper未固定提交是公开再分发前缺口，不能整体称MIT，详见THIRD_PARTY。
+- 样本：6种24秒原创440Hz音和坏MP3，CC0，位于artifacts/R1/fixtures并已新增到手机Music/TagMusic-R1。用户已明确反馈样本子目录授权完成（不是体验全部通过）。真实目录1365首只属于先前读取观察，不等同R2持久入库。
+- 恢复入口：docs/rounds/R1.md追加记录、docs/rounds/R1-ACCEPTANCE.md的7项清单、artifacts/R1/REPORT.md。先查看目标暂停状态并等待用户明确恢复。取得新批次交互确认后才能安装+5或操作电脑/手机，再复验Android元数据、六格式实际有声、seek/暂停、坏文件恢复、通知/锁屏、重启授权和至少30次切歌句柄；未通过不得进R2。Android10/Windows11仍无实机。
