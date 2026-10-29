@@ -141,4 +141,16 @@ class DocumentAccess {
   Future<Map<Object?, Object?>> diagnostics() async => android
       ? await channel.invokeMapMethod<Object?, Object?>('diagnostics') ?? {}
       : {};
+
+  Future<bool> notificationsEnabled() async =>
+      !android ||
+      await channel.invokeMethod<bool>('notificationsEnabled') == true;
+
+  Future<bool> requestNotifications() async =>
+      !android ||
+      await channel.invokeMethod<bool>('requestNotifications') == true;
+
+  Future<void> openNotificationSettings() async {
+    if (android) await channel.invokeMethod<void>('openNotificationSettings');
+  }
 }

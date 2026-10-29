@@ -1,12 +1,17 @@
 package app.tagmusic.player
 
 import android.app.Activity
+import android.app.NotificationManager
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
+import android.provider.Settings
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.Executors
@@ -19,7 +24,29 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
 
     init {
         channel.setMethodCallHandler { call, result ->
-            if (call.method == "pickDirectory") {
+            if (call.method == "notificationsEnabled") {
+                result.success(notificationsEnabled())
+            } else if (call.method == "requestNotifications") {
+                if (notificationRequest != null) result.error("busy", "通知授权正在处理", null)
+                else if (Build.VERSION.SDK_INT >= 33 &&
+                    activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    notificationRequest = result
+                    try {
+                        activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATIONS)
+                    } catch (e: Exception) {
+                        notificationRequest = null
+                        result.error("notifications", e.message, null)
+                    }
+                } else result.success(notificationsEnabled())
+            } else if (call.method == "openNotificationSettings") {
+                try {
+                    activity.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, activity.packageName))
+                    result.success(null)
+                } catch (e: Exception) {
+                    result.error("notifications", e.message, null)
+                }
+            } else if (call.method == "pickDirectory") {
                 if (picker != null) result.error("busy", "目录选择器已打开", null)
                 else {
                     picker = result
@@ -64,6 +91,16 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                 }
             }
         }
+    }
+
+    private fun notificationsEnabled(): Boolean =
+        activity.getSystemService(NotificationManager::class.java).areNotificationsEnabled()
+
+    fun onRequestPermissionsResult(requestCode: Int): Boolean {
+        if (requestCode != NOTIFICATIONS) return false
+        notificationRequest?.success(notificationsEnabled())
+        notificationRequest = null
+        return true
     }
 
     fun onActivityResult(request: Int, result: Int, data: Intent?): Boolean {
@@ -115,10 +152,12 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
 
     companion object {
         private const val PICK_DIRECTORY = 4011
+        private const val NOTIFICATIONS = 4012
         // AudioService's FlutterEngine survives Activity recreation. Descriptor
         // ownership must survive it too; every access is serialized by worker.
         private val worker = Executors.newSingleThreadExecutor()
         private val descriptors = mutableMapOf<Int, ParcelFileDescriptor>()
         private var picker: MethodChannel.Result? = null
+        private var notificationRequest: MethodChannel.Result? = null
     }
 }

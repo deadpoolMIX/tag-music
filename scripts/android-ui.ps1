@@ -26,9 +26,15 @@ function Show-PhoneUi {
 }
 
 function Invoke-PhoneTap {
-    param([Parameter(Mandatory)][string]$Label)
+    param([Parameter(Mandatory)][string]$Label, [switch]$Prefix)
     $ui = Get-PhoneUi
-    $nodes = @($ui.SelectNodes('//node') | Where-Object { $_.text -eq $Label -or $_.'content-desc' -eq $Label })
+    $nodes = @($ui.SelectNodes('//node') | Where-Object {
+        if ($Prefix) {
+            ([string]$_.text).StartsWith($Label) -or ([string]$_.'content-desc').StartsWith($Label)
+        } else {
+            $_.text -eq $Label -or $_.'content-desc' -eq $Label
+        }
+    })
     if ($nodes.Count -ne 1) { throw "不能唯一定位：$Label（$($nodes.Count)）" }
     $bounds = [regex]::Match($nodes[0].bounds, '^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$')
     if (!$bounds.Success) { throw 'Invalid bounds' }

@@ -45,6 +45,9 @@ class PlaybackController extends ChangeNotifier {
   String? error;
   String? metadataWarning;
   bool busy = false;
+  bool notificationsEnabled = true;
+  bool requestingNotifications = false;
+  String? notificationMessage;
   bool _closed = false;
   Future<void> _pending = Future.value();
   ProbeTrack? get current =>
@@ -85,7 +88,45 @@ class PlaybackController extends ChangeNotifier {
       );
     }
     roots = await documents.roots();
+    await refreshNotificationPermission();
     _publish();
+  }
+
+  Future<void> refreshNotificationPermission() async {
+    if (!documents.android || _closed) return;
+    try {
+      notificationsEnabled = await documents.notificationsEnabled();
+      if (notificationsEnabled) notificationMessage = null;
+    } catch (_) {
+      notificationMessage = '无法检查播放通知，请在系统通知设置中查看。';
+    }
+    _publish();
+  }
+
+  Future<void> requestNotificationPermission() async {
+    if (requestingNotifications) return;
+    requestingNotifications = true;
+    _publish();
+    try {
+      notificationsEnabled = await documents.requestNotifications();
+      notificationMessage = notificationsEnabled
+          ? null
+          : '通知尚未开启，可在通知设置中允许播放通知和锁屏显示。';
+    } catch (_) {
+      notificationMessage = '通知授权未完成，请重试或打开通知设置。';
+    } finally {
+      requestingNotifications = false;
+      _publish();
+    }
+  }
+
+  Future<void> openNotificationSettings() async {
+    try {
+      await documents.openNotificationSettings();
+    } catch (_) {
+      notificationMessage = '无法打开通知设置，请在手机系统设置中找到 Tag Music。';
+      _publish();
+    }
   }
 
   Future<void> chooseDirectory() async {
@@ -231,23 +272,54 @@ class TagAudioHandler extends BaseAudioHandler {
     _broadcast();
   }
   final PlaybackController controller;
+  MediaItem? _lastMediaItem;
+  bool _sentState = false;
 
   void _broadcast() {
     final current = controller.current;
     final state = controller.player.state;
     if (current != null) {
-      mediaItem.add(
-        MediaItem(
-          id: current.location,
-          title: controller.metadata?.title ?? current.name,
-          artist: controller.metadata?.artist,
-          album: controller.metadata?.album,
-          duration: state.duration > Duration.zero
-              ? state.duration
-              : controller.metadata?.duration,
-        ),
+      final item = MediaItem(
+        id: current.location,
+        title: controller.metadata?.title ?? current.name,
+        artist: controller.metadata?.artist,
+        album: controller.metadata?.album,
+        duration: state.duration > Duration.zero
+            ? state.duration
+            : controller.metadata?.duration,
       );
+      if (_lastMediaItem?.id != item.id ||
+          _lastMediaItem?.title != item.title ||
+          _lastMediaItem?.artist != item.artist ||
+          _lastMediaItem?.album != item.album ||
+          _lastMediaItem?.duration != item.duration) {
+        _lastMediaItem = item;
+        mediaItem.add(item);
+      }
+    } else if (_lastMediaItem != null) {
+      _lastMediaItem = null;
+      mediaItem.add(null);
     }
+    final processing = controller.error != null
+        ? AudioProcessingState.error
+        : state.playlist.medias.isEmpty
+        ? AudioProcessingState.idle
+        : state.completed
+        ? AudioProcessingState.completed
+        : state.buffering
+        ? AudioProcessingState.buffering
+        : AudioProcessingState.ready;
+    final previous = playbackState.value;
+    if (_sentState &&
+        previous.playing == state.playing &&
+        previous.processingState == processing &&
+        previous.speed == state.rate &&
+        previous.errorMessage == controller.error &&
+        (previous.position - state.position).inMilliseconds.abs() < 500 &&
+        (previous.bufferedPosition - state.buffer).inMilliseconds.abs() < 500) {
+      return;
+    }
+    _sentState = true;
     playbackState.add(
       PlaybackState(
         controls: [
@@ -258,15 +330,7 @@ class TagAudioHandler extends BaseAudioHandler {
         ],
         systemActions: const {MediaAction.seek},
         androidCompactActionIndices: const [0, 1, 3],
-        processingState: controller.error != null
-            ? AudioProcessingState.error
-            : state.playlist.medias.isEmpty
-            ? AudioProcessingState.idle
-            : state.completed
-            ? AudioProcessingState.completed
-            : state.buffering
-            ? AudioProcessingState.buffering
-            : AudioProcessingState.ready,
+        processingState: processing,
         playing: state.playing,
         updatePosition: state.position,
         bufferedPosition: state.buffer,

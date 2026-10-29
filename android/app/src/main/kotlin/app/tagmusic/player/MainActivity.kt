@@ -17,4 +17,10 @@ class MainActivity : AudioServiceActivity() {
             super.onActivityResult(requestCode, resultCode, data)
         }
     }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        if (documents?.onRequestPermissionsResult(requestCode) != true) {
+            super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        }
+    }
 }

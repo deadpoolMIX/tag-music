@@ -68,6 +68,29 @@ class PlaybackPage extends ConsumerWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const Text('目录授权会保存；本轮曲目列表不保存。点击歌曲开始播放。'),
+                  if (!controller.notificationsEnabled ||
+                      controller.notificationMessage != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      controller.notificationMessage ??
+                          '允许播放通知后，可在通知栏和锁屏控制音乐。部分手机还需在通知设置中开启锁屏显示。',
+                    ),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        TextButton(
+                          onPressed: controller.requestingNotifications
+                              ? null
+                              : controller.requestNotificationPermission,
+                          child: const Text('开启播放通知'),
+                        ),
+                        TextButton(
+                          onPressed: controller.openNotificationSettings,
+                          child: const Text('通知设置'),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (controller.busy) const LinearProgressIndicator(),
                   if (controller.error != null)
                     Text(

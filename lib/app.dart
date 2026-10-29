@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/diagnostics.dart';
 import 'core/settings.dart';
 import 'playback/playback_page.dart';
+import 'playback/playback_controller.dart';
 
 class TagMusicApp extends ConsumerWidget {
   const TagMusicApp({super.key});
@@ -47,8 +48,28 @@ class AppShell extends ConsumerStatefulWidget {
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends ConsumerState<AppShell> {
+class _AppShellState extends ConsumerState<AppShell>
+    with WidgetsBindingObserver {
   int _selected = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(playbackProvider)?.refreshNotificationPermission();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -215,6 +236,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final mode = ref.watch(themeProvider);
     final package = ref.watch(packageInfoProvider);
+    final playback = ref.watch(playbackProvider);
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
@@ -246,6 +268,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
             const SizedBox(height: 8),
             const Text('主题会在下次启动和覆盖安装后保留。'),
+            if (playback?.documents.android == true) ...[
+              const SizedBox(height: 24),
+              TextButton.icon(
+                onPressed: playback!.openNotificationSettings,
+                icon: const Icon(Icons.notifications_outlined),
+                label: const Text('播放通知设置'),
+              ),
+            ],
             const SizedBox(height: 32),
             Text('关于', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
