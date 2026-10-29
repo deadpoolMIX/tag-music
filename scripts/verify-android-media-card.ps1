@@ -5,6 +5,15 @@ param([ValidateSet('shade','lock')][string]$Surface, [int]$BuildNumber=7, [Valid
 $evidence=Join-Path $ProjectRoot "artifacts/R1/android$BuildNumber"
 $packageText=(& $R1Adb shell dumpsys package app.tagmusic.player) -join "`n"
 if($packageText -notmatch "versionCode=$BuildNumber(?:\s|$)"){throw 'Wrong installed build'}
+$cardProcessId=([string](& $R1Adb shell pidof -s app.tagmusic.player)).Trim()
+if(!$cardProcessId){throw 'Tag Music process missing'}
+
+function Get-LastOpenedSample {
+    $logLines=@(& $R1Adb logcat -d "--pid=$cardProcessId" -t 2000)
+    $opened=@($logLines|ForEach-Object {if($_ -match 'R1 (\{.*\})$'){$Matches[1]|ConvertFrom-Json}}|Where-Object event -eq opened|Select-Object -Last 1)
+    if($opened.Count -ne 1){throw 'No completed sample open in app log'}
+    return $opened[0].name
+}
 
 function Get-CardSession {
     param([string]$Name)
@@ -39,20 +48,25 @@ function Invoke-CardAction {
     if(!$bounds.Success){throw 'Invalid observed bounds'}
     $x=[int](([int]$bounds.Groups[1].Value+[int]$bounds.Groups[3].Value)/2)
     $y=[int](([int]$bounds.Groups[2].Value+[int]$bounds.Groups[4].Value)/2)
+    $openedBefore=Get-LastOpenedSample
+    $openedAfter=$openedBefore
+    $isSwitch=$Label -in 'Next','Previous'
     $timer=[Diagnostics.Stopwatch]::StartNew()
     & $R1Adb shell input tap $x $y
     do {
         $session=Get-CardSession
-        if($session.state -eq $Expected -and $session.body -match 'description=中文测试音, Tag Music,' -and $session.body -match 'error=null'){break}
+        if($isSwitch){$openedAfter=Get-LastOpenedSample}
+        if($session.state -eq $Expected -and $session.body -match 'description=中文测试音, Tag Music,' -and $session.body -match 'error=null' -and (!$isSwitch -or $openedBefore -ne $openedAfter)){break}
         Start-Sleep -Milliseconds 100
     } while($timer.Elapsed.TotalSeconds -lt 4)
     $latency=$timer.ElapsedMilliseconds
     $session=Get-CardSession -Name $Name
     if($session.state -ne $Expected){throw "Card action $Label did not reach $Expected"}
+    if($isSwitch -and $openedBefore -eq $openedAfter){throw 'Card switch did not open a different sample'}
     $after=Get-SampleCard -Name "$Name-after"
     $expectedIcon=if($Expected -eq 'PLAYING'){'Pause'}else{'Play'}
     if(@($after.SelectNodes('.//node')|Where-Object {$_.'content-desc' -eq $expectedIcon}).Count -ne 1){throw "Icon/session mismatch after $Label"}
-    @{surface=$Surface;check=$Name;action=$Label;expected=$Expected;observed=$session.state;nativeObservationMs=$latency;icon=$expectedIcon;recordedAt=[DateTimeOffset]::Now.ToString('o')}|ConvertTo-Json -Compress|Add-Content (Join-Path $evidence 'card-operations.jsonl')
+    @{surface=$Surface;check=$Name;action=$Label;expected=$Expected;observed=$session.state;openedBefore=$openedBefore;openedAfter=$openedAfter;nativeObservationMs=$latency;icon=$expectedIcon;recordedAt=[DateTimeOffset]::Now.ToString('o')}|ConvertTo-Json -Compress|Add-Content (Join-Path $evidence 'card-operations.jsonl')
     Write-Output "PASS $Surface $Name $Label -> $Expected ($latency ms observation)"
 }
 
