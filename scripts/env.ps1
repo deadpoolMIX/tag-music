@@ -14,6 +14,7 @@ $env:FLUTTER_SUPPRESS_ANALYTICS = 'true'
 
 function Invoke-Checked {
     param([string]$File, [string[]]$Arguments, [string]$Log)
-    & $File @Arguments 2>&1 | Tee-Object -FilePath $Log
+    Add-Content -LiteralPath $Log -Value "[$([DateTimeOffset]::Now.ToString('o'))] $File $($Arguments -join ' ')"
+    & $File @Arguments 2>&1 | Tee-Object -FilePath $Log -Append
     if ($LASTEXITCODE -ne 0) { throw "$File 执行失败，退出码 $LASTEXITCODE；日志：$Log" }
 }

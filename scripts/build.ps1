@@ -12,6 +12,7 @@ if ($Target -in 'all','android') {
     Copy-Item build/app/outputs/flutter-apk/app-release.apk "$report/tag-music-0.1.0+$BuildNumber.apk"
 }
 if ($Target -in 'all','windows') {
+    & "$PSScriptRoot/prepare-windows.ps1"
     Invoke-Checked $Flutter @('build','windows','--release',"--build-number=$BuildNumber","--dart-define=GIT_REVISION=$revision") "$report/build-windows-$BuildNumber.log"
     $release = Join-Path $ProjectRoot 'build/windows/x64/runner/Release'
     Copy-Item LICENSE "$release/LICENSE.txt"
@@ -21,6 +22,7 @@ if ($Target -in 'all','windows') {
     $sdkRoot = Split-Path (Split-Path $Flutter)
     Copy-Item "$sdkRoot/LICENSE" "$runtimeLicenses/FLUTTER.txt"
     Copy-Item "$sdkRoot/bin/cache/LICENSE*" $runtimeLicenses
+    Copy-Item "$sdkRoot/bin/cache/artifacts/engine/windows-x64/license*.md" $runtimeLicenses
     Compress-Archive -Path "$release/*" -DestinationPath "$report/tag-music-windows-0.1.0+$BuildNumber.zip" -Force
 }
 Get-ChildItem $report -File | Where-Object Extension -in '.apk','.zip' | Get-FileHash -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLowerInvariant())  $(Split-Path $_.Path -Leaf)" } | Set-Content "$report/SHA256SUMS.txt"
