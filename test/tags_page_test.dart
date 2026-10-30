@@ -70,6 +70,12 @@ void main() {
       await library.scan();
       await library.createTag('收藏');
     });
+    await playback.playSnapshot(
+      library.tracks.map((track) => track.probe).toList(),
+      0,
+    );
+    final originalQueue = playback.tracks;
+    final originalCurrent = playback.current;
     final ids = {
       for (final track in library.tracks) track.song.identity: track.song.id,
     };
@@ -101,7 +107,8 @@ void main() {
     await tester.tap(find.byTooltip('添加收藏'));
     await tester.pumpAndSettle();
     expect(library.countForTag(library.tags.single.id), 2);
-    expect(playback.current, isNull);
+    expect(playback.current, same(originalCurrent));
+    expect(playback.tracks, same(originalQueue));
     await tester.tap(find.text('完成'));
     await tester.pumpAndSettle();
     await tester.pumpWidget(

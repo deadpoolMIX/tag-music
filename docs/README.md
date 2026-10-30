@@ -22,7 +22,7 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 | 职责 | 代码入口 / 符号 | 相关验证 |
 |---|---|---|
 | 初始化、导航、设置 | [main.dart](../lib/main.dart)、[app.dart](../lib/app.dart)、[core/](../lib/core/) | `app_test`、`settings_test`、集成 `smoke_test` |
-| 数据表、连接、迁移 | [database.dart](../lib/library/database.dart) / `LibraryDatabase`；`database.g.dart` 为生成文件 | `test/library_test.dart`、[schema v1 DDL](database-schema/v1.json) |
+| 数据表、连接、迁移 | [database.dart](../lib/library/database.dart) / `LibraryDatabase`；`database.g.dart` 为生成文件 | `test/library_test.dart`、`test/tag_test.dart`、[schema v2 DDL](database-schema/v2.json) |
 | 扫描事务、增量/失联、搜索排序 | [library_controller.dart](../lib/library/library_controller.dart) / `LibraryController` | 单元/集成 `library_test` |
 | 曲库 UI、封面、输入连接 | [library_page.dart](../lib/library/library_page.dart)、[library_search.dart](../lib/library/library_search.dart) | `test/library_page_test.dart`、真机输入 |
 | 播放、串行切换、媒体会话 | [playback_controller.dart](../lib/playback/playback_controller.dart) / `PlaybackController`、`TagAudioHandler`；[playback_page.dart](../lib/playback/playback_page.dart) 组装曲库 UI | `audio_handler_test`、集成 `playback_test` |
