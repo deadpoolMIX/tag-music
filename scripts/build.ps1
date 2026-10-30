@@ -1,5 +1,5 @@
 #Requires -Version 7.0
-param([ValidateSet('all','android','windows')][string]$Target = 'all', [ValidateRange(1,2100000000)][int]$BuildNumber = 8, [ValidatePattern('^R[0-9]+$')][string]$Round = 'R1')
+param([ValidateSet('all','android','windows')][string]$Target = 'all', [ValidateRange(1,2100000000)][int]$BuildNumber = 9, [ValidatePattern('^R[0-9]+$')][string]$Round = 'R1')
 . "$PSScriptRoot/env.ps1"
 Set-Location $ProjectRoot
 $report = Join-Path $ProjectRoot "artifacts/$Round"

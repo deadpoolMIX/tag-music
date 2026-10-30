@@ -25,6 +25,8 @@ class HandlerController extends ChangeNotifier implements PlaybackController {
   @override
   final HandlerPlayer player = HandlerPlayer();
   @override
+  bool get playing => player.state.playing;
+  @override
   ProbeTrack? current = const ProbeTrack(
     location: 'test://song',
     name: 'sample.flac',
@@ -75,6 +77,7 @@ class HandlerController extends ChangeNotifier implements PlaybackController {
 
 class TransitionStreams implements PlayerStream {
   final changes = StreamController<bool>.broadcast(sync: true);
+  final failures = StreamController<String>.broadcast(sync: true);
   @override
   Stream<bool> get playing => changes.stream;
   @override
@@ -86,7 +89,7 @@ class TransitionStreams implements PlayerStream {
   @override
   Stream<bool> get completed => const Stream.empty();
   @override
-  Stream<String> get error => const Stream.empty();
+  Stream<String> get error => failures.stream;
   @override
   dynamic noSuchMethod(Invocation invocation) =>
       throw UnsupportedError('Unused fake stream');
@@ -97,9 +100,11 @@ class TransitionPlayer extends HandlerPlayer {
   final TransitionStreams stream = TransitionStreams();
   Completer<void>? playGate;
   final commands = <String>[];
+  int stops = 0;
 
   @override
   Future<void> stop() async {
+    stops++;
     state = PlayerState();
     stream.changes.add(false);
   }
@@ -129,12 +134,30 @@ class TransitionPlayer extends HandlerPlayer {
   }
 
   @override
-  Future<void> dispose() => stream.changes.close();
+  Future<void> dispose() async {
+    await stream.changes.close();
+    await stream.failures.close();
+  }
 }
 
 class TransitionDocuments extends DocumentAccess {
-  TransitionDocuments() : super(android: false);
+  TransitionDocuments({bool android = false}) : super(android: android);
   Completer<TrackMetadata>? metadataGate;
+  final descriptors = <int>{};
+  int nextDescriptor = 20;
+  @override
+  Future<int> open(String uri) async {
+    final descriptor = nextDescriptor++;
+    descriptors.add(descriptor);
+    return descriptor;
+  }
+
+  @override
+  Future<void> close(int descriptor) async => descriptors.remove(descriptor);
+  @override
+  Future<Map<Object?, Object?>> diagnostics() async => {
+    'managedDescriptors': descriptors.length,
+  };
   @override
   Future<TrackMetadata> metadata(ProbeTrack track) async =>
       await metadataGate?.future ??
@@ -142,6 +165,81 @@ class TransitionDocuments extends DocumentAccess {
 }
 
 void main() {
+  testWidgets(
+    'decoder failure stops stale playback and retry reopens the track',
+    (tester) async {
+      final player = TransitionPlayer();
+      final documents = TransitionDocuments(android: true);
+      final controller = PlaybackController(player, documents)
+        ..tracks = [
+          const ProbeTrack(location: 'test://first', name: 'first.flac'),
+        ];
+      final handler = TagAudioHandler(controller);
+      await controller.select(0);
+      expect(documents.descriptors, hasLength(1));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [playbackProvider.overrideWithValue(controller)],
+          child: const MaterialApp(home: Scaffold(body: PlaybackPage())),
+        ),
+      );
+      // The native decoder can report failure without resetting its playing flag.
+      player.stream.failures.add('Failed to recognize file format.');
+      expect(player.state.playing, isTrue);
+      expect(controller.playing, isFalse);
+      expect(handler.playbackState.value.playing, isFalse);
+      expect(
+        handler.playbackState.value.processingState,
+        AudioProcessingState.error,
+      );
+      expect(
+        handler.playbackState.value.controls[1].label,
+        MediaControl.play.label,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('播放'), findsOneWidget);
+      expect(player.state.playlist.medias, isEmpty);
+      expect(documents.descriptors, isEmpty);
+      expect(controller.error, contains('Failed to recognize'));
+      await tester.tap(find.byTooltip('播放'));
+      await tester.pumpAndSettle();
+      expect(controller.error, isNull);
+      expect(controller.playing, isTrue);
+      expect(documents.descriptors, hasLength(1));
+      expect(find.byTooltip('暂停'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(controller.shutdown);
+      expect(documents.descriptors, isEmpty);
+    },
+  );
+
+  test(
+    'queued track replacement survives cleanup from the failed selection',
+    () async {
+      final player = TransitionPlayer();
+      final controller = PlaybackController(player, TransitionDocuments())
+        ..tracks = [
+          const ProbeTrack(location: 'test://first', name: 'first.flac'),
+          const ProbeTrack(location: 'test://second', name: 'second.flac'),
+        ];
+      addTearDown(controller.shutdown);
+      await controller.select(0);
+      final replacement = controller.next();
+      player.stream.failures.add('decoder failure');
+      await replacement;
+      // Enqueued after cleanup, so this also waits for its generation guard.
+      await controller.play();
+      expect(controller.current?.name, 'second.flac');
+      expect(controller.error, isNull);
+      expect(controller.playing, isTrue);
+      expect(
+        player.stops,
+        2,
+        reason: 'Only the two selections should stop playback',
+      );
+    },
+  );
+
   test('switch never publishes idle or partial new metadata', () async {
     final player = TransitionPlayer();
     final documents = TransitionDocuments();

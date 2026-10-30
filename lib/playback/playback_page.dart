@@ -122,7 +122,7 @@ class PlaybackPage extends ConsumerWidget {
                           key: ValueKey('track-$index'),
                           selected: controller.index == index,
                           leading: Icon(
-                            controller.index == index && state.playing
+                            controller.index == index && controller.playing
                                 ? Icons.graphic_eq
                                 : Icons.music_note_outlined,
                           ),
@@ -211,10 +211,12 @@ class PlaybackPage extends ConsumerWidget {
                           ),
                           IconButton.filled(
                             key: const ValueKey('play-pause'),
-                            tooltip: state.playing ? '暂停' : '播放',
+                            tooltip: controller.playing ? '暂停' : '播放',
                             onPressed: controller.togglePlayPause,
                             icon: Icon(
-                              state.playing ? Icons.pause : Icons.play_arrow,
+                              controller.playing
+                                  ? Icons.pause
+                                  : Icons.play_arrow,
                             ),
                           ),
                           IconButton(

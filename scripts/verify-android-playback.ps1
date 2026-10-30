@@ -1,6 +1,6 @@
 #Requires -Version 7.0
 # Run only inside a user-confirmed phone-operation batch, with samples visible.
-param([Parameter(Mandatory)][ValidateSet('formats','switches','controls')][string]$Section, [int]$BuildNumber = 8)
+param([Parameter(Mandatory)][ValidateSet('formats','switches','controls')][string]$Section, [int]$BuildNumber = 9)
 . "$PSScriptRoot/android-ui.ps1"
 $evidence = Join-Path $ProjectRoot "artifacts/R1/android$BuildNumber"
 New-Item -ItemType Directory -Force $evidence | Out-Null

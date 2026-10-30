@@ -8,7 +8,7 @@ import zipfile
 parser = argparse.ArgumentParser()
 parser.add_argument('--round', default='R1')
 parser.add_argument('--version', default='0.2.0')
-parser.add_argument('--build', type=int, default=8)
+parser.add_argument('--build', type=int, default=9)
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 report_dir = root / 'artifacts' / args.round

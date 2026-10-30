@@ -1,6 +1,6 @@
 #Requires -Version 7.0
 # Only run with a confirmed batch, Tag Music's sample card visible and paused.
-param([ValidateSet('shade','lock')][string]$Surface, [int]$BuildNumber=8, [ValidateRange(1,10)][int]$Cycles=6)
+param([ValidateSet('shade','lock')][string]$Surface, [int]$BuildNumber=9, [ValidateRange(1,10)][int]$Cycles=6)
 . "$PSScriptRoot/android-ui.ps1"
 $evidence=Join-Path $ProjectRoot "artifacts/R1/android$BuildNumber"
 $packageText=(& $R1Adb shell dumpsys package app.tagmusic.player) -join "`n"
@@ -50,6 +50,18 @@ function Get-SampleCard {
     return $row
 }
 
+function Assert-LockDisplay {
+    param([string]$Name)
+    # UI dumping and log queries can outlast the lock screen's display timeout.
+    # Recheck immediately before input, without dismissing the secure keyguard.
+    & $R1Adb shell input keyevent 224
+    $power=(& $R1Adb shell dumpsys power) -join "`n"
+    $policy=(& $R1Adb shell dumpsys window policy) -join "`n"
+    $on=$power -match 'mWakefulness=Awake' -and $policy -match 'screenState=SCREEN_STATE_ON' -and $policy -match '(?m)^\s*showing=true'
+    @{power=$power;policy=$policy;ready=$on;checkedAt=[DateTimeOffset]::Now.ToString('o')}|ConvertTo-Json|Set-Content (Join-Path $evidence "lock-$Name-before-tap.json")
+    if(!$on){throw 'Display is off or keyguard changed; no card tap sent'}
+}
+
 function Invoke-CardAction {
     param([string]$Label,[string]$Expected,[string]$Name)
     $row=Get-SampleCard -Name "$Name-before"
@@ -62,6 +74,7 @@ function Invoke-CardAction {
     $openedBefore=Get-LastOpenedSample
     $openedAfter=$openedBefore
     $isSwitch=$Label -in 'Next','Previous'
+    if($Surface -eq 'lock'){Assert-LockDisplay -Name $Name}
     $timer=[Diagnostics.Stopwatch]::StartNew()
     & $R1Adb shell input tap $x $y
     do {

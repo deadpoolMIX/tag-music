@@ -21,16 +21,31 @@ class PlaybackController extends ChangeNotifier {
       player.stream.buffering.listen((_) => _publish()),
       player.stream.completed.listen((completed) {
         _publish();
-        if (completed && !changingTrack && index + 1 < tracks.length) {
+        if (completed &&
+            !_playbackFailed &&
+            !changingTrack &&
+            index + 1 < tracks.length) {
           unawaited(next());
         }
       }),
       player.stream.error.listen((message) {
+        _playbackFailed = true;
         error = '播放失败：$message。可选择其他歌曲重试。';
+        final failedSelection = _selection;
         debugPrint(
           'R1 ${jsonEncode({'event': 'playbackError', 'message': message})}',
         );
         _publish();
+        // A decoder error may leave media_kit's playing flag true. Publish the
+        // failure immediately, then release this selection in the serial lane.
+        // A queued replacement must never be stopped by stale error cleanup.
+        unawaited(
+          _serial(() async {
+            if (_selection != failedSelection || !_playbackFailed) return;
+            await _unload();
+            await session?.setActive(false);
+          }),
+        );
       }),
     ]);
   }
@@ -52,6 +67,9 @@ class PlaybackController extends ChangeNotifier {
   bool requestingNotifications = false;
   String? notificationMessage;
   bool _closed = false;
+  bool _playbackFailed = false;
+  int _selection = 0;
+  bool get playing => !_playbackFailed && player.state.playing;
   Future<void> _pending = Future.value();
   ProbeTrack? get current =>
       index >= 0 && index < tracks.length ? tracks[index] : null;
@@ -167,6 +185,8 @@ class PlaybackController extends ChangeNotifier {
   Future<void> _loadDirectory(String root) async {
     final loaded = await documents.list(root);
     await _serial(() async {
+      _selection++;
+      _playbackFailed = false;
       await _unload();
       tracks = loaded;
       index = -1;
@@ -179,6 +199,8 @@ class PlaybackController extends ChangeNotifier {
 
   Future<void> _select(int target) async {
     if (target < 0 || target >= tracks.length) return;
+    _selection++;
+    _playbackFailed = false;
     changingTrack = true;
     error = null;
     metadataWarning = null;
@@ -200,7 +222,7 @@ class PlaybackController extends ChangeNotifier {
           ? 'fd://${_playbackFd = await documents.open(track.location)}'
           : track.location;
       await player.open(Media(location), play: false);
-      await _play();
+      if (!_playbackFailed) await _play();
       debugPrint(
         'R1 ${jsonEncode({'event': 'opened', 'name': track.name, 'diagnostics': await documents.diagnostics()})}',
       );
@@ -239,7 +261,7 @@ class PlaybackController extends ChangeNotifier {
 
   Future<void> _resume() async {
     if (current == null) return;
-    if (player.state.playlist.medias.isEmpty) {
+    if (_playbackFailed || player.state.playlist.medias.isEmpty) {
       await _select(index);
     } else {
       await _play();
@@ -255,13 +277,16 @@ class PlaybackController extends ChangeNotifier {
 
   // Decide at execution time, after any queued switch or earlier click.
   Future<void> togglePlayPause() => _serial(() async {
-    if (player.state.playing) {
+    if (playing) {
       await _pause();
     } else {
       await _resume();
     }
   });
   Future<void> stop() => _serial(() async {
+    _selection++;
+    _playbackFailed = false;
+    error = null;
     await _unload();
     await session?.setActive(false);
   });
@@ -347,7 +372,9 @@ class TagAudioHandler extends BaseAudioHandler {
         : state.buffering
         ? AudioProcessingState.buffering
         : AudioProcessingState.ready;
-    final playing = controller.changingTrack ? previous.playing : state.playing;
+    final playing = controller.changingTrack && controller.error == null
+        ? previous.playing
+        : controller.playing;
     if (_sentState &&
         !mediaChanged &&
         previous.playing == playing &&
@@ -417,7 +444,7 @@ class TagAudioHandler extends BaseAudioHandler {
     );
     await action();
     debugPrint(
-      'R1 ${jsonEncode({'event': 'mediaCommand', 'command': name, 'phase': 'completed', 'elapsedMs': timer.elapsedMilliseconds, 'playing': controller.player.state.playing, 'error': controller.error})}',
+      'R1 ${jsonEncode({'event': 'mediaCommand', 'command': name, 'phase': 'completed', 'elapsedMs': timer.elapsedMilliseconds, 'playing': controller.playing, 'backendPlaying': controller.player.state.playing, 'error': controller.error})}',
     );
   }
 }
