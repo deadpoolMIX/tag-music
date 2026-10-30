@@ -1,51 +1,41 @@
-# 当前交接（压缩恢复入口）
+# 当前交接
 
-## 2026-10-30 11:36 恢复后新增 +9 候选
+更新：2026-10-30 11:58 北京时间。当前轮次 **R1，开发中**；锁屏项**待手机验收**，不进入R2。用户要求停止反复自动锁屏验证，改由其手动体验验收。设备输入已结束，不自行恢复；后台文件检查/文档可继续。
 
-- 对话已压缩，目标恢复active；本轮继续R1，不进入R2。用户表示需要解锁手机时可明确提示，尚未授权新设备批次，未操作设备。
-- 源码版本0.2.0+9，手机仍+8。定位+8日志实际出现解码失败但playing=true，修正为错误后立即向页面/系统发布未播放，在串行队列中卸载失败曲目及释放音频焦点；播放重试重新打开。清理使用选曲代次保护，避免旧错误停掉已排队的新曲。
-- 新增错误状态页面/系统图标、借用FD释放/重试及旧错误清理不误停新曲回归；21项测试、analyze、format及PowerShell脚本AST通过。首次widget测试清理等待挂起，改用tester.runAsync收尾后通过，候选/诊断日志均保留artifacts/R1/test-error-state-*.log。
-- 锁屏脚本增加真正tap前再次唤醒并核对Awake、SCREEN_STATE_ON及showing=true，不解锁、不修改安全设置；仅语法检查通过，待真机执行。
-- +9双端构建尚未完成，不能称已安装或真机修复。下一步构建、包审计完成后发起新设备批次确认，再复测锁屏、坏文件及完整回归和Windows后台声音；下文+8历史证据继续保留。
+## 源码、版本与产物
 
-更新：2026-10-30 11:23 北京时间。用户要求完成手头工作后压缩对话；本批验证已收尾，下一步从本文件继续。目标仍是原计划，**R1状态开发中**，不进入R2，不标目标完成。
+- 修复源码提交 **51f4af1**，应用/已安装手机均 **0.2.0+9**。后续仅测试辅助/交接变更见当前HEAD。双端release包内标识51f4af1，不能冒称后续提交构建。
+- +9 APK：artifacts/R1/tag-music-0.2.0+9.apk，SHA256 5c627e9eb37ae8c5f2e69bb3cdaa9087a8767ccdc36e75d9a5b664c08ce57cdd。
+- +9 Windows ZIP：artifacts/R1/tag-music-windows-0.2.0+9.zip，SHA256 cce371e7203147719536d28f459addc13cf249d3676853b62e3b089f46d70322。
+- 21项测试、分析/格式、双端release构建、+8/+9原签名一致/固定ID/API29检查、包内原生哈希/运行文件/8份许可文本比对通过。test-9.log、analyze-9.log、format-9.log、build-all-9.json、package-audit-9.json、source-manifest-9.json、SHA256SUMS.txt。source-comparison-9.txt是在构建完成时99项文件匹配；后续测试脚本和文档有变化，应用源码未改。
 
-## 当前源码与设备
+## 已处理问题和 +9 自动证据
 
-- 应用源码/已安装手机均 **0.2.0+8**，修复源码提交7678f42；后续纯交接和测试辅助脚本提交见本文件所在HEAD。双端包内仍标识 **2c83b32-dirty**，不改称后续提交构建。
-- 手机固定ID app.tagmusic.player、原持久签名；+7→+8原签名覆盖成功，未卸载/清数据，首次安装仍2026-10-29 20:14:50，通知权限granted=true，两个SAF目录授权保留，目录2无需新授权恢复7个样本。深色界面截图可见。
-- 本批获交互回复允许恢复+8双端验证，记录artifacts/R1/device-batch-8-authorization.json。用户另反馈手机已放置好可测锁屏。收尾时媒体会话实际 **PAUSED**，证据android8/stopped-at-handoff-session.txt；尝试媒体Stop后仍PAUSED，不能声称已卸载/FD归零。本批设备操作结束；后续新批次重新交互确认。
-- Windows本批只发现无Tag Music窗口，**没有启动+8或验证后台输出**；不要将+7原生回归/回环作为+8结论。Windows仅需软件内操作和后台播放，不要实现SMTC、外部卡片、系统媒体键或托盘播放按钮。Android通知/锁屏需求保留。
+- 用户+6反馈锁屏文字一行跳两行、Play偶发不响应及图标/声音反向。+7改切歌loading与完整元数据原子发布、队列内toggle，但独立Play映射MUTE91被Android媒体键过滤，实际通知无回调。+8改MediaAction.playPause85，18次通知操作通过；保留android7/notification-button-root-cause.json及历史失败。
+- +8日志确认解码错误后底层playing仍true。+9独立失败状态立即向页面/系统发布未播放，串行卸载失败曲目/释放焦点，重试重新打开；选曲代次保护避免旧错误清理误停新曲。新增错误图标/FD释放重试和切歌保护测试。
+- 手机+8→+9原签名覆盖，未卸载/清数据。首次安装仍2026-10-29 20:14:50，通知granted、两个SAF授权/深色主题保持，重开目录2无需授权恢复7个样本。android9/upgrade-state.txt、android-9-samples.png。
+- +9六格式中文元数据/系统PLAYING及暂停后真实进度通过；应用拖动/暂停稳定/恢复/停止卸载重开通过。30次FLAC/MP3交替，受管FD播放恒1，总FD234–239，首235末235。formats-check.log、controls-check.log、switches-check.log、descriptor-audit.json及各session/logcat证据。
+- 坏MP3错误页显示播放三角而非暂停，系统ERROR/playing=false，受管FD降0；随后有效曲目恢复。android-9-bad-file.png已查看，bad-file-logcat.log。7个手机样本哈希与原创源文件一致：android9/phone-fixture-readonly-check.json。
+- +9通知栏6轮18次真实Play/Pause/Next/Previous通过，核对最终图标、会话和不同样本opened。android9/shade-card-check.log、card-operations.jsonl及各shade会话/UI。
 
-## 修复背景及当前证据
+## 锁屏当前边界及用户手测决定
 
-- 用户+6反馈：锁屏切歌标题/歌手先一行后两行跳动，播放点击偶发无反应须切歌恢复，实际播放显示▶或实际暂停显示Ⅱ；其他项正常。
-- +7修复切歌临时idle停服/残缺元数据先发布/点击排队前读旧状态；但通知Play真机仍无Dart回调。组件audio_service0.18.19将play映射MUTE91，AOSP媒体控制器过滤该非媒体键；Next正常，原生pending intent送出而无回调。失败证据及原始源码链接见android7/notification-button-root-cause.json。
-- +8通知主按钮改 **MediaAction.playPause85**，保留真实Play/Pause图标标签；沿用队列内toggle判断，显式play/pause接口保留，无新权限/依赖/第三方缓存修改。
-- +8既有 **19项测试**、分析/格式、双端release构建、签名/版本/API29及包内原生哈希/运行文件/8份许可检查通过；26项应用/manifest源码与快照匹配。
-- **本批真实通知栏6轮共18次操作全部通过**：Play6/Pause6/Next3/Previous3；每次按实际卡片按钮、媒体会话、最终图标检查，切歌必须确认不同样本opened。Play/Pause观测136–156ms；切歌观测含日志轮询，不能当纯引擎延迟。证据android8/card-operations.jsonl、shade-card-check.log、shade-card-logcat.log、shade-*-session.txt、phone-8-shade-*.xml、shade-card-recording.mp4。录屏抽帧已查看，标题/歌手两行可见，不能以抽帧证明所有瞬间无跳动。
+- +9首轮锁屏前两轮6次通过，第3轮Play未到达PLAYING。点击前json显示Awake/ON/仍锁定，但lastWakeAge=7264ms，本机窗口覆盖熄屏时限7000ms；key224在已醒时不重置时限。不能将此记作产品通过或确定全部产品失败。
+- 有效锁屏录屏h264/630x1400，实际62.145秒，抽帧已查看标题/歌手两行。android9/lock-first-attempt/保留首轮完整失败/录屏/JSON/UI；lock-recording-probe.json。不能以抽帧声称所有瞬间无跳动。
+- 测试辅助改每次观察前sleep/wake重置时限，tap前要求醒来不足5秒且ON/仍锁定，避免旧树点击；仅测试脚本，不改变手机安全或显示设置。重试有4次成功记录后，用户指出此处耗时过多并要求自行验收，立即Ctrl+C终止脚本，不再跑完整循环，不标锁屏稳定性通过。
+- 收尾时样本自动播至坏MP3，真实会话 **ERROR、position0**；没有盲发播放/暂停键，不冒称PAUSED。device-batch-9-manual-handoff.json、android9/manual-handoff-session.txt、final-before-manual-logcat.log。请用户先解锁选正常曲目，重点按R1-ACCEPTANCE的5项手测反馈；助手不再输入。
 
-## 锁屏未通过与脚本限制（优先处理）
+## Windows 已完成及工具限制
 
-- 后台熄屏8秒会话仍PLAYING、error=null，锁屏卡片截图可见：android8/locked-playing-session.txt、locked-power-state.txt及android-8-lockscreen-playing.png。
-- 起初锁屏发生无空闲UI快照和系统showing true→false变化；没有据此记卡片成功。用户将手机放到摄像头看不到脸的位置后重试。
-- 测试脚本新增逐次key224唤醒并检查Awake和keyguard showing=true（没有解锁或认证）。**锁屏首个Play成功，约142ms，随后Next没有打开另一首样本，脚本正确失败**；不能称锁屏稳定性通过。
-- 后续power/display确认为 **Asleep/OFF**。UI dump可返回旧锁屏树，检查Awake之后到实际tap之前仍会熄屏。下一步应在实际tap前再次唤醒并核对显示ON/仍锁定，解决测试时序；不要盲用旧XML，不修改用户安全/解锁设置。
-- 两次锁屏screenrecord返回INVALID_LAYER_STACK，录屏无效，留存lock-recording.log和lock-card-recording-invalid.mp4；不当作成功录屏。需重新在屏幕ON期间录制短片。
-- 证据android8/lock-card-check.log、lock-card-logcat.log、lock-cycle-1-*-session.txt、lock-*-policy.txt、lock-display-power-investigation.txt、lock-initial-investigation-logcat.log、card-check-summary.json。
-- 样本自动播放到坏MP3时观察到错误文字但应用按钮仍显示Ⅱ（android-8-before-lock-retry.png）；后续恢复FLAC成功，但独立坏文件完整回归未做。需进一步核对错误状态图标，不能据此宣称所有播放状态已同步。
+- 用户范围：软件内基本播放操作、最小化/后台持续播放；不实施外部媒体卡片、SMTC、系统媒体键或托盘播放按钮。Android卡片需求保留。
+- +9Release实际启动、界面文字正常；Computer Use截图FrameArrived/window capture超时，动态控件缓存不可用、坐标几何不可用；快捷键关闭后进程为空。windows9/release-window-text.json。未拿到Release播放/截图，不冒充成功。
+- +9源码原生Debug集成六格式、seek/暂停、坏文件错误与卸载/恢复、20次排队切歌通过；Flutter重绘截图windows9/windows-native-playback.png已查看。用户手动最小化/恢复测试窗口，20秒默认WH-1000XM3输出回环每秒均检测440Hz。windows9/background-output-loopback.json/wav、minimized-user-confirmation.json、restored-user-confirmation.json、integration-playback.log。不是完全自动最小化，也不是Release截图。
+- 初次后台等待90秒因工具窗口操作失败而超时，第二次窗口被用户误关，终止退出79并出现测试临时目录已不存在；失败日志分别integration-playback-capture-timeout.log、integration-playback-user-closed.log。核实进程终止后才重跑，第三次全套通过。电脑测试进程已退出，已明确告知电脑可用。
+- 已向用户解释Windows前台输入不宜并行，普通鼠标键盘可能触发重新观察，Esc停止不自行恢复，蓝色边框不是完成标志，结束以明确消息为准；官方文档https://learn.chatgpt.com/docs/computer-use未说明蓝框关闭时机。无自行操作Codex自身界面。
 
-## 其余未完成与继续顺序
+## 下一步及未验证
 
-1. 新设备批次确认后先稳定锁屏测试时序，反复播放/暂停/上下曲、快速点击、文字布局及图标/声音同步，保存有效录屏和命令状态日志；有产品失败先修复。
-2. +8完整六格式/应用进度/至少30次切歌FD、坏文件恢复、重启授权/主题/无自动播放、7个样本只读哈希尚未本批完成；+7历史通过不冒充+8。
-3. Windows +8发布版实际软件内播放和最小化后低音量默认输出回环未做。使用computer-use技能的sky接口；旧版曾有FrameArrived截图超时/索引缓存问题，激活并刷新正确窗口，必要时键盘操作，不能绕用PowerShell UI Automation。实体Esc表示停止设备输入。
-4. 全部自动验证完成后再给用户5–8项手机清单；尚无+8手机体验通过反馈，状态仍开发中。目录/主题/系统授权保留不等于听感通过。
-
-## 产物与其他边界
-
-- APK artifacts/R1/tag-music-0.2.0+8.apk，SHA256 1d7618506deda3eefc2e562df8e04a7c39629e4ee9d31155c13c29d6a76101e6。
-- Windows ZIP artifacts/R1/tag-music-windows-0.2.0+8.zip，SHA256 192caebfb8b144294bdc4ce234fd76414b1045c04b6f25084eb2bba8e15b00be。
-- 审计package-audit-8.json、source-manifest-8.json、source-comparison-8.txt、test-8.log、analyze-8.log、build-{android,windows}-8.log/json、SHA256SUMS.txt；总报告REPORT.md，历史追加日志docs/rounds/R1.md。
-- R0已验收，R1只有临时曲目列表/持久目录授权；没有R2持久曲库/标签/歌单。音乐只读SAF URI/借用FD，无真实路径推导。原生LGPL3+及公开再分发源码/子依赖通知缺口见THIRD_PARTY，R9核全；Android10/其他手机/Windows11未覆盖。
-- 当前工具没有直接触发本聊天压缩的入口。官方文档列出用户输入/compact可压缩上下文；用户可在本批结束后发送。此次未改变目标状态为暂停或完成。
+1. 等用户+9锁屏5项体验结果。失败时收集大约发生时间/动作及本应用日志，先定位，不盲目重复自动锁屏循环。当前目标仍active，不能当作已验收或目标完成。
+2. +9真实进程重启后的默认不自动播放、重开授权/主题保持、系统目录选择取消不丢列表尚未本批完成；先吸收用户反馈，再安排明确范围的收尾。新批影响设备操作须交互确认，不能用旧授权自动恢复。
+3. Release Windows截图/真实UI播放因工具限制未验证；当前有效Windows声音证据为原生Debug及用户手动最小化的回环，保留边界。
+4. R0已验收；R1仅临时曲目列表和持久目录授权，无R2曲库/标签/歌单。Android只读SAF/显式借用FD，不推导真实路径；LGPL3+及公开再分发对应源码/子依赖通知缺口保留THIRD_PARTY，R9核全，其他系统/手机未覆盖。

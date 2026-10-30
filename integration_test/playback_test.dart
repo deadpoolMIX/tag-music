@@ -93,6 +93,9 @@ void main() {
         await controller.select(bad);
         await Future<void>.delayed(const Duration(milliseconds: 500));
         expect(controller.metadataWarning, isNotNull);
+        expect(controller.error, isNotNull);
+        expect(controller.playing, isFalse);
+        expect(controller.player.state.playlist.medias, isEmpty);
         final good = controller.tracks.indexWhere(
           (track) => track.name.endsWith('.flac'),
         );
@@ -107,6 +110,29 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 500));
         expect(controller.error, isNull);
         expect(controller.player.state.playing, isTrue);
+        final background = Platform.environment['TAG_MUSIC_BACKGROUND_READY'];
+        if (background != null) {
+          await File(background).writeAsString('playing');
+          for (
+            var attempt = 0;
+            attempt < 6000 && !await File('$background.done').exists();
+            attempt++
+          ) {
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+            if (controller.player.state.position >=
+                const Duration(seconds: 20)) {
+              await controller.seek(Duration.zero);
+            }
+          }
+          expect(
+            await File('$background.done').exists(),
+            isTrue,
+            reason: 'Background output capture must finish before UI checks',
+          );
+          expect(controller.error, isNull);
+          expect(controller.playing, isTrue);
+          expect(controller.player.state.position, greaterThan(Duration.zero));
+        }
       });
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));

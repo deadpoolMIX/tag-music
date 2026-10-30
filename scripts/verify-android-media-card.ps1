@@ -31,8 +31,10 @@ function Get-CardSession {
 function Get-SampleCard {
     param([string]$Name)
     if($Surface -eq 'lock'){
-        # Wake the display without dismissing or authenticating the keyguard.
-        # A sleeping device can still dump its old lock UI, but ignores taps.
+        # WAKEUP alone does not restart this phone's seven-second lock timeout
+        # while already awake. Begin each observation with a fresh sleep/wake
+        # cycle; neither key dismisses or authenticates the secure keyguard.
+        & $R1Adb shell input keyevent 223
         & $R1Adb shell input keyevent 224
         $power=(& $R1Adb shell dumpsys power) -join "`n"
         $policy=(& $R1Adb shell dumpsys window policy) -join "`n"
@@ -57,13 +59,15 @@ function Assert-LockDisplay {
     & $R1Adb shell input keyevent 224
     $power=(& $R1Adb shell dumpsys power) -join "`n"
     $policy=(& $R1Adb shell dumpsys window policy) -join "`n"
-    $on=$power -match 'mWakefulness=Awake' -and $policy -match 'screenState=SCREEN_STATE_ON' -and $policy -match '(?m)^\s*showing=true'
+    $wakeAge=[regex]::Match($power,'mLastWakeTime=\d+ \((\d+) ms ago\)')
+    $on=$power -match 'mWakefulness=Awake' -and $policy -match 'screenState=SCREEN_STATE_ON' -and $policy -match '(?m)^\s*showing=true' -and $wakeAge.Success -and [long]$wakeAge.Groups[1].Value -lt 5000
     @{power=$power;policy=$policy;ready=$on;checkedAt=[DateTimeOffset]::Now.ToString('o')}|ConvertTo-Json|Set-Content (Join-Path $evidence "lock-$Name-before-tap.json")
     if(!$on){throw 'Display is off or keyguard changed; no card tap sent'}
 }
 
 function Invoke-CardAction {
     param([string]$Label,[string]$Expected,[string]$Name)
+    $openedBefore=Get-LastOpenedSample
     $row=Get-SampleCard -Name "$Name-before"
     $buttons=@($row.SelectNodes('.//node')|Where-Object {$_.'content-desc' -eq $Label})
     if($buttons.Count -ne 1){throw "Card action unavailable: $Label"}
@@ -71,7 +75,6 @@ function Invoke-CardAction {
     if(!$bounds.Success){throw 'Invalid observed bounds'}
     $x=[int](([int]$bounds.Groups[1].Value+[int]$bounds.Groups[3].Value)/2)
     $y=[int](([int]$bounds.Groups[2].Value+[int]$bounds.Groups[4].Value)/2)
-    $openedBefore=Get-LastOpenedSample
     $openedAfter=$openedBefore
     $isSwitch=$Label -in 'Next','Previous'
     if($Surface -eq 'lock'){Assert-LockDisplay -Name $Name}
