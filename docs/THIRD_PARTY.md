@@ -24,3 +24,9 @@ R0 尚未引入 media_kit、libmpv 或 FFmpeg。R1 必须核对实际原生二�
 来源：[Windows 发行包](https://github.com/media-kit/libmpv-win32-audio-build/releases/tag/2023-09-24)、[Windows mpv 精确源码](https://github.com/mpv-player/mpv/tree/652a1dd90711839acdccc08004056d25514ef2d8)、[FFmpeg n6.0](https://github.com/FFmpeg/FFmpeg/tree/n6.0)、[Android 构建标签](https://github.com/media-kit/libmpv-android-audio-build/tree/87744be8b337c50ed54961249b7a97c5e8cc37c9)、[mpv 许可](https://github.com/mpv-player/mpv/blob/652a1dd90711839acdccc08004056d25514ef2d8/Copyright)、[FFmpeg 许可](https://github.com/FFmpeg/FFmpeg/blob/n6.0/LICENSE.md)。
 
 审计边界：Windows 历史发行标签只有 version 文件，当前 master 不能证明 2023 发行包的完整精确构建来源。DLL 另静态包含其他依赖；完整对应源码、构建材料及所有原生子组件通知须在公开再分发前归档核全。Android helper 的构建引用 main 而非固定提交，也存在源码重现性缺口。R1 仅本机/目标手机技术验证，不将这些缺口记作最终再分发合规完成；R9 必须继续处理。
+
+## R2 曲库依赖（2026-10-30）
+
+新增精确直接依赖 Drift 2.35.3、drift_flutter 0.3.1、path_provider 2.1.6、path 1.9.1、uuid 4.6.0；生成工具 drift_dev 2.35.2 / build_runner 2.17.1。SQLite Dart 包实际锁定 sqlite3 3.5.2，使用默认普通SQLite原生资产，不配置SQLCipher或加密。传递依赖中的 sqlite3_flutter_libs / sqlcipher_flutter_libs 为 eol 占位包，不能据包名声称打包了SQLCipher。
+
+Drift / sqlite3 Dart绑定的许可文本以锁定包内LICENSE及应用“开源许可”为准（MIT）；SQLite源码的许可声明见[SQLite官方版权说明](https://www.sqlite.org/copyright.html)。预编译原生资产来源是 [sqlite3.dart sqlite3-3.5.2 release](https://github.com/simolus3/sqlite3.dart/releases/tag/sqlite3-3.5.2)，下载钩子按包内asset_hashes.dart核对SHA256。R2包内实际原生资产哈希与版本另存artifacts/R2，不将Dart包版本当SQLite引擎版本。既有音频原生库的LGPL及R9再分发缺口保持。

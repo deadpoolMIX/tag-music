@@ -1,6 +1,6 @@
 # Tag Music
 
-Windows / Android 本地音乐播放器，Flutter + Material 3。R0、R1 已双端通过，当前验收版为 `0.2.0+9`；具备目录授权、元数据和单曲播放技术验证能力，准确证据与边界见交接。持久曲库、标签与歌单尚未实现，R2 须在新对话开展。
+Windows / Android 本地音乐播放器，Flutter + Material 3。R0、R1已双端通过；当前推进R2持久曲库。0.3.0+10已进行双端自动验证，手机搜索输入存在用户确认的缺陷，0.3.0+11修复候选正在准备，R2保持开发中；准确状态与证据见交接。标签、规则和歌单尚未实施。
 
 开发入口：先读 [AGENTS.md](AGENTS.md)、[计划](docs/PLAN.md)、[交接](docs/HANDOFF.md)。
 
@@ -8,10 +8,10 @@ Windows / Android 本地音乐播放器，Flutter + Material 3。R0、R1 已双�
 
 ```powershell
 pwsh -File scripts/bootstrap.ps1
-pwsh -File scripts/check.ps1
-pwsh -File scripts/build.ps1 -Target all -BuildNumber 9 -Round R1
-pwsh -File scripts/verify-apk.ps1 -BuildNumbers 9 -Version 0.2.0 -Round R1
-pwsh -File scripts/install-android.ps1 -BuildNumber 9 -Version 0.2.0 -Round R1
+pwsh -File scripts/check.ps1 -Round R2
+pwsh -File scripts/build.ps1 -Target all -BuildNumber 11 -Round R2
+pwsh -File scripts/verify-apk.ps1 -BuildNumbers 11 -Version 0.3.0 -Round R2
+pwsh -File scripts/install-android.ps1 -BuildNumber 11 -Version 0.3.0 -Round R2
 ```
 
 使用项目内 SDK 时，运行 Flutter 命令前先 `. ./scripts/env.ps1`，执行 `& ./scripts/restore.ps1` 恢复锁定依赖并准备 Windows 插件目录，再运行 Flutter 命令。测试与构建须串行。R1 从已验收的 `0.1.0+2` 原签名覆盖升级，保留主题与首次安装时间。历史包验证可显式传入 `-Round R0 -Version 0.1.0 -BuildNumbers 1,2`。
