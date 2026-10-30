@@ -1,37 +1,43 @@
-# 当前交接
+# 当前交接（压缩恢复入口）
 
-- 2026-10-30 01:43 用户选择先暂停，保留修复包。目标执行暂停，不安装+8、不操作设备；+8双端包保留，手机仍+7，源码7678f42，产品状态仍开发中。恢复时等待用户明确继续及适用设备批次的交互确认。
+更新：2026-10-30 11:23 北京时间。用户要求完成手头工作后压缩对话；本批验证已收尾，下一步从本文件继续。目标仍是原计划，**R1状态开发中**，不进入R2，不标目标完成。
 
-- 更新：2026-10-30 00:55 北京时间。当前 **R1，开发中**。+7 通知卡片播放失败已真机复现；+8 候选已完成19项测试和双端发布构建，**未安装、未真机验证**。不进入R2。
-- 当前源码 **0.2.0+8**，基于2c83b32，收尾提交见本文件所在HEAD。包内标识 **2c83b32-dirty**，不能改称后续提交构建。仅本地Git；密钥/SDK/产物不提交。
-- 手机仍 **0.2.0+7**，固定app.tagmusic.player，原签名，首次安装2026-10-29 20:14:50；此前主题和两个SAF授权保留。最后已条件暂停，停在通知中心。旧Windows+7测试窗口已恢复并通过Alt+F4退出，随后进程查询为空。
-- 用户明确Windows只需软件内操作后放后台继续播放，不需软件外媒体卡片/SMTC/系统媒体键/托盘播放按钮；Android通知/锁屏需求保持。PLAN已记录范围变更，原始归档不改。
+## 当前源码与设备
 
-## 失败复现与候选修复
+- 应用源码/已安装手机均 **0.2.0+8**，修复源码提交7678f42；后续纯交接和测试辅助脚本提交见本文件所在HEAD。双端包内仍标识 **2c83b32-dirty**，不改称后续提交构建。
+- 手机固定ID app.tagmusic.player、原持久签名；+7→+8原签名覆盖成功，未卸载/清数据，首次安装仍2026-10-29 20:14:50，通知权限granted=true，两个SAF目录授权保留，目录2无需新授权恢复7个样本。深色界面截图可见。
+- 本批获交互回复允许恢复+8双端验证，记录artifacts/R1/device-batch-8-authorization.json。用户另反馈手机已放置好可测锁屏。收尾时媒体会话实际 **PAUSED**，证据android8/stopped-at-handoff-session.txt；尝试媒体Stop后仍PAUSED，不能声称已卸载/FD归零。本批设备操作结束；后续新批次重新交互确认。
+- Windows本批只发现无Tag Music窗口，**没有启动+8或验证后台输出**；不要将+7原生回归/回环作为+8结论。Windows仅需软件内操作和后台播放，不要实现SMTC、外部卡片、系统媒体键或托盘播放按钮。Android通知/锁屏需求保留。
 
-- 用户+6反馈锁屏切歌标题/歌手先一行后两行跳动、播放偶发无响应须切歌恢复、实际播放显示▶或实际暂停显示Ⅱ；其他验收项正常。
-- +7已修复切歌临时idle导致停服、残缺新媒体信息先发布、点击排队前读取旧状态；18项测试和基础六格式/进度/30次切歌通过，但不等于卡片问题全部解决。
-- 本批获用户交互明确允许继续已安装+7验证后，实际点击通知Play，4秒后仍PAUSED且Dart无mediaCommand。相同卡片Next立即送达next，打开OGG并PLAYING。Play原生PendingIntent requestCode91显示sent=true、canceled=false。失败证据不覆盖为通过。
-- audio_service0.18.19把通知play映射KEYCODE_MUTE91。AOSP Android16 MediaController.dispatchMediaButtonEvent过滤非媒体键，KeyEvent.isMediaSessionKey不含MUTE；与真机无回调而Next有效相吻合。证据为源码及链路推断，修复仍需实际按钮复验。源码链接保存android7/notification-button-root-cause.json及R1日志。
-- +8将通知主按钮改为标准 **MediaAction.playPause（键码85）**，保留随实际状态变化的Play/Pause图标和标签，沿用+7队列内toggle判断；显式play/pause入口仍保留。没有改第三方缓存、原生库、权限或依赖。
-- 新增传输动作/图标/标签合约测试，全套 **19项测试**、分析/格式、双端release、签名/API29/版本、包内原生哈希/运行文件及8份许可检查通过；26项应用/manifest文件与构建快照一致。构建通过不能代替真机。
+## 修复背景及当前证据
 
-## 已有证据与当前批次
+- 用户+6反馈：锁屏切歌标题/歌手先一行后两行跳动，播放点击偶发无反应须切歌恢复，实际播放显示▶或实际暂停显示Ⅱ；其他项正常。
+- +7修复切歌临时idle停服/残缺元数据先发布/点击排队前读旧状态；但通知Play真机仍无Dart回调。组件audio_service0.18.19将play映射MUTE91，AOSP媒体控制器过滤该非媒体键；Next正常，原生pending intent送出而无回调。失败证据及原始源码链接见android7/notification-button-root-cause.json。
+- +8通知主按钮改 **MediaAction.playPause85**，保留真实Play/Pause图标标签；沿用队列内toggle判断，显式play/pause接口保留，无新权限/依赖/第三方缓存修改。
+- +8既有 **19项测试**、分析/格式、双端release构建、签名/版本/API29及包内原生哈希/运行文件/8份许可检查通过；26项应用/manifest源码与快照匹配。
+- **本批真实通知栏6轮共18次操作全部通过**：Play6/Pause6/Next3/Previous3；每次按实际卡片按钮、媒体会话、最终图标检查，切歌必须确认不同样本opened。Play/Pause观测136–156ms；切歌观测含日志轮询，不能当纯引擎延迟。证据android8/card-operations.jsonl、shade-card-check.log、shade-card-logcat.log、shade-*-session.txt、phone-8-shade-*.xml、shade-card-recording.mp4。录屏抽帧已查看，标题/歌手两行可见，不能以抽帧证明所有瞬间无跳动。
 
-- +7基础：手机六格式、应用内seek/暂停/继续/停止重开、30次切歌通过，受管FD播放1卸载0，总FD234–240、首尾236；切歌采样无idle/残缺媒体项。Windows原生Debug六格式/进度/暂停/坏文件/20次切歌和20秒回环440Hz通过，Release启动/文本正常。上述均保持+7边界，不冒充+8。
-- 最新+7卡片失败：artifacts/R1/android7/shade-card-check.log、shade-cycle-1-play-session.txt、shade-card-logcat.log、shade-next-after-play-failure.log、pending-intents-failure.txt、audio-service-button-mapping.txt、notification-button-root-cause.json、shade-card-recording.mp4；截图android-7-shade-play-failure.png。
-- 用户最新授权“允许本批+7继续验证”，记录device-batch-7-continue-authorization.json；该批未授权安装+8。已发出+8双端验证交互确认，**用户已选择先暂停，保留修复包**。本批不安装、不操作设备。
-- Android+8通知/锁屏反复按钮、图标/文字布局/短录屏、六格式/切歌/坏文件恢复/重启授权与主题/样本只读哈希全部未验证。Windows+8实际运行及最小化后持续输出未验证。系统卡片进度条此前未显示，不称拖动通过。
+## 锁屏未通过与脚本限制（优先处理）
 
-## +8产物
+- 后台熄屏8秒会话仍PLAYING、error=null，锁屏卡片截图可见：android8/locked-playing-session.txt、locked-power-state.txt及android-8-lockscreen-playing.png。
+- 起初锁屏发生无空闲UI快照和系统showing true→false变化；没有据此记卡片成功。用户将手机放到摄像头看不到脸的位置后重试。
+- 测试脚本新增逐次key224唤醒并检查Awake和keyguard showing=true（没有解锁或认证）。**锁屏首个Play成功，约142ms，随后Next没有打开另一首样本，脚本正确失败**；不能称锁屏稳定性通过。
+- 后续power/display确认为 **Asleep/OFF**。UI dump可返回旧锁屏树，检查Awake之后到实际tap之前仍会熄屏。下一步应在实际tap前再次唤醒并核对显示ON/仍锁定，解决测试时序；不要盲用旧XML，不修改用户安全/解锁设置。
+- 两次锁屏screenrecord返回INVALID_LAYER_STACK，录屏无效，留存lock-recording.log和lock-card-recording-invalid.mp4；不当作成功录屏。需重新在屏幕ON期间录制短片。
+- 证据android8/lock-card-check.log、lock-card-logcat.log、lock-cycle-1-*-session.txt、lock-*-policy.txt、lock-display-power-investigation.txt、lock-initial-investigation-logcat.log、card-check-summary.json。
+- 样本自动播放到坏MP3时观察到错误文字但应用按钮仍显示Ⅱ（android-8-before-lock-retry.png）；后续恢复FLAC成功，但独立坏文件完整回归未做。需进一步核对错误状态图标，不能据此宣称所有播放状态已同步。
 
-- APK：artifacts/R1/tag-music-0.2.0+8.apk；SHA256 **1d7618506deda3eefc2e562df8e04a7c39629e4ee9d31155c13c29d6a76101e6**。
-- Windows：artifacts/R1/tag-music-windows-0.2.0+8.zip；SHA256 **192caebfb8b144294bdc4ce234fd76414b1045c04b6f25084eb2bba8e15b00be**。
-- build-{android,windows}-8.log/json、apk-signature-8.txt、apk-manifest-8.txt、package-audit-8.json、source-manifest-8.json、source-comparison-8.txt、test-8.log、analyze-8.log、format-8.log、final-validation-8.txt、SHA256SUMS.txt。签名与R0一致；未卸载/清数据。
-- 总报告artifacts/R1/REPORT.md；7项清单docs/rounds/R1-ACCEPTANCE.md；手机卡片辅助脚本verify-android-media-card.ps1已真机执行并正确报告+7失败，切歌检查还要求opened样本变化。
+## 其余未完成与继续顺序
 
-## 下一步
+1. 新设备批次确认后先稳定锁屏测试时序，反复播放/暂停/上下曲、快速点击、文字布局及图标/声音同步，保存有效录屏和命令状态日志；有产品失败先修复。
+2. +8完整六格式/应用进度/至少30次切歌FD、坏文件恢复、重启授权/主题/无自动播放、7个样本只读哈希尚未本批完成；+7历史通过不冒充+8。
+3. Windows +8发布版实际软件内播放和最小化后低音量默认输出回环未做。使用computer-use技能的sky接口；旧版曾有FrameArrived截图超时/索引缓存问题，激活并刷新正确窗口，必要时键盘操作，不能绕用PowerShell UI Automation。实体Esc表示停止设备输入。
+4. 全部自动验证完成后再给用户5–8项手机清单；尚无+8手机体验通过反馈，状态仍开发中。目录/主题/系统授权保留不等于听感通过。
 
-- 收到+8批次明确允许后原签名覆盖升级，优先复测真正通知/锁屏按钮的响应、切歌文本/图标同步，保存命令和状态日志/短录屏；补足其余手机回归，Windows只测软件内操作和最小化后台持续输出。系统授权/解锁由用户完成。
-- 自动检查及运行验证都通过后，再请用户做手机体验验收；当前没有+8通过反馈，不能标双端通过。R1只有临时曲目列表及目录授权，没有持久曲库/标签/歌单。
-- Android10/其他手机/Windows11未覆盖；复杂Android音频焦点/蓝牙后续R7。原生库含LGPL3+，完整对应源码/子依赖通知及helper固定源码缺口见THIRD_PARTY，R9继续核全。所有历史失败、包、日志保留。
+## 产物与其他边界
+
+- APK artifacts/R1/tag-music-0.2.0+8.apk，SHA256 1d7618506deda3eefc2e562df8e04a7c39629e4ee9d31155c13c29d6a76101e6。
+- Windows ZIP artifacts/R1/tag-music-windows-0.2.0+8.zip，SHA256 192caebfb8b144294bdc4ce234fd76414b1045c04b6f25084eb2bba8e15b00be。
+- 审计package-audit-8.json、source-manifest-8.json、source-comparison-8.txt、test-8.log、analyze-8.log、build-{android,windows}-8.log/json、SHA256SUMS.txt；总报告REPORT.md，历史追加日志docs/rounds/R1.md。
+- R0已验收，R1只有临时曲目列表/持久目录授权；没有R2持久曲库/标签/歌单。音乐只读SAF URI/借用FD，无真实路径推导。原生LGPL3+及公开再分发源码/子依赖通知缺口见THIRD_PARTY，R9核全；Android10/其他手机/Windows11未覆盖。
+- 当前工具没有直接触发本聊天压缩的入口。官方文档列出用户输入/compact可压缩上下文；用户可在本批结束后发送。此次未改变目标状态为暂停或完成。

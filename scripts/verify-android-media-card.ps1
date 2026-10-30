@@ -30,6 +30,17 @@ function Get-CardSession {
 
 function Get-SampleCard {
     param([string]$Name)
+    if($Surface -eq 'lock'){
+        # Wake the display without dismissing or authenticating the keyguard.
+        # A sleeping device can still dump its old lock UI, but ignores taps.
+        & $R1Adb shell input keyevent 224
+        $power=(& $R1Adb shell dumpsys power) -join "`n"
+        $policy=(& $R1Adb shell dumpsys window policy) -join "`n"
+        if($power -notmatch 'mWakefulness=Awake' -or $policy -notmatch '(?m)^\s*showing=true'){
+            throw 'Lock test requires an awake display with keyguard still showing'
+        }
+        $policy|Set-Content (Join-Path $evidence "lock-$Name-policy.txt")
+    }
     $ui=Get-PhoneUi -Name "phone-$BuildNumber-$Surface-$Name"
     $rows=@($ui.SelectNodes('//node')|Where-Object {$_.'resource-id' -eq 'com.android.systemui:id/expandableNotificationRow' -and $_.text -eq 'Tag Music'})
     if($rows.Count -ne 1){throw 'Expected one observed Tag Music media row'}
