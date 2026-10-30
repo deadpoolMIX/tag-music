@@ -1,39 +1,15 @@
 # Tag Music
 
-Windows / Android 本地音乐播放器，Flutter + Material 3。R0、R1已双端通过；当前推进R2持久曲库。0.3.0+10已进行双端自动验证，手机搜索输入存在用户确认的缺陷，0.3.0+11修复候选已完成双端构建和升级，用户要求暂停测试，R2保持开发中且待输入复验；准确状态与证据见交接。标签、规则和歌单尚未实施。
+Windows / Android 本地音乐播放器，Flutter + Material 3。原创代码 MIT，第三方许可独立保留。
 
-开发入口：先读 [AGENTS.md](AGENTS.md)、[计划](docs/PLAN.md)、[交接](docs/HANDOFF.md)。
+协作规则：[AGENTS](AGENTS.md)。新对话先读 [当前交接](docs/HANDOFF.md)，沿其链接恢复当前计划；[项目索引](docs/README.md) 按任务查阅，不必通读所有文档。产品目标见 [PLAN](docs/PLAN.md)。
 
-查看进展：[简明开发日志](docs/开发日志.md)；查看全部说明：[文档目录](docs/README.md)。
+日常续行只需说：
 
-```powershell
-pwsh -File scripts/bootstrap.ps1
-pwsh -File scripts/check.ps1 -Round R2
-pwsh -File scripts/build.ps1 -Target all -BuildNumber 11 -Round R2
-pwsh -File scripts/verify-apk.ps1 -BuildNumbers 11 -Version 0.3.0 -Round R2
-pwsh -File scripts/install-android.ps1 -BuildNumber 11 -Version 0.3.0 -Round R2
-```
+> 继续当前阶段，按项目交接恢复。
 
-使用项目内 SDK 时，运行 Flutter 命令前先 `. ./scripts/env.ps1`，执行 `& ./scripts/restore.ps1` 恢复锁定依赖并准备 Windows 插件目录，再运行 Flutter 命令。测试与构建须串行。R1 从已验收的 `0.1.0+2` 原签名覆盖升级，保留主题与首次安装时间。历史包验证可显式传入 `-Round R0 -Version 0.1.0 -BuildNumbers 1,2`。
+新阶段用Plan模式确认目标、依赖与验收，再以阶段Goal推进；阶段内由Codex自主拆分、验证和建立Git检查点。你负责关键决策与验收、额度观察、压缩及换对话。设备/前台操作仍须本批交互确认。
 
-助手启动/关闭前台应用、操作电脑或手机界面、安装/升级手机应用前，按 AGENTS 规则先提供交互式选项，得到本批确认后执行。
+模块/验证入口在项目索引，环境与签名见 [TOOLCHAIN](docs/TOOLCHAIN.md)，许可见 [THIRD_PARTY](docs/THIRD_PARTY.md)。产物 `artifacts/Rxx/`、SDK `.tools/`、密钥 `.secrets/` 均不提交Git；候选不复用构建号覆盖。
 
-构建产物按轮次位于 `artifacts/Rxx/`，SDK 位于 `.tools/`。两者均不入 Git。签名通过 `scripts/signing.ps1` 首次创建，此后必须沿用，密钥和配置需自行安全备份。
-
-原创代码 MIT；第三方许可见应用“设置 → 开源许可”和 [第三方说明](docs/THIRD_PARTY.md)。
-
-项目目录按用途组织：
-
-| 目录 | 用途 |
-|---|---|
-| `docs/` | 计划、简明日志、交接、工具链与许可；`rounds/` 放轮次日志和验收，`archive/` 放历史原件 |
-| `lib/` | Flutter 应用代码 |
-| `test/`、`integration_test/` | 单元/界面测试、原生集成测试 |
-| `android/`、`windows/` | 两个平台工程 |
-| `scripts/` | 环境、检查、构建、签名与安装脚本 |
-| `artifacts/R0/` | 已验收安装包、校验值、报告、截图和原始日志 |
-| `.tools/` | 本地 SDK；`downloads/` 放安装包，`downloads/partial/` 放历史下载分段，`backups/` 放工具临时备份 |
-| `.secrets/` | 本地持久签名密钥，不提交 Git |
-| `build/`、`.dart_tool/`、`.idea/` | 工具自动生成的构建、缓存与 IDE 配置 |
-
-根目录保留 README、AGENTS、LICENSE 和 Flutter 必需的工程配置。最初的计划原件已原样归档至 `docs/archive/PLAN.original.md`。
+完成摘要见 [开发日志](docs/开发日志.md)，原始计划在 `docs/archive/PLAN.original.md`，仅作历史依据。
