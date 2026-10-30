@@ -25,6 +25,7 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 | 数据表、连接、迁移 | [database.dart](../lib/library/database.dart) / `LibraryDatabase`；`database.g.dart` 为生成文件 | `test/library_test.dart`、`test/tag_test.dart`、[schema v2 DDL](database-schema/v2.json) |
 | 扫描事务、增量/失联、搜索排序 | [library_controller.dart](../lib/library/library_controller.dart) / `LibraryController` | 单元/集成 `library_test` |
 | 曲库 UI、封面、输入连接 | [library_page.dart](../lib/library/library_page.dart)、[library_search.dart](../lib/library/library_search.dart) | `test/library_page_test.dart`、真机输入 |
+| 标签关系与管理、多选操作 | [tag_repository.dart](../lib/library/tag_repository.dart)、[tags_page.dart](../lib/library/tags_page.dart)；曲库controller共用DB及状态 | `tag_test`、`tags_page_test`、设备 `tag_benchmark_test` |
 | 播放、串行切换、媒体会话 | [playback_controller.dart](../lib/playback/playback_controller.dart) / `PlaybackController`、`TagAudioHandler`；[playback_page.dart](../lib/playback/playback_page.dart) 组装曲库 UI | `audio_handler_test`、集成 `playback_test` |
 | 共用文件/元数据/FD 适配 | [documents.dart](../lib/playback/documents.dart) / `DocumentAccess`；[descriptor_file.dart](../lib/playback/descriptor_file.dart) | `documents_test`、`descriptor_file_test` |
 | Android 原生桥 | [DocumentBridge.kt](../android/app/src/main/kotlin/app/tagmusic/player/DocumentBridge.kt)、[MainActivity.kt](../android/app/src/main/kotlin/app/tagmusic/player/MainActivity.kt) | 桥测试 + 真机日志/媒体会话 |
@@ -39,7 +40,7 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 - **迁移已开始**：R3 当前 schema v2，v1→v2 显式创建标签及关系表；未知升级抛错。变表即升版本并验证旧库数据、外键及失败处理。[v1.json](database-schema/v1.json) 和 [v2.json](database-schema/v2.json) 是实际 SQLite DDL 基线，不覆盖，也不是 Drift CLI schema JSON。
 - **资源生命周期已实现**：切歌/通知操作串行，停止旧曲后关闭应用持有的播放 FD 再开新曲；元数据只读借用 FD、finally 释放，不靠 GC。业务万首队列只为当前与有限预取建立播放对象/句柄。
 - **R2→R5 边界**：点击播放是不可变快照，搜索/扫描不改播放；当前 `ProbeTrack` 仍用 location/name，R5 要接稳定歌曲 ID 后做持久队列/进度恢复，重启默认暂停。
-- **R3 开发中**：扁平多标签与歌曲 UUID 关系已接入，是否验收见 HANDOFF。R4 版本化规则树及删标签影响、R5 普通/智能歌单和队列、R8 版本化管理数据备份/整体回滚仍属未来接口。
+- **标签已实现**：扁平多标签引用歌曲UUID，名称trim/小写唯一键；批量关系事务、删除级联与数量确认，多选按UUID跨搜索保留，不改变播放快照；R3验收见HANDOFF。R4版本化规则树及删标签影响、R5歌单和队列、R8备份/整体回滚仍属未来接口。
 - 固定 ID/签名、锁定依赖、本机受限补丁见 [TOOLCHAIN](TOOLCHAIN.md)；实际原生库与再分发来源缺口见 [THIRD_PARTY](THIRD_PARTY.md)。相关变更即核对，不等 R9 从零处理。
 
 ## 验证入口与维护

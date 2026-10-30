@@ -1,30 +1,37 @@
 # 当前交接
 
-更新：2026-10-30 20:56 北京时间。当前阶段 **R3 标签管理，待手机验收**；Goal active。Windows +12 已由用户确认全部人工通过；手机Codex测试与独立性能测量已结束，等待用户最终验收结论。阶段目标、顺序和验收见 [R3 当前执行计划](rounds/R3.md#r3-当前执行计划)、[手机结果](rounds/R3-ACCEPTANCE.md)。
+更新：2026-10-30 21:00 北京时间。**R3 标签管理已结束，双端通过。** 用户明确“确认R3验收通过”，接受最终结果及已列明边界；本阶段Goal收口为complete。R0～R2此前已双端通过，R4未启动。
 
-## 已完成与证据
+## 目标与完成入口
 
-- 本地 main，R3 源码检查点 **bcf31d5**；构建时工作区干净，包内 revision **bcf31d5**。
-- schema v2：标签、歌曲标签关系、外键及索引；v1→v2 显式迁移，原 v1 DDL 基线保留，新 v2 基线来自实际 SQLite。歌曲 UUID 与目录不变，失联标签保留。
-- 标签页提供创建、改名、影响数确认删除及关联歌曲查看；曲库提供单曲编辑、显式多选及跨搜索保留勾选的批量增删。候选 **0.4.0+12** 已完成双端 Release 构建。
-- artifacts/R3 最终 check 记录：格式、analyze、38 项测试通过。Windows 万首合成库的标签加载预热 P95 13,437 μs，见 tag-benchmark.json；不代表手机或真实扫描。
-- APK `artifacts/R3/tag-music-0.4.0+12.apk`，SHA256 **cfe6f72a113c58f3d2925376102fde9535c2dd0493dddbdad033f32fd368be21**；Windows ZIP `artifacts/R3/tag-music-windows-0.4.0+12.zip`，SHA256 **1536c06a59b56d2647a197c34f8e0de6041bc21ed0acb9cf80d6367e72110b22**。APK 固定 ID、版本、API29 与原签名指纹相同；双端原生库、许可文本及 SQLite 包审计通过。见 build-all-12.json、apk-signature-12.txt、apk-manifest-12.txt、package-audit-12.json。
-- 已修复测试发现的标签输入框控制器过早释放和 app_test 旧占位页断言。首个依赖恢复 Git 拒绝访问、一次测试失败及一次格式失败的原始日志分别保存在 artifacts/R3/*-failure-1.log；改变执行方式并修复后完整检查通过。同一问题不原样重试。
-- Windows +12 由指定 Terra/high 子 Agent 按本批授权启动；原库备份 `artifacts/R3/windows-v1-preupgrade.sqlite`，SHA256 f38571d9aa92fa1f62ef45e01e74a8f828533afcbfc9aee0594653ee87d66c30。主 Agent 已核对 `windows12/run-20261030-202308/migration-comparison.json`：schema 1→2，原 songs=9、roots=3、locations=17 全部行逐列相同，foreign_key_check 空。该结论不代替标签功能验收。
-- 新增 `integration_test/tag_benchmark_test.dart`，在独立临时库测量万首标签加载并输出设备/模式/P95；不打开用户曲库。格式、analyze及设备Release运行已通过；不改变 +12 应用候选。
-- 正式源码 **bcf31d5**、测试入口检查点 **54c3475**、独立打包检查点 **1011e0a**；后续仅补强测试，不改正式候选身份。Windows一次只读观察到2标签/2关系、外键无错，见 `windows12/run-20261030-202308/manual-observation-1.json`；不推定界面步骤通过。
-- 用户明确“全部通过了，你直接记为全部通过”，按刚才 Windows 六项清单记录全部人工通过，见同目录 `manual-feedback.json`。包含版本、标签创建/改名/重名、单曲多标签、跨搜索批量、删除影响与播放独立性；音频为用户人工确认，工具12秒回环未执行，不生成或推定录音证据。
-- 手机性能测试包已改为独立ID `app.tagmusic.player.benchmark` / 名称“Tag Music R3 Benchmark”，Release测试构建1，路径 `artifacts/R3/benchmark/tag-benchmark-release-1.apk`，SHA256 **4ba01e6a9e4445f932682d028dc0222b88e3ec0360c2e17496fd077b7c8df135**；包记录revision为cf2d93d-dirty，不改写身份。独立临时合成库，不打开正式曲库。构建、包名/名称/API29/签名检查及设备测试通过，现已卸载测试App。
-- 用户随后分别选择正式App Codex测试及允许独立性能测量，授权见 `artifacts/R3/android12/run-20261030-2040/authorization.json`。+12覆盖成功，firstInstallTime保持2026-10-29 20:14:50；设置显示0.4.0+12、曲库1374首。创建/重名拒绝/改名、单曲多标签、跨搜索选两首批量增删、删除数量及取消/确认、播放当前项及进度保持、进程重启后标签和曲库保留均有XML/截图/日志，汇总results.json通过17项核对。
-- 目标vivo V2309A独立Release性能包：万首临时合成库标签加载预热P95 **19,607 μs**，20样本/5预热，低于1s，原始benchmark.log有All tests passed，benchmark-result.json已独立重算P95。性能包已卸载，仅正式App包保留；测试标签已清理，最终1374首、无播放器栏，采集全部结束。
-- 播放期间标签编辑截图显示同曲0:39→0:51，重启日志idle/playing=false；媒体会话不公开业务全队列。另补强tags_page_test为已有不可变队列/当前项断言，2项相关widget测试及最终analyze通过，日志 `artifacts/R3/active-snapshot-test.log`、`analyze-final-test.log`。
+- 本轮计划/技术历史：[R3](rounds/R3.md#r3-当前执行计划)；[手机验收结果](rounds/R3-ACCEPTANCE.md)。标签创建、改名、影响数确认删除、单曲多标签、显式多选批量增删、v1→v2迁移与关系完整性已实现并验收。
+- 用户最终结论、逐项证据审计和边界：artifacts/R3/final-acceptance.json。R3没有待执行工作；下一阶段由用户决定，先Plan核对，不自动进入R4。
+- 所有设备测试与采集已结束。手机最后停在正式+12曲库页1374首、无播放器栏，测试标签已清理；独立性能App已卸载，正式App未卸载/清数据。电脑不再操作，保持用户最后状态。旧批授权不可复用。
 
-## 待办与边界
+## 分支、源码与产物
 
-- Windows 六项已人工通过，停止该批继续采集/操作；工具回环未执行明确保留。人工模式下不代为输入/切窗/关闭重开。PID31612仅为本批启动记录，不复用旧焦点或坐标。
-- 当前只待用户最终验收手机结果；不重复采集/检查，不进入R4，不将Goal标complete。设备测试批次已结束，不能据旧批授权再安装、启动或切窗。
-- Windows 自动路径：窗口截图 FrameArrived 超时1次，改读树后缓存点击失败2次；已停止同类尝试。技能允许的接口无桌面截图替代，用户随后明确改选人工测试。原失败证据 `windows12/run-20261030-202308/results.json` 保留；不得再次原样自动点击或把未测功能记通过。
-- 手机输入自动化历史：输入法可把ADB ASCII留在候选区，核对截图后确认键提交，后续搜索成功；带首尾空白的注入仍不可靠，不记手机去空白通过（单元与Windows人工覆盖保留）。一次播放中UIA无法idle，改用最新截图定位成功；不重用旧XML。输入手感/中文组合体验/听感由用户判断；未做手机失联模拟或正式库UUID逐行比较，不以日志猜通过。
-- 注意：最新 `build/app/outputs/flutter-apk/app-release.apk` 是隔离性能包，不能拿它当正式候选安装。正式安装始终使用 `artifacts/R3/tag-music-0.4.0+12.apk`；其SHA256重新核对不变。
-- Android 授权撤销旧补验已由用户取消，不把它算作 R3 通过项。R3 未验收不得进入 R4 或将 Goal 标 complete。
-- 产物/日志留 artifacts/R3，不提交；v1.json 不覆盖。原 Android ID 与签名保持，覆盖安装保留数据，不卸载/清数据。
+- 本地main；正式应用源码/包内revision **bcf31d5**，候选 **0.4.0+12**。测试与记录检查点d0f0e5b，隔离测试包工具1011e0a；最终文档收口提交以git log为准。后续测试/文档提交不冒充正式包内revision。
+- APK：artifacts/R3/tag-music-0.4.0+12.apk；SHA256 **cfe6f72a113c58f3d2925376102fde9535c2dd0493dddbdad033f32fd368be21**。
+- Windows ZIP：artifacts/R3/tag-music-windows-0.4.0+12.zip；SHA256 **1536c06a59b56d2647a197c34f8e0de6041bc21ed0acb9cf80d6367e72110b22**。
+- 正式Android ID app.tagmusic.player、原签名指纹保持；覆盖+12后firstInstallTime仍2026-10-29 20:14:50。
+- 独立性能包：artifacts/R3/benchmark/tag-benchmark-release-1.apk；ID app.tagmusic.player.benchmark，Release测试构建1，包记录revision cf2d93d-dirty，源清单source-manifest-release-1.json；SHA256 **4ba01e6a9e4445f932682d028dc0222b88e3ec0360c2e17496fd077b7c8df135**。不将其当正式候选。当前build/app默认Release输出是该测试包，正式安装必须从artifacts/R3取+12。
+- schema v2已生效，v1/v2实际DDL基线均保留；标签引用歌曲UUID。下一次变表继续显式迁移，不覆盖旧基线。
+
+## 已验证与证据
+
+| 项目 | 结果 / artifacts/R3内证据 |
+|---|---|
+| 自动与构建 | 格式/analyze/38项完整测试通过；补强已有不可变队列与当前项断言后2项相关widget及最终analyze通过。test.log、active-snapshot-test.log、analyze-final-test.log；build-all-12.json、package-audit-12.json核对双端Release、原生/SQLite和许可；APK ID/版本/API29/原签名通过 |
+| 迁移/关系 | 单元覆盖v1升级、重开、失败保留、约束、批量回滚、失联重现；Windows原库1→2后9歌曲/3目录/17位置逐列相同、外键无错，windows12/run-20261030-202308/migration-comparison.json。升级前备份windows-v1-preupgrade.sqlite |
+| Windows | 用户确认六项全部人工通过，含标签、跨搜索批量、删除影响及播放独立性；同目录manual-feedback.json，音频为用户人工确认，工具12秒回环未执行 |
+| 手机+12 | vivo V2309A，Codex批次六项可观察结果/17项证据核对通过；android12/run-20261030-2040/results.json、授权/包信息、XML/关键截图/本App日志。重启PID12816→18873、1374首和标签关联保留，启动idle/playing=false |
+| 性能 | Windows万首合成标签加载预热P95 13,437μs；手机独立Release临时万首库P95 19,607μs，20样本/5预热，低于对应500ms/1s。tag-benchmark.json、手机run目录benchmark-result.json/log；已独立重算 |
+
+## 边界、失败与不可重复项
+
+- 用户已接受的边界：手机首尾空白注入不可靠，不记真机去空白通过（单元及Windows人工覆盖保留）；输入手感/中文组合体验/听感不能由工具判定。手机未做失联模拟或正式库UUID逐行比较；失联标签保留有单元覆盖。媒体会话不公开完整业务队列，用UI回归验证不可变快照。性能为合成库，不代表实际万首文件扫描、R4复杂规则或其他设备。
+- Windows截图FrameArrived超时1次、缓存点击失败2次，已停止同类尝试并按用户改选人工通过；不得复用旧焦点/坐标。电脑界面仍须专用GPT 6.1 Terra/high子Agent，主Agent不接管。
+- 手机ADB输入曾停在IME候选区，依据截图改为确认提交后搜索成功；空白注入失败历史保留，不原样重复。播放中UIA一次无法idle后改用新截图定位，原XML不沿用。手机run目录保存过程与局限。
+- Debug性能包下载Flutter引擎停在53KB，保留benchmark/build-1.log、gradle-thread-1.txt；停止该构建后改为已有引擎的Release隔离包成功，没有原样重试。正式候选未因此重建或覆盖。
+- R2用户取消的Android授权撤销补验不补做、不记通过。第三方音频再分发来源缺口和其他系统/设备覆盖仍依PLAN/THIRD_PARTY在后续相关阶段处理，不以本轮替代首版交付。
+- 不轮询数据库、不重跑无新疑点的已通过检查、不再操作设备；R4启动须用户明确选择与Plan确认。
