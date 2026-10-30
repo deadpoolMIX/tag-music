@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'playback_controller.dart';
+import '../library/library_page.dart';
+import '../library/library_controller.dart';
 
 String formatPosition(Duration duration) {
   final seconds = duration.inSeconds;
@@ -16,6 +18,7 @@ class PlaybackPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.watch(playbackProvider);
+    final library = ref.watch(libraryProvider);
     if (controller == null) {
       return const Center(child: Text('让音乐有自己的归属'));
     }
@@ -26,118 +29,124 @@ class PlaybackPage extends ConsumerWidget {
         final current = controller.current;
         return Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Wrap(
-                    spacing: 12,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      FilledButton.icon(
-                        key: const ValueKey('choose-directory'),
-                        onPressed: controller.busy
-                            ? null
-                            : controller.chooseDirectory,
-                        icon: const Icon(Icons.create_new_folder_outlined),
-                        label: const Text('选择音乐文件夹'),
-                      ),
-                      PopupMenuButton<String>(
-                        tooltip: '重新打开已授权目录',
-                        enabled:
-                            !controller.busy && controller.roots.isNotEmpty,
-                        onSelected: controller.refresh,
-                        itemBuilder: (_) => [
-                          for (var i = 0; i < controller.roots.length; i++)
-                            PopupMenuItem(
-                              value: controller.roots[i],
-                              child: Text('已授权目录 ${i + 1}'),
-                            ),
-                        ],
-                        child: const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: Text('重新打开目录'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '播放技术验证 · ${controller.tracks.length} 首',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const Text('目录授权会保存；本轮曲目列表不保存。点击歌曲开始播放。'),
-                  if (!controller.notificationsEnabled ||
-                      controller.notificationMessage != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      controller.notificationMessage ??
-                          '允许播放通知后，可在通知栏和锁屏控制音乐。部分手机还需在通知设置中开启锁屏显示。',
-                    ),
+            if (library != null)
+              Expanded(
+                child: LibraryPage(library: library, playback: controller),
+              )
+            else ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                     Wrap(
-                      spacing: 8,
+                      spacing: 12,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        TextButton(
-                          onPressed: controller.requestingNotifications
+                        FilledButton.icon(
+                          key: const ValueKey('choose-directory'),
+                          onPressed: controller.busy
                               ? null
-                              : controller.requestNotificationPermission,
-                          child: const Text('开启播放通知'),
+                              : controller.chooseDirectory,
+                          icon: const Icon(Icons.create_new_folder_outlined),
+                          label: const Text('选择音乐文件夹'),
                         ),
-                        TextButton(
-                          onPressed: controller.openNotificationSettings,
-                          child: const Text('通知设置'),
+                        PopupMenuButton<String>(
+                          tooltip: '重新打开已授权目录',
+                          enabled:
+                              !controller.busy && controller.roots.isNotEmpty,
+                          onSelected: controller.refresh,
+                          itemBuilder: (_) => [
+                            for (var i = 0; i < controller.roots.length; i++)
+                              PopupMenuItem(
+                                value: controller.roots[i],
+                                child: Text('已授权目录 ${i + 1}'),
+                              ),
+                          ],
+                          child: const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: Text('重新打开目录'),
+                          ),
                         ),
                       ],
                     ),
-                  ],
-                  if (controller.busy) const LinearProgressIndicator(),
-                  if (controller.error != null)
+                    const SizedBox(height: 8),
                     Text(
-                      controller.error!,
-                      key: const ValueKey('playback-error'),
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
+                      '播放技术验证 · ${controller.tracks.length} 首',
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: controller.tracks.isEmpty
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text(
-                          '让音乐有自己的归属\n选择包含音乐的文件夹，支持读取子文件夹。',
-                          textAlign: TextAlign.center,
+                    const Text('目录授权会保存；本轮曲目列表不保存。点击歌曲开始播放。'),
+                    if (!controller.notificationsEnabled ||
+                        controller.notificationMessage != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        controller.notificationMessage ??
+                            '允许播放通知后，可在通知栏和锁屏控制音乐。部分手机还需在通知设置中开启锁屏显示。',
+                      ),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          TextButton(
+                            onPressed: controller.requestingNotifications
+                                ? null
+                                : controller.requestNotificationPermission,
+                            child: const Text('开启播放通知'),
+                          ),
+                          TextButton(
+                            onPressed: controller.openNotificationSettings,
+                            child: const Text('通知设置'),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (controller.busy) const LinearProgressIndicator(),
+                    if (controller.error != null)
+                      Text(
+                        controller.error!,
+                        key: const ValueKey('playback-error'),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
                         ),
                       ),
-                    )
-                  : ListView.builder(
-                      itemCount: controller.tracks.length,
-                      itemBuilder: (context, index) {
-                        final track = controller.tracks[index];
-                        return ListTile(
-                          key: ValueKey('track-$index'),
-                          selected: controller.index == index,
-                          leading: Icon(
-                            controller.index == index && controller.playing
-                                ? Icons.graphic_eq
-                                : Icons.music_note_outlined,
+                  ],
+                ),
+              ),
+              Expanded(
+                child: controller.tracks.isEmpty
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text(
+                            '让音乐有自己的归属\n选择包含音乐的文件夹，支持读取子文件夹。',
+                            textAlign: TextAlign.center,
                           ),
-                          title: Text(
-                            track.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          onTap: controller.busy
-                              ? null
-                              : () => unawaited(controller.select(index)),
-                        );
-                      },
-                    ),
-            ),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: controller.tracks.length,
+                        itemBuilder: (context, index) {
+                          final track = controller.tracks[index];
+                          return ListTile(
+                            key: ValueKey('track-$index'),
+                            selected: controller.index == index,
+                            leading: Icon(
+                              controller.index == index && controller.playing
+                                  ? Icons.graphic_eq
+                                  : Icons.music_note_outlined,
+                            ),
+                            title: Text(
+                              track.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onTap: controller.busy
+                                ? null
+                                : () => unawaited(controller.select(index)),
+                          );
+                        },
+                      ),
+              ),
+            ],
             if (current != null)
               Material(
                 color: Theme.of(context).colorScheme.surfaceContainer,
@@ -149,6 +158,12 @@ class PlaybackPage extends ConsumerWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (library != null)
+                        TrackCover(
+                          key: ValueKey(current.location),
+                          documents: controller.documents,
+                          track: current,
+                        ),
                       Text(
                         controller.metadata?.title ?? current.name,
                         maxLines: 1,

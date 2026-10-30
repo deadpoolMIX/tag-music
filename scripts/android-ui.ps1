@@ -1,7 +1,9 @@
 #Requires -Version 7.0
 # Test helpers. Call only within an explicitly authorized device-operation batch.
+param([ValidatePattern('^R[0-9]+$')][string]$Round = 'R1')
 . "$PSScriptRoot/env.ps1"
 $R1Adb = Join-Path $env:ANDROID_HOME 'platform-tools/adb.exe'
+$PhoneEvidenceRoot = Join-Path $ProjectRoot "artifacts/$Round"
 
 function Get-PhoneUi {
     param([string]$Name = 'phone-ui')
@@ -10,7 +12,7 @@ function Get-PhoneUi {
     if ($LASTEXITCODE -ne 0 -or ($output -join "`n") -notmatch 'UI hierchary dumped to:') {
         throw "没有获得新的手机 UI 快照，禁止沿用旧 XML：$output"
     }
-    $local = Join-Path $ProjectRoot "artifacts/R1/$Name.xml"
+    $local = Join-Path $PhoneEvidenceRoot "$Name.xml"
     & $R1Adb pull $remote $local 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'UI snapshot pull failed' }
     & $R1Adb shell rm $remote | Out-Null
@@ -45,5 +47,5 @@ function Invoke-PhoneTap {
 
 function Save-PhoneScreenshot {
     param([Parameter(Mandatory)][string]$Name)
-    & $R1Adb exec-out screencap -p > (Join-Path $ProjectRoot "artifacts/R1/$Name.png")
+    & $R1Adb exec-out screencap -p > (Join-Path $PhoneEvidenceRoot "$Name.png")
 }

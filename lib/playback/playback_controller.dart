@@ -197,6 +197,14 @@ class PlaybackController extends ChangeNotifier {
 
   Future<void> select(int target) => _serial(() => _select(target));
 
+  // Search, sorting and rescanning never mutate this playback snapshot.
+  Future<void> playSnapshot(List<ProbeTrack> snapshot, int target) =>
+      _serial(() async {
+        if (target < 0 || target >= snapshot.length) return;
+        tracks = List.unmodifiable(snapshot);
+        await _select(target);
+      });
+
   Future<void> _select(int target) async {
     if (target < 0 || target >= tracks.length) return;
     _selection++;

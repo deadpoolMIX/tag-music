@@ -83,6 +83,61 @@ void main() {
   });
 
   test(
+    'paged SAF enumeration closes token on cancellation and page errors',
+    () async {
+      const channel = MethodChannel('test.pages');
+      final calls = <String>[];
+      var fail = false;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call.method);
+            if (call.method == 'beginScan') return 41;
+            if (call.method == 'nextScan') {
+              if (fail) throw PlatformException(code: 'lost-grant');
+              return {
+                'done': false,
+                'files': [
+                  {
+                    'identity': 'provider:opaque:42',
+                    'location':
+                        'content://provider/tree/root/document/opaque%3A42',
+                    'name': '中文.mp3',
+                    'relativePath': '子目录/中文.mp3',
+                    'size': 123,
+                    'modified': 1000,
+                  },
+                ],
+              };
+            }
+            return null;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null),
+      );
+      final access = DocumentAccess(android: true, channel: channel);
+      final first = await access
+          .scan('content://provider/tree/root', cancelled: () => false)
+          .first;
+      expect(
+        first.location,
+        'content://provider/tree/root/document/opaque%3A42',
+      );
+      expect(first.relativePath, '子目录/中文.mp3');
+      expect(calls, ['beginScan', 'nextScan', 'endScan']);
+      calls.clear();
+      fail = true;
+      await expectLater(
+        access
+            .scan('content://provider/tree/root', cancelled: () => false)
+            .toList(),
+        throwsA(isA<PlatformException>()),
+      );
+      expect(calls, ['beginScan', 'nextScan', 'endScan']);
+    },
+  );
+
+  test(
     'six original audio formats read metadata without changing file bytes',
     () async {
       final fixtures = Directory(Platform.environment['TAG_MUSIC_FIXTURES']!);

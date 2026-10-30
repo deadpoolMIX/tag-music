@@ -12,6 +12,7 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.provider.Settings
+import android.database.Cursor
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.Executors
@@ -20,7 +21,6 @@ import java.util.concurrent.Executors
 class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger) {
     private val channel = MethodChannel(messenger, "app.tagmusic.player/documents")
     private val main = Handler(Looper.getMainLooper())
-    private val extensions = setOf("mp3", "flac", "m4a", "aac", "wav", "ogg", "opus")
 
     init {
         channel.setMethodCallHandler { call, result ->
@@ -65,6 +65,15 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                 worker.execute {
                     try {
                         val value: Any? = when (call.method) {
+                            "beginScan" -> {
+                                val tree = Uri.parse(requireNotNull(call.argument<String>("uri")))
+                                require(tree.scheme == "content" && DocumentsContract.isTreeUri(tree))
+                                val token = ++scanToken
+                                scans[token] = Scan(tree, activity.applicationContext.contentResolver)
+                                token
+                            }
+                            "nextScan" -> requireNotNull(scans[call.argument<Int>("token")]).next()
+                            "endScan" -> { scans.remove(call.argument<Int>("token"))?.close(); null }
                             "list" -> list(Uri.parse(requireNotNull(call.argument<String>("uri"))))
                             "open" -> {
                                 val uri = Uri.parse(requireNotNull(call.argument<String>("uri")))
@@ -79,6 +88,8 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                             }
                             "diagnostics" -> mapOf(
                                 "managedDescriptors" to descriptors.size,
+                                "inputAcceptingText" to (activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).isAcceptingText,
+                                "inputActive" to (activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).isActive,
                                 "processDescriptors" to (java.io.File("/proc/self/fd").list()?.size ?: -1),
                                 "persistedReadGrants" to activity.contentResolver.persistedUriPermissions.count { it.isReadPermission }
                             )
@@ -150,7 +161,56 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
         return tracks.sortedBy { it["name"] }
     }
 
+    /** Bounded pages; the single worker can service playback FD calls between pages. */
+    private class Scan(private val tree: Uri, private val resolver: android.content.ContentResolver) {
+        private val pending = java.util.ArrayDeque<Pair<String, String>>()
+        private val visited = mutableSetOf<String>()
+        private var cursor: Cursor? = null
+        private var parentPath = ""
+        init { pending.add(DocumentsContract.getTreeDocumentId(tree) to "") }
+        fun close() { cursor?.close(); cursor = null; pending.clear() }
+        fun next(): Map<String, Any> {
+            val files = mutableListOf<Map<String, Any?>>()
+            var examined = 0
+            try {
+                while (examined < 128) {
+                    if (cursor == null) {
+                        if (pending.isEmpty()) break
+                        val (id, path) = pending.removeFirst()
+                        if (!visited.add(id)) continue
+                        require(visited.size <= 100000) { "目录数量超过安全上限" }
+                        parentPath = path
+                        cursor = resolver.query(
+                            DocumentsContract.buildChildDocumentsUriUsingTree(tree, id),
+                            arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                                DocumentsContract.Document.COLUMN_MIME_TYPE,
+                                DocumentsContract.Document.COLUMN_SIZE,
+                                DocumentsContract.Document.COLUMN_LAST_MODIFIED), null, null, null)
+                            ?: throw IllegalStateException("子目录不可访问，请重新授权")
+                    }
+                    val row = requireNotNull(cursor)
+                    if (!row.moveToNext()) { row.close(); cursor = null; continue }
+                    examined++
+                    val id = row.getString(0)
+                    val name = row.getString(1) ?: id
+                    val path = if (parentPath.isEmpty()) name else "$parentPath/$name"
+                    if (row.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR) pending.add(id to path)
+                    else if (name.substringAfterLast('.', "").lowercase() in extensions) {
+                        files.add(mapOf("identity" to "${tree.authority}:$id",
+                            "location" to DocumentsContract.buildDocumentUriUsingTree(tree, id).toString(),
+                            "name" to name, "relativePath" to path,
+                            "size" to if (row.isNull(3)) null else row.getLong(3),
+                            "modified" to if (row.isNull(4) || row.getLong(4) <= 0) null else row.getLong(4)))
+                    }
+                }
+                return mapOf("files" to files, "done" to (cursor == null && pending.isEmpty()))
+            } catch (e: Exception) { close(); throw e }
+        }
+    }
+
     companion object {
+        private val extensions = setOf("mp3", "flac", "m4a", "aac", "wav", "ogg", "opus")
         private const val PICK_DIRECTORY = 4011
         private const val NOTIFICATIONS = 4012
         // AudioService's FlutterEngine survives Activity recreation. Descriptor
@@ -159,5 +219,7 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
         private val descriptors = mutableMapOf<Int, ParcelFileDescriptor>()
         private var picker: MethodChannel.Result? = null
         private var notificationRequest: MethodChannel.Result? = null
+        private var scanToken = 0
+        private val scans = mutableMapOf<Int, Scan>()
     }
 }

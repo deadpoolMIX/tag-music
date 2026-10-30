@@ -6,6 +6,7 @@ import 'package:audio_metadata_reader/audio_metadata_reader.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path/path.dart' as p;
 
 import 'descriptor_file.dart';
 
@@ -26,10 +27,51 @@ class TrackMetadata {
   final Duration? duration;
 }
 
+class ScannedFile {
+  const ScannedFile({
+    required this.identity,
+    required this.location,
+    required this.name,
+    required this.relativePath,
+    this.size,
+    this.modified,
+  });
+  final String identity;
+  final String location;
+  final String name;
+  final String relativePath;
+  final int? size;
+  final int? modified;
+  ProbeTrack get probe => ProbeTrack(location: location, name: name);
+}
+
+Uint8List? readFileCover(File file) {
+  final pictures = readMetadata(file, getImage: true).pictures;
+  // Embedded originals are read only on demand, never stored in the library.
+  for (final picture in pictures) {
+    if (picture.bytes.isNotEmpty && picture.bytes.length <= 8 * 1024 * 1024) {
+      return Uint8List.fromList(picture.bytes);
+    }
+  }
+  return null;
+}
+
 TrackMetadata readTrackMetadata(String path) => readFileMetadata(File(path));
 
 TrackMetadata readDescriptorMetadata(int fd) =>
     readFileMetadata(DescriptorFile(AndroidDescriptorSource(fd)));
+
+// Keep isolate entry closures outside DocumentAccess: its pending Future is
+// intentionally unsendable, and nested closures may capture the outer context.
+Future<TrackMetadata> _pathMetadata(String path) =>
+    Isolate.run(() => readTrackMetadata(path));
+Future<TrackMetadata> _fdMetadata(int fd) =>
+    Isolate.run(() => readDescriptorMetadata(fd));
+Future<Uint8List?> _pathCover(String path) =>
+    Isolate.run(() => readFileCover(File(path)));
+Future<Uint8List?> _fdCover(int fd) => Isolate.run(
+  () => readFileCover(DescriptorFile(AndroidDescriptorSource(fd))),
+);
 
 TrackMetadata readFileMetadata(File source) {
   final data = readMetadata(source);
@@ -74,6 +116,15 @@ class DocumentAccess {
   final MethodChannel channel;
   late final _preferences = SharedPreferencesAsync();
   static const _rootsKey = 'r1.directoryLocations';
+  Future<void> _reading = Future.value();
+  Future<T> _read<T>(Future<T> Function() action) {
+    final result = _reading.then((_) => action());
+    _reading = result.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stack) {},
+    );
+    return result;
+  }
 
   Future<List<String>> roots() async =>
       await _preferences.getStringList(_rootsKey) ?? [];
@@ -121,22 +172,96 @@ class DocumentAccess {
     return tracks;
   }
 
+  Stream<ScannedFile> scan(
+    String root, {
+    required bool Function() cancelled,
+  }) async* {
+    if (android) {
+      final token = (await channel.invokeMethod<int>('beginScan', {
+        'uri': root,
+      }))!;
+      try {
+        var done = false;
+        while (!done && !cancelled()) {
+          final page = (await channel.invokeMapMethod<String, Object?>(
+            'nextScan',
+            {'token': token},
+          ))!;
+          done = page['done'] == true;
+          for (final raw in page['files']! as List) {
+            if (cancelled()) return;
+            final row = raw as Map;
+            yield ScannedFile(
+              identity: row['identity'] as String,
+              location: row['location'] as String,
+              name: row['name'] as String,
+              relativePath: row['relativePath'] as String,
+              size: row['size'] as int?,
+              modified: row['modified'] as int?,
+            );
+          }
+        }
+      } finally {
+        await channel.invokeMethod<void>('endScan', {'token': token});
+      }
+    } else {
+      final directory = Directory(p.normalize(p.absolute(root)));
+      await for (final item in directory.list(
+        recursive: true,
+        followLinks: false,
+      )) {
+        if (cancelled()) return;
+        if (item is! File ||
+            !audioExtensions.contains(
+              item.path.split('.').last.toLowerCase(),
+            )) {
+          continue;
+        }
+        final stat = await item.stat();
+        if (stat.type != FileSystemEntityType.file) {
+          throw FileSystemException('扫描期间文件不可访问', item.path);
+        }
+        final location = p.normalize(p.absolute(item.path));
+        yield ScannedFile(
+          identity: Platform.isWindows ? location.toLowerCase() : location,
+          location: location,
+          name: item.uri.pathSegments.last,
+          relativePath: location
+              .substring(directory.path.length)
+              .replaceFirst(RegExp(r'^[/\\]'), ''),
+          size: stat.size,
+          modified: stat.modified.millisecondsSinceEpoch,
+        );
+      }
+    }
+  }
+
+  Future<Uint8List?> cover(ProbeTrack track) => _read(() async {
+    if (!android) return _pathCover(track.location);
+    final fd = await open(track.location);
+    try {
+      return await _fdCover(fd);
+    } finally {
+      await close(fd);
+    }
+  });
+
   Future<int> open(String uri) async =>
       (await channel.invokeMethod<int>('open', {'uri': uri}))!;
 
   Future<void> close(int fd) => channel.invokeMethod<void>('close', {'fd': fd});
 
-  Future<TrackMetadata> metadata(ProbeTrack track) async {
-    if (!android) return Isolate.run(() => readTrackMetadata(track.location));
+  Future<TrackMetadata> metadata(ProbeTrack track) => _read(() async {
+    if (!android) return _pathMetadata(track.location);
     final fd = await open(track.location);
     try {
       // Read the already-authorized descriptor directly. Reopening /proc/self/fd
       // can be denied by Android providers/SELinux even though the fd is readable.
-      return await Isolate.run(() => readDescriptorMetadata(fd));
+      return await _fdMetadata(fd);
     } finally {
       await close(fd);
     }
-  }
+  });
 
   Future<Map<Object?, Object?>> diagnostics() async => android
       ? await channel.invokeMapMethod<Object?, Object?>('diagnostics') ?? {}

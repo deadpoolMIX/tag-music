@@ -11,6 +11,8 @@ import 'app.dart';
 import 'core/settings.dart';
 import 'playback/documents.dart';
 import 'playback/playback_controller.dart';
+import 'library/database.dart';
+import 'library/library_controller.dart';
 
 Future<PlaybackController>? _playback;
 bool _nativeLicensesRegistered = false;
@@ -35,6 +37,10 @@ Future<PlaybackController> initializePlayback() async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('R2 FlutterError: ${details.exceptionAsString()}');
+  };
   if (!_nativeLicensesRegistered) {
     _nativeLicensesRegistered = true;
     LicenseRegistry.addLicense(() async* {
@@ -58,11 +64,23 @@ Future<void> main() async {
   var mode = ThemeMode.system;
   String? warning;
   PlaybackController? playback;
+  LibraryController? library;
   try {
     playback = await (_playback ??= initializePlayback());
   } catch (e) {
     _playback = null;
     warning = '播放初始化失败：$e';
+  }
+  try {
+    library = LibraryController(
+      LibraryDatabase(),
+      playback?.documents ?? DocumentAccess(),
+    );
+    await library.initialize();
+  } catch (e) {
+    await library?.shutdown();
+    library = null;
+    warning = '${warning == null ? '' : '$warning\n'}曲库初始化失败：$e';
   }
   try {
     mode = decodeTheme(await store.readTheme());
@@ -77,6 +95,7 @@ Future<void> main() async {
         initialThemeProvider.overrideWithValue(mode),
         startupWarningProvider.overrideWithValue(warning),
         playbackProvider.overrideWithValue(playback),
+        libraryProvider.overrideWithValue(library),
       ],
       child: const TagMusicApp(),
     ),

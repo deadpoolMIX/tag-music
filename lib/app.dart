@@ -81,7 +81,7 @@ class _AppShellState extends ConsumerState<AppShell>
           actions: const [
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Chip(label: Text('R1 · 播放验证')),
+              child: Chip(label: Text('R2 · 本地曲库')),
             ),
           ],
         ),
@@ -302,7 +302,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       const SizedBox(height: 8),
                       SelectableText('版本 ${info.version}+${info.buildNumber}'),
                       const SizedBox(height: 8),
-                      const Text('R1 · 双端播放技术验证'),
+                      const Text('R2 · 本地音乐库'),
                       const SizedBox(height: 12),
                       TextButton.icon(
                         key: const ValueKey('copy-diagnostics'),
