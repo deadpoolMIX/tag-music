@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../playback/documents.dart';
 import 'database.dart';
+import 'tag_repository.dart';
 
 final libraryProvider = Provider<LibraryController?>((ref) => null);
 
@@ -24,11 +25,15 @@ class LibraryTrack {
 }
 
 class LibraryController extends ChangeNotifier {
-  LibraryController(this.db, this.documents);
+  LibraryController(this.db, this.documents) : tagsStore = TagRepository(db);
   final LibraryDatabase db;
   final DocumentAccess documents;
+  final TagRepository tagsStore;
   List<LibraryTrack> tracks = [];
   List<LibraryRoot> roots = [];
+  List<Tag> tags = [];
+  Map<String, Set<String>> tagIdsBySong = {};
+  Map<String, int> tagCounts = {};
   String query = '';
   LibrarySort sort = LibrarySort.title;
   bool descending = false;
@@ -101,6 +106,49 @@ class LibraryController extends ChangeNotifier {
     await reload();
   }
 
+  Set<String> tagsForSong(String songId) =>
+      Set.unmodifiable(tagIdsBySong[songId] ?? const <String>{});
+
+  int countForTag(String tagId) => tagCounts[tagId] ?? 0;
+
+  List<LibraryTrack> tracksForTag(String tagId) => List.unmodifiable(
+    tracks.where(
+      (track) => tagIdsBySong[track.song.id]?.contains(tagId) == true,
+    ),
+  );
+
+  Future<void> reloadTags() async {
+    final snapshot = await tagsStore.load();
+    tags = snapshot.tags;
+    tagIdsBySong = snapshot.bySong;
+    tagCounts = _countTags(snapshot.bySong);
+    _publish();
+  }
+
+  Future<void> createTag(String name) async {
+    await tagsStore.create(name);
+    await reloadTags();
+  }
+
+  Future<void> renameTag(String id, String name) async {
+    await tagsStore.rename(id, name);
+    await reloadTags();
+  }
+
+  Future<void> deleteTag(String id) async {
+    await tagsStore.delete(id);
+    await reloadTags();
+  }
+
+  Future<void> changeSongTags(
+    String tagId,
+    Iterable<String> songIds, {
+    required bool add,
+  }) async {
+    await tagsStore.changeSongs(tagId, songIds, add: add);
+    await reloadTags();
+  }
+
   Future<void> _addRoot(String root) => db
       .into(db.libraryRoots)
       .insert(
@@ -126,7 +174,21 @@ class LibraryController extends ChangeNotifier {
     }
     tracks = [for (final song in songs) LibraryTrack(song, bySong[song.id])];
     _visibleCache = null;
+    final tagSnapshot = await tagsStore.load();
+    tags = tagSnapshot.tags;
+    tagIdsBySong = tagSnapshot.bySong;
+    tagCounts = _countTags(tagSnapshot.bySong);
     _publish();
+  }
+
+  Map<String, int> _countTags(Map<String, Set<String>> bySong) {
+    final counts = <String, int>{};
+    for (final ids in bySong.values) {
+      for (final id in ids) {
+        counts.update(id, (value) => value + 1, ifAbsent: () => 1);
+      }
+    }
+    return counts;
   }
 
   Future<void> chooseDirectory() async {

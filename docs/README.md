@@ -36,18 +36,18 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 
 - 产品完整语义见 [PLAN §1～2](PLAN.md#2-技术结构与关键行为)。音乐只读、标签仅入库；Android 保留 SAF URI/授权，不转真实路径；Windows 仅软件内操作和后台播放，不做 SMTC、系统媒体键、托盘播放按钮。
 - **曲库已实现**：`Songs.id` 是 UUID，根目录/`SongLocations` 关联位置。重叠根目录按位置去重，异位置同内容不合并；单根完整成功才事务提交，取消/授权失败保留旧数据，失联/重现保持 UUID。后续标签/歌单用歌曲 ID，不能把路径当永久 ID。
-- **迁移从下一次 schema 变化开始**：当前 v1，`onUpgrade` 对未知升级抛错；变表即升版本、显式迁移并验证旧库数据/外键/失败处理，不等 R8/R9。[v1.json](database-schema/v1.json) 是实际 SQLite DDL 基线，不覆盖，也不是 Drift CLI schema JSON。
+- **迁移已开始**：R3 当前 schema v2，v1→v2 显式创建标签及关系表；未知升级抛错。变表即升版本并验证旧库数据、外键及失败处理。[v1.json](database-schema/v1.json) 和 [v2.json](database-schema/v2.json) 是实际 SQLite DDL 基线，不覆盖，也不是 Drift CLI schema JSON。
 - **资源生命周期已实现**：切歌/通知操作串行，停止旧曲后关闭应用持有的播放 FD 再开新曲；元数据只读借用 FD、finally 释放，不靠 GC。业务万首队列只为当前与有限预取建立播放对象/句柄。
 - **R2→R5 边界**：点击播放是不可变快照，搜索/扫描不改播放；当前 `ProbeTrack` 仍用 location/name，R5 要接稳定歌曲 ID 后做持久队列/进度恢复，重启默认暂停。
-- **未来接口**：R3 扁平多标签，R4 版本化规则树及删标签影响，R5 普通/智能歌单和队列，R8 版本化管理数据备份/整体回滚；详细语义见 PLAN，尚未据此视为已实现。
+- **R3 开发中**：扁平多标签与歌曲 UUID 关系已接入，是否验收见 HANDOFF。R4 版本化规则树及删标签影响、R5 普通/智能歌单和队列、R8 版本化管理数据备份/整体回滚仍属未来接口。
 - 固定 ID/签名、锁定依赖、本机受限补丁见 [TOOLCHAIN](TOOLCHAIN.md)；实际原生库与再分发来源缺口见 [THIRD_PARTY](THIRD_PARTY.md)。相关变更即核对，不等 R9 从零处理。
 
 ## 验证入口与维护
 
-- `pwsh.exe -File scripts/check.ps1 -Round R2`：依赖恢复、格式、analyze、全套单元/widget；不含原生集成、双端构建、手机验收。R2 准备真实样本并写合成万首基准，不代表手机/真实万首文件。
+- `& ./scripts/check.ps1 -Round R3`（PowerShell 7）：依赖恢复、格式、analyze、全套单元/widget；不含原生集成、双端构建、手机验收。R3 准备曲库样本及万首合成标签基准，不代表手机/真实万首文件。
 - 候选参数：`scripts/build.ps1 -Target all -BuildNumber <新构建号> -Round <当前阶段>`；`verify-apk.ps1` 显式传 `-Version/-BuildNumbers/-Round`；`verify-packages.py` 传 `--version/--build/--round`，当前音频基线另传 `--native-reference-round R1`。示意值须取实际 pubspec/交接。
-- 手动 Flutter 先 `. ./scripts/env.ps1`，再 `& ./scripts/restore.ps1 -Round R2`。所有 Flutter 检查/测试/构建串行，避免共享注册文件互改。按模块表先做相关回归，候选/阶段收口完整验证，具体门禁见 [PLAN §4](PLAN.md#4-验证与质量门禁)。
-- 现有 check 仅在 R1/R2 自动准备样本，SQLite 包审计分支也仅在 R2 启用；后续阶段 Plan 要先核对样本与审计覆盖，将必要适配列入执行计划，不能把 skip 当通过。脚本默认参数及 Android 播放/卡片脚本仍有 R1 路径/样本假设，使用前核对，显式传当前参数。
+- 手动 Flutter 先 `. ./scripts/env.ps1`，再 `& ./scripts/restore.ps1 -Round R3`。所有 Flutter 检查/测试/构建串行，避免共享注册文件互改。按模块表先做相关回归，候选/阶段收口完整验证，具体门禁见 [PLAN §4](PLAN.md#4-验证与质量门禁)。
+- 现有 check 在 R1～R3 按阶段准备样本，SQLite 包审计分支在 R2/R3 启用；后续阶段 Plan 要先核对覆盖，不能把 skip 当通过。脚本默认参数及 Android 播放/卡片脚本仍有 R1 路径/样本假设，使用前核对，显式传当前参数。
 - 固定日志名重跑前保留旧失败证据到同轮构建号/问题子目录，候选不复用构建号覆盖。`install-android.ps1` 还会启动应用与抓日志，须取得涵盖这些操作的本批交互确认。
 - 仅文档改动验 diff、链接/事实/改动范围，不重建应用。改公共接口先查调用方/已有实现并验证，避免重复功能或闲置抽象。临时修复记录原因、范围、验证与撤除条件；改模块/接口/命令同步对应长期文档。
 
@@ -64,4 +64,4 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 | [TOOLCHAIN](TOOLCHAIN.md) / [THIRD_PARTY](THIRD_PARTY.md) | 环境/补丁及许可，相关任务读 |
 | [原始计划](archive/PLAN.original.md) | 原件保留，仅溯源时读 |
 
-历史入口（非必读）：[R0](rounds/R0.md)/[验收](rounds/R0-ACCEPTANCE.md)、[R1](rounds/R1.md)/[验收](rounds/R1-ACCEPTANCE.md)、[R2](rounds/R2.md)/[验收](rounds/R2-ACCEPTANCE.md)。历史旧路径按本索引/Git 定位，不改写原始失败记录。
+历史入口（非必读）：[R0](rounds/R0.md)/[验收](rounds/R0-ACCEPTANCE.md)、[R1](rounds/R1.md)/[验收](rounds/R1-ACCEPTANCE.md)、[R2](rounds/R2.md)/[验收](rounds/R2-ACCEPTANCE.md)；当前 [R3](rounds/R3.md)/[验收](rounds/R3-ACCEPTANCE.md)。历史旧路径按本索引/Git 定位，不改写原始失败记录。

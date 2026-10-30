@@ -48,15 +48,13 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('desktop uses sidebar and navigates placeholders', (
-    tester,
-  ) async {
+  testWidgets('desktop uses sidebar and navigates pages', (tester) async {
     await open(tester, const Size(1280, 800));
     expect(find.byType(NavigationRail), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
     await tester.tap(find.text('标签'));
     await tester.pumpAndSettle();
-    expect(find.text('用标签连接每一种喜好'), findsOneWidget);
+    expect(find.text('曲库尚未就绪'), findsOneWidget);
     await tester.tap(find.text('歌单'));
     await tester.pumpAndSettle();
     expect(find.text('留住每一次灵感'), findsOneWidget);

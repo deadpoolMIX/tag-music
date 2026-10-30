@@ -39,7 +39,24 @@ class SongLocations extends Table {
   Set<Column> get primaryKey => {songId, root};
 }
 
-@DriftDatabase(tables: [Songs, LibraryRoots, SongLocations])
+class Tags extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get nameKey => text().unique()();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class SongTags extends Table {
+  TextColumn get songId =>
+      text().references(Songs, #id, onDelete: KeyAction.cascade)();
+  TextColumn get tagId =>
+      text().references(Tags, #id, onDelete: KeyAction.cascade)();
+  @override
+  Set<Column> get primaryKey => {songId, tagId};
+}
+
+@DriftDatabase(tables: [Songs, LibraryRoots, SongLocations, Tags, SongTags])
 class LibraryDatabase extends _$LibraryDatabase {
   LibraryDatabase([QueryExecutor? executor])
     : super(
@@ -52,12 +69,26 @@ class LibraryDatabase extends _$LibraryDatabase {
             ),
       );
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    onCreate: (m) => m.createAll(),
-    // Future schema changes must explicitly migrate from version 1.
-    onUpgrade: (m, from, to) async => throw StateError('不支持的数据库升级 $from → $to'),
+    onCreate: (m) async {
+      await m.createAll();
+      await customStatement(
+        'CREATE INDEX song_tags_tag_id_idx ON song_tags (tag_id)',
+      );
+    },
+    onUpgrade: (m, from, to) async {
+      if (from == 1 && to == 2) {
+        await m.createTable(tags);
+        await m.createTable(songTags);
+        await customStatement(
+          'CREATE INDEX song_tags_tag_id_idx ON song_tags (tag_id)',
+        );
+        return;
+      }
+      throw StateError('不支持的数据库升级 $from → $to');
+    },
     beforeOpen: (_) => customStatement('PRAGMA foreign_keys = ON'),
   );
 }

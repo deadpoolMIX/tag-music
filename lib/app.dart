@@ -7,6 +7,8 @@ import 'core/diagnostics.dart';
 import 'core/settings.dart';
 import 'playback/playback_page.dart';
 import 'playback/playback_controller.dart';
+import 'library/library_controller.dart';
+import 'library/tags_page.dart';
 
 class TagMusicApp extends ConsumerWidget {
   const TagMusicApp({super.key});
@@ -81,7 +83,7 @@ class _AppShellState extends ConsumerState<AppShell>
           actions: const [
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Chip(label: Text('R2 · 本地曲库')),
+              child: Chip(label: Text('R3 · 标签管理')),
             ),
           ],
         ),
@@ -125,6 +127,11 @@ class _AppShellState extends ConsumerState<AppShell>
                         ? const SettingsPage()
                         : _selected == 0
                         ? const PlaybackPage()
+                        : _selected == 1
+                        ? switch (ref.watch(libraryProvider)) {
+                            final library? => TagsPage(library: library),
+                            null => const Center(child: Text('曲库尚未就绪')),
+                          }
                         : EmptyPage(index: _selected),
                   ),
                 ],
@@ -162,7 +169,7 @@ class EmptyPage extends StatelessWidget {
     final titles = ['让音乐有自己的归属', '用标签连接每一种喜好', '留住每一次灵感'];
     final descriptions = [
       '这里将收纳你的本地音乐。\n目录导入与播放将在后续版本开放。',
-      '这里将管理音乐的多个标签。\n标签管理将在 R3 开放。',
+      '这里将管理音乐的多个标签。',
       '这里将保存普通歌单和智能歌单。\n歌单与队列将在 R5 开放。',
     ];
     return Center(
@@ -302,7 +309,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       const SizedBox(height: 8),
                       SelectableText('版本 ${info.version}+${info.buildNumber}'),
                       const SizedBox(height: 8),
-                      const Text('R2 · 本地音乐库'),
+                      const Text('R3 · 标签管理'),
                       const SizedBox(height: 12),
                       TextButton.icon(
                         key: const ValueKey('copy-diagnostics'),

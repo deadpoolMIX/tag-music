@@ -1,7 +1,7 @@
 name: tag_music
 description: 双端本地音乐播放器。
 publish_to: none
-version: 0.3.0+11
+version: 0.4.0+12
 
 environment:
   sdk: '>=3.13.0 <4.0.0'
@@ -36,6 +36,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   drift_dev: 2.35.2
   build_runner: 2.17.1
+  sqlite3: 3.5.2
 
 flutter:
   uses-material-design: true

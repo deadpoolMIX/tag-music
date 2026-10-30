@@ -6,11 +6,31 @@ import '../playback/documents.dart';
 import '../playback/playback_controller.dart';
 import 'library_controller.dart';
 import 'library_search.dart';
+import 'tags_page.dart';
 
-class LibraryPage extends StatelessWidget {
+class LibraryPage extends StatefulWidget {
   const LibraryPage({required this.library, required this.playback, super.key});
   final LibraryController library;
   final PlaybackController playback;
+  @override
+  State<LibraryPage> createState() => _LibraryPageState();
+}
+
+class _LibraryPageState extends State<LibraryPage> {
+  LibraryController get library => widget.library;
+  PlaybackController get playback => widget.playback;
+  bool selecting = false;
+  final Set<String> selected = {};
+
+  void toggle(String id) => setState(() {
+    if (!selected.add(id)) selected.remove(id);
+  });
+
+  void endSelection() => setState(() {
+    selected.clear();
+    selecting = false;
+  });
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: library,
@@ -64,10 +84,46 @@ class LibraryPage extends StatelessWidget {
                               onPressed: library.cancelScan,
                               child: const Text('取消扫描'),
                             ),
+                          TextButton.icon(
+                            key: const ValueKey('select-songs'),
+                            onPressed: () => setState(() {
+                              selecting = !selecting;
+                              if (!selecting) selected.clear();
+                            }),
+                            icon: Icon(
+                              selecting ? Icons.close : Icons.checklist,
+                            ),
+                            label: Text(selecting ? '退出多选' : '多选歌曲'),
+                          ),
                           Text('${rows.length} / ${library.tracks.length} 首'),
                         ],
                       ),
                       const SizedBox(height: 8),
+                      if (selecting)
+                        Wrap(
+                          spacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text('已选 ${selected.length} 首'),
+                            TextButton(
+                              onPressed: selected.isEmpty
+                                  ? null
+                                  : () => setState(selected.clear),
+                              child: const Text('清空选择'),
+                            ),
+                            FilledButton(
+                              key: const ValueKey('batch-tags'),
+                              onPressed: selected.isEmpty
+                                  ? null
+                                  : () => showTagActions(
+                                      context,
+                                      library,
+                                      Set.of(selected),
+                                    ),
+                              child: const Text('批量编辑标签'),
+                            ),
+                          ],
+                        ),
                       LibrarySearch(
                         library: library,
                         documents: playback.documents,
@@ -150,13 +206,27 @@ class LibraryPage extends StatelessWidget {
                       itemCount: rows.length,
                       itemBuilder: (context, index) {
                         final track = rows[index];
+                        final assigned = library.tags
+                            .where(
+                              (tag) =>
+                                  library.tagIdsBySong[track.song.id]?.contains(
+                                    tag.id,
+                                  ) ==
+                                  true,
+                            )
+                            .map((tag) => tag.name)
+                            .join('、');
                         return ListTile(
                           key: ValueKey(track.song.id),
                           selected:
                               track.probe.location ==
                               playback.current?.location,
                           leading: Icon(
-                            track.available
+                            selecting
+                                ? selected.contains(track.song.id)
+                                      ? Icons.check_box
+                                      : Icons.check_box_outline_blank
+                                : track.available
                                 ? Icons.music_note_outlined
                                 : Icons.link_off,
                           ),
@@ -166,23 +236,39 @@ class LibraryPage extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                           subtitle: Text(
-                            track.available
-                                ? [
-                                    track.song.artist ?? '未知歌手',
-                                    track.song.album,
-                                    track.song.name,
-                                  ].nonNulls.join(' · ')
-                                : '文件失联 · 记录仍保留',
-                            maxLines: 1,
+                            [
+                              if (track.available)
+                                [
+                                  track.song.artist ?? '未知歌手',
+                                  track.song.album,
+                                  track.song.name,
+                                ].nonNulls.join(' · ')
+                              else
+                                '文件失联 · 记录仍保留',
+                              if (assigned.isNotEmpty) '标签：$assigned',
+                              if (track.song.metadataError != null) '元数据不可读',
+                            ].join('\n'),
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          trailing: track.song.metadataError == null
+                          trailing: selecting
                               ? null
-                              : const Tooltip(
-                                  message: '元数据不可读，仍可尝试播放',
-                                  child: Icon(Icons.info_outline),
+                              : IconButton(
+                                  tooltip: '编辑${track.title}的标签',
+                                  onPressed: () => showTagActions(
+                                    context,
+                                    library,
+                                    {track.song.id},
+                                  ),
+                                  icon: const Icon(Icons.sell_outlined),
                                 ),
-                          onTap: !track.available
+                          onLongPress: () => setState(() {
+                            selecting = true;
+                            selected.add(track.song.id);
+                          }),
+                          onTap: selecting
+                              ? () => toggle(track.song.id)
+                              : !track.available
                               ? null
                               : () {
                                   final snapshot = rows
