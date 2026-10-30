@@ -1,6 +1,6 @@
 # 当前交接
 
-更新：2026-10-30 17:23 北京时间。当前阶段 **R3 标签管理，自动验证通过**；Goal active。R2 已双端通过，R3 尚无设备测试授权。阶段目标、顺序和验收见 [R3 当前执行计划](rounds/R3.md#r3-当前执行计划)、[手机清单](rounds/R3-ACCEPTANCE.md)。
+更新：2026-10-30 20:25 北京时间。当前阶段 **R3 标签管理，自动验证通过**；Goal active。Windows +12 已启动升级，用户已改选人工测试，等待操作反馈；Android 尚未选择测试方式。阶段目标、顺序和验收见 [R3 当前执行计划](rounds/R3.md#r3-当前执行计划)、[手机清单](rounds/R3-ACCEPTANCE.md)。
 
 ## 已完成与证据
 
@@ -10,10 +10,13 @@
 - artifacts/R3 最终 check 记录：格式、analyze、38 项测试通过。Windows 万首合成库的标签加载预热 P95 13,437 μs，见 tag-benchmark.json；不代表手机或真实扫描。
 - APK `artifacts/R3/tag-music-0.4.0+12.apk`，SHA256 **cfe6f72a113c58f3d2925376102fde9535c2dd0493dddbdad033f32fd368be21**；Windows ZIP `artifacts/R3/tag-music-windows-0.4.0+12.zip`，SHA256 **1536c06a59b56d2647a197c34f8e0de6041bc21ed0acb9cf80d6367e72110b22**。APK 固定 ID、版本、API29 与原签名指纹相同；双端原生库、许可文本及 SQLite 包审计通过。见 build-all-12.json、apk-signature-12.txt、apk-manifest-12.txt、package-audit-12.json。
 - 已修复测试发现的标签输入框控制器过早释放和 app_test 旧占位页断言。首个依赖恢复 Git 拒绝访问、一次测试失败及一次格式失败的原始日志分别保存在 artifacts/R3/*-failure-1.log；改变执行方式并修复后完整检查通过。同一问题不原样重试。
+- Windows +12 由指定 Terra/high 子 Agent 按本批授权启动；原库备份 `artifacts/R3/windows-v1-preupgrade.sqlite`，SHA256 f38571d9aa92fa1f62ef45e01e74a8f828533afcbfc9aee0594653ee87d66c30。主 Agent 已核对 `windows12/run-20261030-202308/migration-comparison.json`：schema 1→2，原 songs=9、roots=3、locations=17 全部行逐列相同，foreign_key_check 空。该结论不代替标签功能验收。
+- 新增 `integration_test/tag_benchmark_test.dart`，在独立临时库测量万首标签加载并输出设备/模式/P95；不打开用户曲库。格式及 analyze 已通过，设备运行未执行；仅测试入口新增，不改变 +12 应用候选。
 
 ## 待办与边界
 
-- Windows 原生与实际 Release 运行、手机覆盖升级及体验/性能验收；手机万首合成标签查询基准尚未运行。
-- 设备操作前必须按 AGENTS 列明当批构建、操作、影响和执行者，再分别用交互选项取得电脑/手机测试方式。电脑 Codex 测试须委派 GPT 6.1 Terra/high 专用子 Agent；主 Agent 不控制电脑界面。当前无新批授权，不能安装、启动或切窗。
+- Windows 剩余标签、播放独立性、默认输出回环待用户人工测试反馈。已提供6项操作；用户准备播放原创测试音后回复“开始录音”才采默认输出12秒。人工模式下不代为输入/切窗/关闭重开。PID31612为本批启动时记录，不复用旧焦点或坐标。
+- Windows 自动路径：窗口截图 FrameArrived 超时1次，改读树后缓存点击失败2次；已停止同类尝试。技能允许的接口无桌面截图替代，用户随后明确改选人工测试。原失败证据 `windows12/run-20261030-202308/results.json` 保留；不得再次原样自动点击或把未测功能记通过。
+- Android 原+12覆盖安装/启动与清单1–5、7项的选择问题仍待答复，未操作手机；万首性能测试需额外说明测试构建安装/运行及恢复Release的影响，不能把旧批授权扩展为测试包。
 - Android 授权撤销旧补验已由用户取消，不把它算作 R3 通过项。R3 未验收不得进入 R4 或将 Goal 标 complete。
 - 产物/日志留 artifacts/R3，不提交；v1.json 不覆盖。原 Android ID 与签名保持，覆盖安装保留数据，不卸载/清数据。
