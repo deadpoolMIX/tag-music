@@ -67,4 +67,4 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 | [TOOLCHAIN](TOOLCHAIN.md) / [THIRD_PARTY](THIRD_PARTY.md) | 环境/补丁及许可，相关任务读 |
 | [原始计划](archive/PLAN.original.md) | 原件保留，仅溯源时读 |
 
-历史入口（非必读）：[R0](rounds/R0.md)/[验收](rounds/R0-ACCEPTANCE.md)、[R1](rounds/R1.md)/[验收](rounds/R1-ACCEPTANCE.md)、[R2](rounds/R2.md)/[验收](rounds/R2-ACCEPTANCE.md)、[R3](rounds/R3.md)/[验收](rounds/R3-ACCEPTANCE.md)；当前 [R4](rounds/R4.md)。历史旧路径按本索引/Git 定位，不改写原始失败记录。
+历史入口（非必读）：[R0](rounds/R0.md)/[验收](rounds/R0-ACCEPTANCE.md)、[R1](rounds/R1.md)/[验收](rounds/R1-ACCEPTANCE.md)、[R2](rounds/R2.md)/[验收](rounds/R2-ACCEPTANCE.md)、[R3](rounds/R3.md)/[验收](rounds/R3-ACCEPTANCE.md)；当前 [R4](rounds/R4.md)/[验收](rounds/R4-ACCEPTANCE.md)。历史旧路径按本索引/Git 定位，不改写原始失败记录。
