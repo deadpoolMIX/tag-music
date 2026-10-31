@@ -15,7 +15,6 @@ void main() {
     await tester.runAsync(() async {
       final report = await runFilterBenchmark();
       binding.reportData = report;
-      debugPrint('R4_FILTER_BENCHMARK ${jsonEncode(report)}');
       for (final scenario in report['scenarios'] as List) {
         expect(
           scenario['warmFilterSearchSortP95Microseconds'],
@@ -28,6 +27,20 @@ void main() {
         await File(output)
             .writeAsString(const JsonEncoder.withIndent('  ').convert(report));
       }
+      // Keep every Android log message below the observed 1023-character cap.
+      // Base64 gives fixed ASCII boundaries even when report text is Unicode.
+      final payload = base64Encode(utf8.encode(jsonEncode(report)));
+      const chunkSize = 600;
+      final count = (payload.length / chunkSize).ceil();
+      debugPrintSynchronously('R4_REPORT_BEGIN $count ${payload.length}');
+      for (var index = 0; index < count; index++) {
+        final start = index * chunkSize;
+        final end = (start + chunkSize).clamp(0, payload.length);
+        debugPrintSynchronously(
+          'R4_REPORT_PART ${index + 1}/$count ${payload.substring(start, end)}',
+        );
+      }
+      debugPrintSynchronously('R4_REPORT_END $count ${payload.length}');
     });
   });
 }
