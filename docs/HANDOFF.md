@@ -1,6 +1,6 @@
 # 当前交接
 
-更新：2026-10-31 16:27 北京时间。**R4 开发中：功能已实现，Windows原生无障碍树错误待处理；阶段未验收，按用户明确要求在当前诊断检查点后暂停Goal。** R0～R3已双端通过。本批电脑测试已收尾，当前无Tag Music进程；Android测试方式未选择，从未操作手机。
+更新：2026-10-31 17:27 北京时间。**R4 开发中：功能已实现，Windows原生无障碍树错误待处理；用户已重新激活Goal，已续查离线诊断，下一批电脑诊断待交互授权。** R0～R3已双端通过。前批电脑测试已收尾；本次未启动应用或操作设备，Android测试方式未选择，从未操作手机。
 
 ## 目标与当前计划
 
@@ -34,9 +34,11 @@
 - Android仍未授权，不安装/启动/输入/采集；原待选人工/Codex问题尚未回复。新批电脑UI仍只由GPT6.1Terra/high专用子Agent、使用Windows MCP执行；主Agent不接管。阶段双端通过及用户最终确认前Goal不complete，R5不启动。
 - 用户要求的额度分析见artifacts/R4/usage-analysis.json；共享5小时额度桌面阶段21%→82%，不是每Agent精确费用。流程优化已写入AGENTS，保留原模型及Windows MCP要求。
 
-## 用户要求停止后的唯一下一步
+## 当前诊断检查点与下一步
 
-- 用户明确暂停R4；诊断检查点已保存。本次仅完成流程优化，不排查、构建或操作设备；此前Goal按要求暂停，本次Goal工具未带入目标，未创建或恢复。R4未验收，不complete。
+- 用户先前要求暂停，流程优化已完成；17:27续行时收到Goal重新激活指令，实际main/a2049d9、工作区干净，已恢复离线诊断。R4未验收，不complete。
 - 新增离线语义更新记录器已验证：通用Slider弹层在Windows平台序列化出孤立节点；真实PlaybackPage的增量起播、拖动、tooltip和页面切换暂未复现同类断链。不能据此套用上游workaround或认定原生错误已修复。诊断草稿保存在artifacts/R4/diagnostics/accessibility_probe_test.dart（恢复至test/accessibility_test.dart运行，依赖同目录测试辅助类），未纳入默认测试、未改业务源码/SDK/依赖，正式候选仍+13。
 - 本轮诊断日志：accessibility-baseline.log（测试fake缺seek，已补）；accessibility-windows-test.log（缺foundation导入，已修）；accessibility-windows-corrected.log（通用弹层孤立节点及测试平台override清理问题）；accessibility-app-baseline.log、accessibility-incremental-baseline.log（修正平台variant后的真实页面通过，覆盖仍不足以解释native AXTree）。这些不是当前候选全量/真机通过证据。
-- 流程优化完成：GUI按断言采集与批次汇报，工具输出限于摘要及证据路径；详细规则见 [AGENTS](../AGENTS.md)。未改业务、SDK、工具脚本或模型配置。下一步须由用户明确要求后才继续R4。
+- 流程优化完成：GUI按断言采集与批次汇报，工具输出限于摘要及证据路径；详细规则见 [AGENTS](../AGENTS.md)。未改业务、SDK、工具脚本或模型配置。
+- 新离线诊断补查缺失子节点，覆盖搜索聚焦/进度通知、真实目录弹窗、完整TagMusicApp导航中销毁和重建播放器。三次针对性真实页面检查通过；通用Slider弹窗对照同时检出孤立节点和缺失子节点，故仍不能认定正式候选问题已修复。草稿、日志及上游修复入口见[R4技术记录](rounds/R4.md#技术记录)。默认测试和业务源码无变更。
+- 下一步按状态分段定位+13首次原生错误：启动空闲→播放并接收进度→目录弹窗→标签/筛选/曲库导航→停止退出，每段保存错误计数及时间、关键截图和stdout/stderr。需要新批电脑交互授权后，由专用Terra/high子Agent使用Windows MCP纯Screenshot执行；不使用已知异常UIA Snapshot路径，不编辑标签/目录、不采音、不操作手机。等待选择期间不启动设备测试。
