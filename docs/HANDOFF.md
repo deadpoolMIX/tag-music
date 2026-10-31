@@ -1,6 +1,6 @@
 # 当前交接
 
-更新：2026-10-31 16:15 北京时间。**R4 开发中：功能已实现，Windows原生无障碍树错误待处理；阶段未验收，Goal active。** R0～R3已双端通过。本批电脑测试已收尾，当前无Tag Music进程；Android测试方式未选择，从未操作手机。
+更新：2026-10-31 16:22 北京时间。**R4 开发中：功能已实现，Windows原生无障碍树错误待处理；阶段未验收，按用户明确要求在当前诊断检查点后暂停Goal。** R0～R3已双端通过。本批电脑测试已收尾，当前无Tag Music进程；Android测试方式未选择，从未操作手机。
 
 ## 目标与当前计划
 
@@ -33,3 +33,10 @@
 - 下一步先建立能暴露当前Slider/Tooltip语义树问题的自动复现，再核对应用层修复；未升级SDK、未关闭全局无障碍语义。不以压日志替代正确性。若改源码，相关验证→完整检查→新构建号+14及双端Release→新批交互确认；旧批许可不能用于新候选测试。
 - Android仍未授权，不安装/启动/输入/采集；原待选人工/Codex问题尚未回复。新批电脑UI仍只由GPT6.1Terra/high专用子Agent、使用Windows MCP执行；主Agent不接管。阶段双端通过及用户最终确认前Goal不complete，R5不启动。
 - 用户要求本批工作收尾后分析额度。已读取本轮主/子Agent日志，统计截点16:06:31北京时间见artifacts/R4/usage-analysis.json；共享5小时额度桌面阶段21%→82%，不是每Agent精确费用。模型主Sol/high、子Terra/high；后续减少视觉调用、长输出与协调开销，未经用户要求不改AGENTS或模型设置。
+
+## 用户要求停止后的唯一下一步
+
+- 用户明确“这个工作完成了以后就停下，然后把提示词给我。额度现在不够了”。当前诊断检查点已保存，不再排查、构建或操作设备；Goal按明确请求paused，R4不complete。用户将另开对话优化流程，该对话不应自动继续R4业务。
+- 新增离线语义更新记录器已验证：通用Slider弹层在Windows平台序列化出孤立节点；真实PlaybackPage的增量起播、拖动、tooltip和页面切换暂未复现同类断链。不能据此套用上游workaround或认定原生错误已修复。诊断草稿保存在artifacts/R4/diagnostics/accessibility_probe_test.dart（恢复至test/accessibility_test.dart运行，依赖同目录测试辅助类），未纳入默认测试、未改业务源码/SDK/依赖，正式候选仍+13。
+- 本轮诊断日志：accessibility-baseline.log（测试fake缺seek，已补）；accessibility-windows-test.log（缺foundation导入，已修）；accessibility-windows-corrected.log（通用弹层孤立节点及测试平台override清理问题）；accessibility-app-baseline.log、accessibility-incremental-baseline.log（修正平台variant后的真实页面通过，覆盖仍不足以解释native AXTree）。这些不是当前候选全量/真机通过证据。
+- 后续流程优化提示词由本聊天末尾提供；优化目标是减少GUI采集密度、主Agent长输出/协调开销和失败后无效调用，保留既有验收门禁及Windows专用Terra/high+Windows MCP要求，未经用户同意不降低。
