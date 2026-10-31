@@ -1,6 +1,6 @@
 # R4 候选验收
 
-候选：0.5.0+14，正式包内revision f0da853。双端Release和审计已通过；Android七项功能及独立Release性能包2六场景完整报告/外部复核均通过，Windows因点击审批阻塞按用户选择保留未测。手机本批已结束，阶段未验收；用户已将Goal恢复active。Windows Codex测试仍只由专用GPT 6.1 Terra/high按用户指定使用Windows MCP执行；构建和包审计证据见HANDOFF。
+候选：0.5.0+14，正式包内revision f0da853。双端Release和审计已通过；Android七项功能及独立Release性能包2六场景完整报告/外部复核均通过，Windows因点击审批阻塞按用户选择保留未测。手机本批已结束，阶段未验收；用户已选择暂停，Goal已同步paused。Windows Codex测试仍只由专用GPT 6.1 Terra/high按用户指定使用Windows MCP执行；构建和包审计证据见HANDOFF。
 
 ## 当批操作与边界
 
