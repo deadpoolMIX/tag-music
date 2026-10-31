@@ -1,46 +1,39 @@
 # 当前交接
 
-更新：2026-10-31 17:40 北京时间。**R4 开发中：功能已实现，Windows原生无障碍树错误待处理；Goal已重新激活，用户已明确授权继续尝试设备诊断，专用Terra/high子Agent正在解决目标窗口确认并续测。** R0～R3已双端通过。上一次+13已正常关闭退出0，本次续测实时状态待子Agent报告；Android测试方式未选择，从未操作手机。
+更新：2026-10-31 17:47 北京时间。**R4 开发中：Slider语义故障已有针对修复，format/analyze/56项通过；正在准备0.5.0+14双端Release，尚未实际复验。Goal保持active，阶段未验收。** R0～R3已双端通过。+13续测已正常退出0；Android未授权，从未操作手机。
 
-## 目标与当前计划
+## 目标与有效计划
 
-- [R4计划](rounds/R4.md#r4-当前执行计划)、[七项验收及当前结果](rounds/R4-ACCEPTANCE.md)。用户确认固定三框：交集框与并集框结果取并集，再减排除并集；前两框都空以全部可用歌曲为起点；删标签确认影响后自动移除规则引用。规则/排序保存一份，搜索词仅会话。
-- 已完成：三框UI及独立搜索排序、schema v3和v1/v2迁移、删标签事务联动、快照播放、R4检查/包审计/独立双端Release性能工具。源码功能2bdd20d、工具cb0c072，计划d5848b3。
-- 自动验证：最终格式/analyze/53项通过，快速连续选择回归已包含；此后仅补独立基准出口并再次analyze通过。证据artifacts/R4/test.log、analyze.log、format.log；首轮保留checkpoint1。不重复无新疑点的已通过检查。
-- 当前问题：Windows首次两次输入后UIA Snapshot观测期间进程消失，原因未证实；换Windows MCP纯Screenshot并捕获stdout/stderr后，全部七项功能已观察核对、两次正常退出0，但播放时记录422条Flutter AXTree错误，不能把纯截图成功当作底层故障已修复。
+- 目标及验收入口：[R4当前计划](rounds/R4.md#r4-当前执行计划)、[七项验收](rounds/R4-ACCEPTANCE.md)。三框规则、独立搜索排序、schema v3及迁移、删标签事务联动、快照播放已实现；不进入R5，不complete。
+- 新修复：Slider仅在seek不可用/可用之间转换时重建，避免原生删除换父级子树后，浮层后代未重新提交。未升级SDK或关闭全局语义。默认回归见test/playback_semantics_test.dart，序列化记录器近似检查删除子树条件，不能替代原生验证。
+- 自动验证：相关11项通过，最终完整格式/analyze/56项通过。证据artifacts/R4/check14-console.log及test/analyze/format.log；旧+13自动日志及基准保留check13-preserved，首轮checkpoint1。不重复无新疑点的已通过检查。
 
-## 版本、产物及源码状态
+## 分支、版本和产物
 
-- 本地main，文档检查点见git log。正式候选0.5.0+13、包内revision cb0c072；双端Release、固定Android ID/API29/原持久签名、原生/SQLite/8份许可审计通过。源码尚未因AXTree问题修改，候选不重建覆盖。
-- APK：artifacts/R4/tag-music-0.5.0+13.apk；SHA256 26d5a153e19ea55f5f54fbc534ee7365d57637946009b053a3d60db5ae2d5b06。
-- Windows ZIP：artifacts/R4/tag-music-windows-0.5.0+13.zip；SHA256 cd3934a75c5720ed15f5eab563a4d0fb45c2070a5a1057a63459647b10a901d9。
-- 独立Release性能包编号1、revision6e881c4，artifacts/R4/benchmark下filter-benchmark-release-1.apk（独立ID app.tagmusic.player.benchmark）及filter-benchmark-windows-release-1.zip；元数据/哈希见package-release-1.json、package-windows-release-1.json。Android包未安装运行。
-- build/app和build/windows当前均是独立基准产物；正式安装/运行必须取artifacts/R4内+13正式包。手机最后已知仍R3正式0.4.0+12、bcf31d5，不假定当前已升级。
-- v1/v2实际DDL基线保留，新增v3；下一次变表仍显式迁移。
+- 本地main，实际提交/工作区以git log及git status为准；本检查点包含Slider修复、3项语义回归及pubspec升0.5.0+14。+14尚未构建，下一步提交后双端Release构建及审计，不能覆盖旧+13。
+- 最后已构建正式包：0.5.0+13、包内revision cb0c072；双端Release、固定Android ID/API29/原持久签名、原生/SQLite/8份许可审计通过。
+- APK artifacts/R4/tag-music-0.5.0+13.apk，SHA256 26d5a153e19ea55f5f54fbc534ee7365d57637946009b053a3d60db5ae2d5b06；ZIP tag-music-windows-0.5.0+13.zip，SHA256 cd3934a75c5720ed15f5eab563a4d0fb45c2070a5a1057a63459647b10a901d9。
+- 独立Release性能包编号1/revision6e881c4，artifacts/R4/benchmark内双端产物及package-*-release-1.json。Android包未安装运行。build/app与build/windows当前仍可能是独立基准产物；正式测试只取artifacts对应正式候选，不能猜包身份。
+- 手机最后已知R3正式0.4.0+12/bcf31d5，未假定升级。下一次手机操作需新批确认；覆盖安装保留数据/原签名，不卸载或清数据。
 
-## Windows实际证据与收尾
+## 已有实际证据
 
-- 专用GPT6.1Terra/high子Agent按用户指定Windows MCP执行。原库备份windows13/run-20261031-153416/original.sqlite；主Agentbackup-audit.json核对完整性/外键和v2基线；migration-comparison.json证明五张旧表逐列逐行保留。
-- 首批步骤见同run目录steps-result.json；纯截图补验见pure-vision-results.json。原未落盘的纯截图已从本次子Agent原始工具响应恢复27张到recovered-pure-vision/，manifest记原响应时间/哈希，无重新截图。最终表核对windows13/final-data-audit.json：9歌/3根/17位置/2原标签/3原关联，五表数据与原备份相同；三框空、title升序，搜索空，播放停止，所有测试标签清理。
-- 两次受监视正常关闭：windows13/diagnostic/pure-vision-1和pure-vision-2内launch/exit.json、stdout/stderr；第二轮stdout证实FLAC→手动下一首M4A，原快照不随清空条件改变。此前两次消失见disappearance.json及wait-sequence.json，退出与取消等待的因果未定。
-- 12秒默认输出回环检测440Hz，run内loopback.wav/json/log，主Agent核对12个分析窗口；听感/输入手感未作人工判断。
-- Windows独立Release万首6场景P95 1.814～18.088ms，加载103.523ms；原始benchmark/filter-benchmark-windows-release-1.json及windows-release-1-root-audit.json独立重算通过。不是万首真实扫描或UI帧耗时；基准程序正常关闭，无tag_music进程。
+- Windows均由专用GPT6.1Terra/high、Windows MCP执行。+13七项功能及数据保留/清理已核对：windows13/run-20261031-153416内steps-result.json、pure-vision-results.json、original.sqlite；主Agentbackup-audit/migration-comparison/final-data-audit.json证明v2五表逐列逐行保留及清理后相同（9歌/3根/17位置/2原标签/3原关联）。三框空、title升序、搜索空、播放停止。恢复27张原工具截图在recovered-pure-vision/，manifest含来源时间/哈希，无重采。
+- windows13/diagnostic/pure-vision-1及pure-vision-2两次正常退出0；第二轮日志证实FLAC→手动下一首M4A且队列不变，但stderr有422条AXTree错误。
+- 12秒默认输出回环440Hz证据在原run内loopback.wav/json/log，12分析窗口经主Agent核对；听感/输入体验未由工具代判。
+- Windows独立Release万首六场景P95 1.814～18.088ms、加载103.523ms，benchmark/filter-benchmark-windows-release-1.json及windows-release-1-root-audit.json；不是万首真实扫描/UI帧耗时，Android性能未测。
+- 新分段：windows13/segmented-20261031-172946仅启动空闲0错误/退出0，播放因目标确认被审批拒绝。用户随后明确要求继续设备操作；续测segmented-20261031-173854空闲0→起播首次39→232，最终746，停播导航对照743→746，退出0；不能细分点击与进度，也不能把3条只归因导航。result.md、stdout/stderr、launch/exit.json、stopped.png及approval-rejection.json已核对；其他关键截图仅在子Agent工具响应。
 
-## 失败计数、边界和下一步
+## 失败计数及证据边界
 
-- 所有失败历史及计数保存在[R4技术记录](rounds/R4.md#技术记录)，原日志不覆盖。正式UIA输入/观测路径进程消失累计2次，禁止原样重试；App switch Invalid window handle累计2次，改用新截图/核对PID后正常CloseMainWindow。Sky启动审批拒绝1次原文保留，随后用户明确指定Windows MCP；不绕过实际权限控制。
-- 已聚焦原生无障碍树：pure-vision-2/stderr.log有422条accessibility_bridge.cc更新失败；本机锁定engine cf636b1dfb818dd6a3ff16e390e93b1a036969c8相关源仍有child->parent()仅assert后解引用。上游相似Slider/Tooltip问题见R4技术记录；这不是两次退出的已证实根因。唯一WER档案是旧0.2.0+9 Debug，不能当本次证据。
-- 下一步先建立能暴露当前Slider/Tooltip语义树问题的自动复现，再核对应用层修复；未升级SDK、未关闭全局无障碍语义。不以压日志替代正确性。若改源码，相关验证→完整检查→新构建号+14及双端Release→新批交互确认；旧批许可不能用于新候选测试。
-- Android仍未授权，不安装/启动/输入/采集；原待选人工/Codex问题尚未回复。新批电脑UI仍只由GPT6.1Terra/high专用子Agent、使用Windows MCP执行；主Agent不接管。阶段双端通过及用户最终确认前Goal不complete，R5不启动。
-- 用户要求的额度分析见artifacts/R4/usage-analysis.json；共享5小时额度桌面阶段21%→82%，不是每Agent精确费用。流程优化已写入AGENTS，保留原模型及Windows MCP要求。
+- 历史累计及全部原日志见[R4技术记录](rounds/R4.md#技术记录)。UIA输入/观测期间进程消失2次，App switch无效句柄2次，禁止原样重试；两次消失与AXTree错误因果仍未证实。
+- Sky启动审批拒绝1次；新分段Click审批拒绝2次：活动窗口未确认、DPI虚拟坐标与物理坐标混用。后一问题已用物理窗口矩形、前景PID和新截图解决后完成操作；不绕过权限。后续Windows MCP先核对实际前景与物理矩形，不使用UIA Snapshot。截图落盘不要转录base64。
+- 离线诊断原草稿及原失败日志保留artifacts/R4/diagnostics和accessibility-*.log。重复鼠标设备的探针断言失败1次已修正。9首/鼠标起播/duration零→已知复现浮层后代丢失，修复后同例通过；这不能证明+14原生错误已消失。
+- 用量分析见artifacts/R4/usage-analysis.json，共享窗口额度变化不能精确拆分Agent费用；流程优化已入AGENTS，指定模型/Windows MCP要求保留。
 
-## 当前诊断检查点与下一步
+## 下一步与授权
 
-- 用户先前要求暂停，流程优化已完成；17:27续行时收到Goal重新激活指令，实际main/a2049d9、工作区干净，已恢复离线诊断。R4未验收，不complete。
-- 新增离线语义更新记录器已验证：通用Slider弹层在Windows平台序列化出孤立节点；真实PlaybackPage的增量起播、拖动、tooltip和页面切换暂未复现同类断链。不能据此套用上游workaround或认定原生错误已修复。诊断草稿保存在artifacts/R4/diagnostics/accessibility_probe_test.dart（恢复至test/accessibility_test.dart运行，依赖同目录测试辅助类），未纳入默认测试、未改业务源码/SDK/依赖，正式候选仍+13。
-- 本轮诊断日志：accessibility-baseline.log（测试fake缺seek，已补）；accessibility-windows-test.log（缺foundation导入，已修）；accessibility-windows-corrected.log（通用弹层孤立节点及测试平台override清理问题）；accessibility-app-baseline.log、accessibility-incremental-baseline.log（修正平台variant后的真实页面通过，覆盖仍不足以解释native AXTree）。这些不是当前候选全量/真机通过证据。
-- 流程优化完成：GUI按断言采集与批次汇报，工具输出限于摘要及证据路径；详细规则见 [AGENTS](../AGENTS.md)。未改业务、SDK、工具脚本或模型配置。
-- 新离线诊断补查缺失子节点，覆盖搜索聚焦/进度通知、真实目录弹窗、完整TagMusicApp导航中销毁和重建播放器。三次针对性真实页面检查通过；通用Slider弹窗对照同时检出孤立节点和缺失子节点，故仍不能认定正式候选问题已修复。草稿、日志及上游修复入口见[R4技术记录](rounds/R4.md#技术记录)。默认测试和业务源码无变更。
-- 用户已选择新批Codex测试，Terra/high通过Windows MCP执行；本批目录artifacts/R4/windows13/segmented-20261031-172946，result.md记录启动空闲9首/AXTree错误0、正常退出0。播放Click被自动审批拒绝1次：Screenshot窗口元数据为空，坐标目标无法确认；随后截图显示应用不在前景。拒绝原文及参数见approval-rejection.json。播放、弹窗、导航均未测，旧422条AXTree故障仍未解释。未编辑数据、未录音、未操作手机。
-- 用户随后明确回复“继续尝试操作设备，我没有拒绝”，授权沿用+13分段诊断范围继续Codex测试；无需再问同一选择。专用Terra/high子Agent使用Windows MCP先核对PID/路径/HWND/窗口矩形及原生前景PID；必要时仅对刚核实的唯一HWND尝试精确聚焦，再核对前景和新截图。不是重复旧App switch或盲点；工具仍拒绝或目标不符即停止，不能绕过。下一步核对子Agent新批日志/结果，旧批未测项不补判通过。
-- 离线补充原生换父级时删除旧子树的近似检查：对照例能检出未重新提交的后代，真实AppShell场景仍通过。草稿accessibility_native_removal_probe_test.dart及accessibility-native-removal-probe.log位于artifacts/R4；详细依据见R4技术记录。它是诊断模型，不是实际原生树验证，故障未修复；未改业务/SDK/默认测试。
+1. 保存修复检查点，构建+14双端Release并审计固定身份/签名、原生/SQLite及许可，记录包内revision和SHA256。仅后台构建，不启动应用。
+2. 新候选准备好后，按当批范围交互确认Windows/Android测试方式。Windows复验起播/进度、停止/再播/切歌、弹窗导航及R4七项；原生错误为0是修复验证要求。若仍失败先存证、缩小假设，不无依据重试。
+3. Android七项和独立Release性能仍未测。用户未选择手机测试方式，严禁安装/启动/输入/采集；旧+13电脑许可不能用于+14新候选。Windows UI仍只由指定Terra/high子Agent通过Windows MCP执行，主Agent不接管。
+4. 双端实际验收及用户最终确认前不complete；候选实际失败继续开发中。用户暂停立即生效。

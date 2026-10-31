@@ -193,26 +193,32 @@ class PlaybackPage extends ConsumerWidget {
                         children: [
                           Text(formatPosition(state.position)),
                           Expanded(
-                            child: Slider(
-                              key: const ValueKey('playback-seek'),
-                              value: state.position.inMilliseconds
-                                  .toDouble()
-                                  .clamp(
-                                    0,
-                                    state.duration.inMilliseconds
-                                        .toDouble()
-                                        .clamp(1, double.infinity),
-                                  ),
-                              max: state.duration.inMilliseconds
-                                  .toDouble()
-                                  .clamp(1, double.infinity),
-                              onChanged: state.duration > Duration.zero
-                                  ? (value) => unawaited(
-                                      controller.seek(
-                                        Duration(milliseconds: value.round()),
-                                      ),
-                                    )
-                                  : null,
+                            // Keep overlay descendants together across changes
+                            // in seek availability. Windows removes reparented
+                            // subtrees before applying semantics updates.
+                            child: KeyedSubtree(
+                              key: ValueKey(state.duration > Duration.zero),
+                              child: Slider(
+                                key: const ValueKey('playback-seek'),
+                                value: state.position.inMilliseconds
+                                    .toDouble()
+                                    .clamp(
+                                      0,
+                                      state.duration.inMilliseconds
+                                          .toDouble()
+                                          .clamp(1, double.infinity),
+                                    ),
+                                max: state.duration.inMilliseconds
+                                    .toDouble()
+                                    .clamp(1, double.infinity),
+                                onChanged: state.duration > Duration.zero
+                                    ? (value) => unawaited(
+                                        controller.seek(
+                                          Duration(milliseconds: value.round()),
+                                        ),
+                                      )
+                                    : null,
+                              ),
                             ),
                           ),
                           Text(formatPosition(state.duration)),
