@@ -27,7 +27,7 @@ android {
         val benchmark = System.getenv("TAG_MUSIC_BENCHMARK") == "1"
         applicationId = if (benchmark) "app.tagmusic.player.benchmark" else "app.tagmusic.player"
         manifestPlaceholders["tagMusicLabel"] =
-            if (benchmark) "Tag Music R3 Benchmark" else "Tag Music"
+            if (benchmark) "Tag Music ${System.getenv("TAG_MUSIC_BENCHMARK_ROUND") ?: "R3"} Benchmark" else "Tag Music"
         minSdk = 29
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION

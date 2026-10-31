@@ -47,7 +47,7 @@ with zipfile.ZipFile(windows) as archive:
         assert archive.read(f'licenses/native/{name}') == data, name
     result['windows'] = {'sha256': digest(windows.read_bytes()), 'nativeSha256': actual, 'licenseFiles': sorted(licenses)}
 
-if args.round in ('R2', 'R3'):
+if args.round in ('R2', 'R3', 'R4'):
     config = json.loads((root / '.dart_tool/package_config.json').read_text(encoding='utf-8'))
     package = next(p for p in config['packages'] if p['name'] == 'sqlite3')
     package_root = Path(unquote(urlparse(package['rootUri']).path).lstrip('/') if os.name == 'nt' else unquote(urlparse(package['rootUri']).path))

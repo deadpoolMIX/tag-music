@@ -2,6 +2,8 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import 'database.dart';
+import 'filter_repository.dart';
+import 'filter_rule.dart';
 
 class TagSnapshot {
   const TagSnapshot(this.tags, this.bySong);
@@ -59,11 +61,16 @@ class TagRepository {
     if (changed != 1) throw StateError('标签不存在');
   }
 
-  Future<void> delete(String id) async {
-    final changed = await (db.delete(
-      db.tags,
-    )..where((t) => t.id.equals(id))).go();
-    if (changed != 1) throw StateError('标签不存在');
+  Future<void> delete(String id, {FilterPreferences? currentFilter}) async {
+    await db.transaction(() async {
+      final filters = FilterRepository(db);
+      final current = currentFilter ?? await filters.load();
+      final changed = await (db.delete(
+        db.tags,
+      )..where((t) => t.id.equals(id))).go();
+      if (changed != 1) throw StateError('标签不存在');
+      await filters.save(current.without(id));
+    });
   }
 
   Future<void> changeSongs(

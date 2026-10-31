@@ -8,10 +8,12 @@ import 'package:uuid/uuid.dart';
 import '../playback/documents.dart';
 import 'database.dart';
 import 'tag_repository.dart';
+import 'filter_rule.dart';
+import 'filter_repository.dart';
+
+export 'filter_rule.dart' show LibrarySort;
 
 final libraryProvider = Provider<LibraryController?>((ref) => null);
-
-enum LibrarySort { title, artist, album, name }
 
 class LibraryTrack {
   const LibraryTrack(this.song, this.location);
@@ -25,10 +27,103 @@ class LibraryTrack {
 }
 
 class LibraryController extends ChangeNotifier {
-  LibraryController(this.db, this.documents) : tagsStore = TagRepository(db);
+  LibraryController(this.db, this.documents, {FilterRepository? filterStore})
+    : tagsStore = TagRepository(db),
+      filterStore = filterStore ?? FilterRepository(db);
   final LibraryDatabase db;
   final DocumentAccess documents;
   final TagRepository tagsStore;
+  final FilterRepository filterStore;
+  FilterPreferences filterPreferences = FilterPreferences();
+  String filterQuery = '';
+  String? filterLoadError;
+  String? filterSaveError;
+  bool filterDeletingTag = false;
+  int _filterWritesPending = 0;
+  int _filterWriteRevision = 0;
+  Future<void>? _filterWrites;
+  List<LibraryTrack>? _matchedCache;
+  List<LibraryTrack>? _filteredCache;
+  bool get filterSaving => _filterWritesPending > 0;
+
+  List<LibraryTrack> get filterMatches => _matchedCache ??= List.unmodifiable(
+    filterLoadError != null
+        ? <LibraryTrack>[]
+        : tracks.where(
+            (t) =>
+                t.available &&
+                filterPreferences.rule.matches(
+                  tagIdsBySong[t.song.id] ?? const {},
+                ),
+          ),
+  );
+
+  List<LibraryTrack> get filtered {
+    if (_filteredCache != null) return _filteredCache!;
+    final needle = filterQuery.trim().toLowerCase();
+    final rows = filterMatches
+        .where(
+          (t) =>
+              needle.isEmpty ||
+              [
+                t.title,
+                t.song.name,
+                t.song.artist ?? '',
+                t.song.album ?? '',
+              ].any((value) => value.toLowerCase().contains(needle)),
+        )
+        .toList();
+    _sortTracks(rows, filterPreferences.sort, filterPreferences.descending);
+    return _filteredCache = List.unmodifiable(rows);
+  }
+
+  void _invalidateFilter() {
+    _matchedCache = null;
+    _filteredCache = null;
+  }
+
+  void searchFilter(String text) {
+    filterQuery = text;
+    _filteredCache = null;
+    _publish();
+  }
+
+  Future<void> updateFilter({
+    FilterRule? rule,
+    LibrarySort? order,
+    bool? reverse,
+    bool reset = false,
+  }) {
+    if (filterDeletingTag || (filterLoadError != null && !reset)) {
+      return Future.value();
+    }
+    filterPreferences = FilterPreferences(
+      rule: rule ?? filterPreferences.rule,
+      sort: order ?? filterPreferences.sort,
+      descending: reverse ?? filterPreferences.descending,
+    );
+    filterLoadError = null;
+    _invalidateFilter();
+    final preferences = filterPreferences;
+    final revision = ++_filterWriteRevision;
+    _filterWritesPending++;
+    _publish();
+    final previous = _filterWrites;
+    return _filterWrites = () async {
+      if (previous != null) await previous;
+      try {
+        await filterStore.save(preferences);
+        if (revision == _filterWriteRevision) filterSaveError = null;
+      } catch (error) {
+        if (revision == _filterWriteRevision) filterSaveError = '筛选未保存：$error';
+      } finally {
+        _filterWritesPending--;
+        if (_filterWritesPending == 0) _filterWrites = null;
+        _publish();
+      }
+    }();
+  }
+
   List<LibraryTrack> tracks = [];
   List<LibraryRoot> roots = [];
   List<Tag> tags = [];
@@ -65,6 +160,11 @@ class LibraryController extends ChangeNotifier {
                   ].any((v) => v.toLowerCase().contains(needle))),
         )
         .toList();
+    _sortTracks(rows, sort, descending);
+    return _visibleCache = List.unmodifiable(rows);
+  }
+
+  void _sortTracks(List<LibraryTrack> rows, LibrarySort sort, bool descending) {
     String value(LibraryTrack t) => switch (sort) {
       LibrarySort.title => t.title,
       LibrarySort.artist => t.song.artist ?? '',
@@ -77,7 +177,6 @@ class LibraryController extends ChangeNotifier {
       if (result == 0) result = a.song.id.compareTo(b.song.id);
       return descending ? -result : result;
     });
-    return _visibleCache = List.unmodifiable(rows);
   }
 
   void _publish() {
@@ -104,6 +203,19 @@ class LibraryController extends ChangeNotifier {
       await _addRoot(root);
     }
     await reload();
+    try {
+      filterPreferences = await filterStore.load();
+      if (!tags
+          .map((t) => t.id)
+          .toSet()
+          .containsAll(filterPreferences.rule.referencedIds)) {
+        throw const FormatException('筛选引用的标签不存在');
+      }
+    } catch (error) {
+      filterLoadError = '无法读取筛选：$error';
+    }
+    _invalidateFilter();
+    _publish();
   }
 
   Set<String> tagsForSong(String songId) =>
@@ -122,6 +234,7 @@ class LibraryController extends ChangeNotifier {
     tags = snapshot.tags;
     tagIdsBySong = snapshot.bySong;
     tagCounts = _countTags(snapshot.bySong);
+    _invalidateFilter();
     _publish();
   }
 
@@ -136,8 +249,23 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> deleteTag(String id) async {
-    await tagsStore.delete(id);
-    await reloadTags();
+    if (filterDeletingTag) throw StateError('正在删除标签');
+    filterDeletingTag = true;
+    _publish();
+    try {
+      await _filterWrites;
+      // Do not overwrite an unreadable rule with a default during deletion.
+      await tagsStore.delete(
+        id,
+        currentFilter: filterLoadError == null ? filterPreferences : null,
+      );
+      filterPreferences = filterPreferences.without(id);
+      if (filterLoadError == null) filterSaveError = null;
+      await reloadTags();
+    } finally {
+      filterDeletingTag = false;
+      _publish();
+    }
   }
 
   Future<void> changeSongTags(
@@ -178,6 +306,7 @@ class LibraryController extends ChangeNotifier {
     tags = tagSnapshot.tags;
     tagIdsBySong = tagSnapshot.bySong;
     tagCounts = _countTags(tagSnapshot.bySong);
+    _invalidateFilter();
     _publish();
   }
 
@@ -359,6 +488,7 @@ class LibraryController extends ChangeNotifier {
     _closed = true;
     _cancelled = true;
     await _scanTask;
+    await _filterWrites;
     await db.close();
     super.dispose();
   }

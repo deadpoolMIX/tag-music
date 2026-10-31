@@ -22,10 +22,11 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 | 职责 | 代码入口 / 符号 | 相关验证 |
 |---|---|---|
 | 初始化、导航、设置 | [main.dart](../lib/main.dart)、[app.dart](../lib/app.dart)、[core/](../lib/core/) | `app_test`、`settings_test`、集成 `smoke_test` |
-| 数据表、连接、迁移 | [database.dart](../lib/library/database.dart) / `LibraryDatabase`；`database.g.dart` 为生成文件 | `test/library_test.dart`、`test/tag_test.dart`、[schema v2 DDL](database-schema/v2.json) |
+| 数据表、连接、迁移 | [database.dart](../lib/library/database.dart) / `LibraryDatabase`；`database.g.dart` 为生成文件 | `test/library_test.dart`、`test/tag_test.dart`、[schema v3 DDL](database-schema/v3.json) |
 | 扫描事务、增量/失联、搜索排序 | [library_controller.dart](../lib/library/library_controller.dart) / `LibraryController` | 单元/集成 `library_test` |
 | 曲库 UI、封面、输入连接 | [library_page.dart](../lib/library/library_page.dart)、[library_search.dart](../lib/library/library_search.dart) | `test/library_page_test.dart`、真机输入 |
 | 标签关系与管理、多选操作 | [tag_repository.dart](../lib/library/tag_repository.dart)、[tags_page.dart](../lib/library/tags_page.dart)；曲库controller共用DB及状态 | `tag_test`、`tags_page_test`、设备 `tag_benchmark_test` |
+| 三框组合筛选、当前规则保留 | [filter_rule.dart](../lib/library/filter_rule.dart)、[filter_repository.dart](../lib/library/filter_repository.dart)、[filter_page.dart](../lib/library/filter_page.dart)；LibraryController复用曲库/标签数据 | `filter_test`、`filter_page_test`、双端 `filter_benchmark_test` |
 | 播放、串行切换、媒体会话 | [playback_controller.dart](../lib/playback/playback_controller.dart) / `PlaybackController`、`TagAudioHandler`；[playback_page.dart](../lib/playback/playback_page.dart) 组装曲库 UI | `audio_handler_test`、集成 `playback_test` |
 | 共用文件/元数据/FD 适配 | [documents.dart](../lib/playback/documents.dart) / `DocumentAccess`；[descriptor_file.dart](../lib/playback/descriptor_file.dart) | `documents_test`、`descriptor_file_test` |
 | Android 原生桥 | [DocumentBridge.kt](../android/app/src/main/kotlin/app/tagmusic/player/DocumentBridge.kt)、[MainActivity.kt](../android/app/src/main/kotlin/app/tagmusic/player/MainActivity.kt) | 桥测试 + 真机日志/媒体会话 |
@@ -37,20 +38,20 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 
 - 产品完整语义见 [PLAN §1～2](PLAN.md#2-技术结构与关键行为)。音乐只读、标签仅入库；Android 保留 SAF URI/授权，不转真实路径；Windows 仅软件内操作和后台播放，不做 SMTC、系统媒体键、托盘播放按钮。
 - **曲库已实现**：`Songs.id` 是 UUID，根目录/`SongLocations` 关联位置。重叠根目录按位置去重，异位置同内容不合并；单根完整成功才事务提交，取消/授权失败保留旧数据，失联/重现保持 UUID。后续标签/歌单用歌曲 ID，不能把路径当永久 ID。
-- **迁移已开始**：R3 当前 schema v2，v1→v2 显式创建标签及关系表；未知升级抛错。变表即升版本并验证旧库数据、外键及失败处理。[v1.json](database-schema/v1.json) 和 [v2.json](database-schema/v2.json) 是实际 SQLite DDL 基线，不覆盖，也不是 Drift CLI schema JSON。
+- **迁移已开始**：R4 当前 schema v3，v1→v2→v3 或 v2→v3 显式迁移标签关系及当前筛选表；未知升级抛错。变表即升版本并验证旧库数据、外键及失败处理。[v1.json](database-schema/v1.json) 和 [v2.json](database-schema/v2.json)、[v3.json](database-schema/v3.json) 是实际 SQLite DDL 基线，不覆盖，也不是 Drift CLI schema JSON。
 - **资源生命周期已实现**：切歌/通知操作串行，停止旧曲后关闭应用持有的播放 FD 再开新曲；元数据只读借用 FD、finally 释放，不靠 GC。业务万首队列只为当前与有限预取建立播放对象/句柄。
 - **R2→R5 边界**：点击播放是不可变快照，搜索/扫描不改播放；当前 `ProbeTrack` 仍用 location/name，R5 要接稳定歌曲 ID 后做持久队列/进度恢复，重启默认暂停。
-- **标签已实现**：扁平多标签引用歌曲UUID，名称trim/小写唯一键；批量关系事务、删除级联与数量确认，多选按UUID跨搜索保留，不改变播放快照；R3验收见HANDOFF。R4版本化规则树及删标签影响、R5歌单和队列、R8备份/整体回滚仍属未来接口。
+- **标签已实现**：扁平多标签引用歌曲UUID，名称trim/小写唯一键；批量关系事务、删除级联与数量确认，多选按UUID跨搜索保留，不改变播放快照；R3验收见HANDOFF。R4新增版本化三框配置及删除标签时事务移除规则引用；R5歌单和队列、R8备份/整体回滚仍属未来接口。
 - 固定 ID/签名、锁定依赖、本机受限补丁见 [TOOLCHAIN](TOOLCHAIN.md)；实际原生库与再分发来源缺口见 [THIRD_PARTY](THIRD_PARTY.md)。相关变更即核对，不等 R9 从零处理。
 
 ## 验证入口与维护
 
-- `& ./scripts/check.ps1 -Round R3`（PowerShell 7）：依赖恢复、格式、analyze、全套单元/widget；不含原生集成、双端构建、手机验收。R3 准备曲库样本及万首合成标签基准，不代表手机/真实万首文件。
+- `& ./scripts/check.ps1 -Round R4`（PowerShell 7）：依赖恢复、格式、analyze、全套单元/widget；不含原生集成、双端构建、手机验收。R4 准备曲库样本、万首合成标签和三框筛选基准，不代表手机/真实万首文件。
 - 候选参数：`scripts/build.ps1 -Target all -BuildNumber <新构建号> -Round <当前阶段>`；`verify-apk.ps1` 显式传 `-Version/-BuildNumbers/-Round`；`verify-packages.py` 传 `--version/--build/--round`，当前音频基线另传 `--native-reference-round R1`。示意值须取实际 pubspec/交接。
-- 手动 Flutter 先 `. ./scripts/env.ps1`，再 `& ./scripts/restore.ps1 -Round R3`。所有 Flutter 检查/测试/构建串行，避免共享注册文件互改。按模块表先做相关回归，候选/阶段收口完整验证，具体门禁见 [PLAN §4](PLAN.md#4-验证与质量门禁)。
-- 现有 check 在 R1～R3 按阶段准备样本，SQLite 包审计分支在 R2/R3 启用；后续阶段 Plan 要先核对覆盖，不能把 skip 当通过。脚本默认参数及 Android 播放/卡片脚本仍有 R1 路径/样本假设，使用前核对，显式传当前参数。
+- 手动 Flutter 先 `. ./scripts/env.ps1`，再 `& ./scripts/restore.ps1 -Round R4`。所有 Flutter 检查/测试/构建串行，避免共享注册文件互改。按模块表先做相关回归，候选/阶段收口完整验证，具体门禁见 [PLAN §4](PLAN.md#4-验证与质量门禁)。
+- 现有 check 在 R1～R4 按阶段准备样本，SQLite 包审计分支在 R2/R3/R4 启用；后续阶段 Plan 要先核对覆盖，不能把 skip 当通过。脚本默认参数及 Android 播放/卡片脚本仍有 R1 路径/样本假设，使用前核对，显式传当前参数。
 - 固定日志名重跑前保留旧失败证据到同轮构建号/问题子目录，候选不复用构建号覆盖。`install-android.ps1` 还会启动应用与抓日志，须取得涵盖这些操作的本批交互确认。
-- R3设备标签性能包：`& ./scripts/build-tag-benchmark.ps1 -BenchmarkBuildNumber <新测试编号>`，Release模式、独立ID `app.tagmusic.player.benchmark`、临时合成库；脚本只构建审计，不安装运行。正式APK安装从artifacts取包，不能从最新build/app输出推定候选身份。
+- 独立设备性能包（R3标签/R4三框）：`& ./scripts/build-tag-benchmark.ps1 -Round R4 -BenchmarkBuildNumber <新测试编号>`，Release模式、独立ID `app.tagmusic.player.benchmark`、临时合成库；脚本只构建审计，不安装运行。正式APK安装从artifacts取包，不能从最新build/app输出推定候选身份。R4使用`integration_test/filter_benchmark_test.dart`，报告实际规则重算/搜索排序，初次加载单列，不计真实文件扫描或UI渲染。
 - 仅文档改动验 diff、链接/事实/改动范围，不重建应用。改公共接口先查调用方/已有实现并验证，避免重复功能或闲置抽象。临时修复记录原因、范围、验证与撤除条件；改模块/接口/命令同步对应长期文档。
 
 ## 文档各司其职
@@ -66,4 +67,4 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 | [TOOLCHAIN](TOOLCHAIN.md) / [THIRD_PARTY](THIRD_PARTY.md) | 环境/补丁及许可，相关任务读 |
 | [原始计划](archive/PLAN.original.md) | 原件保留，仅溯源时读 |
 
-历史入口（非必读）：[R0](rounds/R0.md)/[验收](rounds/R0-ACCEPTANCE.md)、[R1](rounds/R1.md)/[验收](rounds/R1-ACCEPTANCE.md)、[R2](rounds/R2.md)/[验收](rounds/R2-ACCEPTANCE.md)；当前 [R3](rounds/R3.md)/[验收](rounds/R3-ACCEPTANCE.md)。历史旧路径按本索引/Git 定位，不改写原始失败记录。
+历史入口（非必读）：[R0](rounds/R0.md)/[验收](rounds/R0-ACCEPTANCE.md)、[R1](rounds/R1.md)/[验收](rounds/R1-ACCEPTANCE.md)、[R2](rounds/R2.md)/[验收](rounds/R2-ACCEPTANCE.md)、[R3](rounds/R3.md)/[验收](rounds/R3-ACCEPTANCE.md)；当前 [R4](rounds/R4.md)。历史旧路径按本索引/Git 定位，不改写原始失败记录。

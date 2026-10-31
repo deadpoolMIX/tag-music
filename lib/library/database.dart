@@ -56,7 +56,20 @@ class SongTags extends Table {
   Set<Column> get primaryKey => {songId, tagId};
 }
 
-@DriftDatabase(tables: [Songs, LibraryRoots, SongLocations, Tags, SongTags])
+class CurrentFilters extends Table {
+  IntColumn get id => integer()
+      .withDefault(const Constant(1))
+      .check(const CustomExpression<bool>('"id" = 1'))();
+  TextColumn get ruleJson => text()();
+  TextColumn get sortOrder => text().withDefault(const Constant('title'))();
+  BoolColumn get descending => boolean().withDefault(const Constant(false))();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DriftDatabase(
+  tables: [Songs, LibraryRoots, SongLocations, Tags, SongTags, CurrentFilters],
+)
 class LibraryDatabase extends _$LibraryDatabase {
   LibraryDatabase([QueryExecutor? executor])
     : super(
@@ -69,7 +82,7 @@ class LibraryDatabase extends _$LibraryDatabase {
             ),
       );
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
@@ -79,12 +92,15 @@ class LibraryDatabase extends _$LibraryDatabase {
       );
     },
     onUpgrade: (m, from, to) async {
-      if (from == 1 && to == 2) {
-        await m.createTable(tags);
-        await m.createTable(songTags);
-        await customStatement(
-          'CREATE INDEX song_tags_tag_id_idx ON song_tags (tag_id)',
-        );
+      if ((from == 1 || from == 2) && to == 3) {
+        if (from == 1) {
+          await m.createTable(tags);
+          await m.createTable(songTags);
+          await customStatement(
+            'CREATE INDEX song_tags_tag_id_idx ON song_tags (tag_id)',
+          );
+        }
+        await m.createTable(currentFilters);
         return;
       }
       throw StateError('不支持的数据库升级 $from → $to');

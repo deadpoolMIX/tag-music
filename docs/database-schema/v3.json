@@ -1,0 +1,47 @@
+{
+  "version": 3,
+  "schema": [
+    {
+      "type": "index",
+      "name": "song_tags_tag_id_idx",
+      "tbl_name": "song_tags",
+      "sql": "CREATE INDEX song_tags_tag_id_idx ON song_tags (tag_id)"
+    },
+    {
+      "type": "table",
+      "name": "current_filters",
+      "tbl_name": "current_filters",
+      "sql": "CREATE TABLE \"current_filters\" (\"id\" INTEGER NOT NULL DEFAULT 1 CHECK(\"id\" = 1), \"rule_json\" TEXT NOT NULL, \"sort_order\" TEXT NOT NULL DEFAULT 'title', \"descending\" INTEGER NOT NULL DEFAULT 0 CHECK (\"descending\" IN (0, 1)), PRIMARY KEY (\"id\"))"
+    },
+    {
+      "type": "table",
+      "name": "library_roots",
+      "tbl_name": "library_roots",
+      "sql": "CREATE TABLE \"library_roots\" (\"location\" TEXT NOT NULL, \"accessible\" INTEGER NOT NULL DEFAULT 1 CHECK (\"accessible\" IN (0, 1)), \"status\" TEXT NOT NULL DEFAULT '尚未扫描', \"scanned_at\" INTEGER NULL, PRIMARY KEY (\"location\"))"
+    },
+    {
+      "type": "table",
+      "name": "song_locations",
+      "tbl_name": "song_locations",
+      "sql": "CREATE TABLE \"song_locations\" (\"song_id\" TEXT NOT NULL REFERENCES songs (id), \"root\" TEXT NOT NULL REFERENCES library_roots (location), \"location\" TEXT NOT NULL, \"relative_path\" TEXT NOT NULL, \"available\" INTEGER NOT NULL DEFAULT 1 CHECK (\"available\" IN (0, 1)), PRIMARY KEY (\"song_id\", \"root\"))"
+    },
+    {
+      "type": "table",
+      "name": "song_tags",
+      "tbl_name": "song_tags",
+      "sql": "CREATE TABLE \"song_tags\" (\"song_id\" TEXT NOT NULL REFERENCES songs (id) ON DELETE CASCADE, \"tag_id\" TEXT NOT NULL REFERENCES tags (id) ON DELETE CASCADE, PRIMARY KEY (\"song_id\", \"tag_id\"))"
+    },
+    {
+      "type": "table",
+      "name": "songs",
+      "tbl_name": "songs",
+      "sql": "CREATE TABLE \"songs\" (\"id\" TEXT NOT NULL, \"identity\" TEXT NOT NULL UNIQUE, \"location\" TEXT NOT NULL, \"name\" TEXT NOT NULL, \"size\" INTEGER NULL, \"modified\" INTEGER NULL, \"title\" TEXT NULL, \"artist\" TEXT NULL, \"album\" TEXT NULL, \"duration_ms\" INTEGER NULL, \"metadata_error\" TEXT NULL, PRIMARY KEY (\"id\"))"
+    },
+    {
+      "type": "table",
+      "name": "tags",
+      "tbl_name": "tags",
+      "sql": "CREATE TABLE \"tags\" (\"id\" TEXT NOT NULL, \"name\" TEXT NOT NULL, \"name_key\" TEXT NOT NULL UNIQUE, PRIMARY KEY (\"id\"))"
+    }
+  ]
+}

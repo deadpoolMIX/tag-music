@@ -39,6 +39,7 @@ class TagMusicApp extends ConsumerWidget {
 const _destinations = [
   (Icons.library_music_outlined, Icons.library_music, '曲库'),
   (Icons.sell_outlined, Icons.sell, '标签'),
+  (Icons.filter_alt_outlined, Icons.filter_alt, '筛选'),
   (Icons.queue_music_outlined, Icons.queue_music, '歌单'),
   (Icons.settings_outlined, Icons.settings, '设置'),
 ];
@@ -83,7 +84,7 @@ class _AppShellState extends ConsumerState<AppShell>
           actions: const [
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Chip(label: Text('R3 · 标签管理')),
+              child: Chip(label: Text('R4 · 组合筛选')),
             ),
           ],
         ),
@@ -117,13 +118,13 @@ class _AppShellState extends ConsumerState<AppShell>
                       content: Text(warning),
                       actions: [
                         TextButton(
-                          onPressed: () => setState(() => _selected = 3),
+                          onPressed: () => setState(() => _selected = 4),
                           child: const Text('查看设置'),
                         ),
                       ],
                     ),
                   Expanded(
-                    child: _selected == 3
+                    child: _selected == 4
                         ? const SettingsPage()
                         : _selected == 0
                         ? const PlaybackPage()
@@ -132,7 +133,9 @@ class _AppShellState extends ConsumerState<AppShell>
                             final library? => TagsPage(library: library),
                             null => const Center(child: Text('曲库尚未就绪')),
                           }
-                        : EmptyPage(index: _selected),
+                        : _selected == 2
+                        ? const PlaybackPage(filtering: true)
+                        : const EmptyPage(index: 2),
                   ),
                 ],
               ),
@@ -187,7 +190,7 @@ class EmptyPage extends StatelessWidget {
                   borderRadius: BorderRadius.circular(32),
                 ),
                 child: Icon(
-                  _destinations[index].$1,
+                  _destinations[3].$1,
                   size: 56,
                   color: scheme.onSecondaryContainer,
                 ),
@@ -309,7 +312,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       const SizedBox(height: 8),
                       SelectableText('版本 ${info.version}+${info.buildNumber}'),
                       const SizedBox(height: 8),
-                      const Text('R3 · 标签管理'),
+                      const Text('R4 · 组合筛选'),
                       const SizedBox(height: 12),
                       TextButton.icon(
                         key: const ValueKey('copy-diagnostics'),

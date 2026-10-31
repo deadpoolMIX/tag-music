@@ -13,69 +13,74 @@ import 'library_test.dart' show FakeDocuments, entry;
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('v1 file upgrades to v2 without changing songs or locations', () async {
-    final dir = await Directory.systemTemp.createTemp('tag-music-tag-upgrade-');
-    final file = File('${dir.path}/library.sqlite');
-    final baseline = jsonDecode(
-      await File('docs/database-schema/v1.json').readAsString(),
-    ) as Map<String, dynamic>;
-    final old = sqlite.sqlite3.open(file.path);
-    try {
-      for (final row in baseline['schema'] as List<dynamic>) {
-        old.execute((row as Map<String, dynamic>)['sql'] as String);
+  test(
+    'v1 file upgrades to current schema without changing songs or locations',
+    () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'tag-music-tag-upgrade-',
+      );
+      final file = File('${dir.path}/library.sqlite');
+      final baseline = jsonDecode(
+        await File('docs/database-schema/v1.json').readAsString(),
+      ) as Map<String, dynamic>;
+      final old = sqlite.sqlite3.open(file.path);
+      try {
+        for (final row in baseline['schema'] as List<dynamic>) {
+          old.execute((row as Map<String, dynamic>)['sql'] as String);
+        }
+        old.execute('PRAGMA user_version = 1');
+        old.execute(
+          "INSERT INTO songs (id, identity, location, name) VALUES ('stable-id', 'old-song', '/old.mp3', 'old.mp3')",
+        );
+        old.execute("INSERT INTO library_roots (location) VALUES ('old-root')");
+        old.execute(
+          "INSERT INTO song_locations (song_id, root, location, relative_path) VALUES ('stable-id', 'old-root', '/old.mp3', 'old.mp3')",
+        );
+      } finally {
+        old.close();
       }
-      old.execute('PRAGMA user_version = 1');
-      old.execute(
-        "INSERT INTO songs (id, identity, location, name) VALUES ('stable-id', 'old-song', '/old.mp3', 'old.mp3')",
-      );
-      old.execute("INSERT INTO library_roots (location) VALUES ('old-root')");
-      old.execute(
-        "INSERT INTO song_locations (song_id, root, location, relative_path) VALUES ('stable-id', 'old-root', '/old.mp3', 'old.mp3')",
-      );
-    } finally {
-      old.close();
-    }
-    final db = LibraryDatabase(NativeDatabase(file));
-    try {
-      expect((await db.select(db.songs).get()).single.id, 'stable-id');
-      expect(
-        (await db.select(db.songLocations).get()).single.songId,
-        'stable-id',
-      );
-      expect((await db.select(db.tags).get()), isEmpty);
-      final tags = TagRepository(db);
-      await tags.create(' Rock ');
-      final tag = (await tags.load()).tags.single;
-      await tags.changeSongs(tag.id, ['stable-id'], add: true);
-      expect((await tags.load()).bySong['stable-id'], {tag.id});
-      expect(
-        (await db.customSelect('PRAGMA foreign_key_check').get()),
-        isEmpty,
-      );
-      expect(
-        (await db.customSelect('PRAGMA user_version').getSingle()).read<int>(
-          'user_version',
-        ),
-        2,
-      );
-    } finally {
-      await db.close();
-    }
-    final reopened = LibraryDatabase(NativeDatabase(file));
-    try {
-      expect(
-        (await reopened.select(reopened.songs).get()).single.id,
-        'stable-id',
-      );
-      expect(
-        (await reopened.select(reopened.songTags).get()).single.songId,
-        'stable-id',
-      );
-    } finally {
-      await reopened.close();
-      await dir.delete(recursive: true);
-    }
-  });
+      final db = LibraryDatabase(NativeDatabase(file));
+      try {
+        expect((await db.select(db.songs).get()).single.id, 'stable-id');
+        expect(
+          (await db.select(db.songLocations).get()).single.songId,
+          'stable-id',
+        );
+        expect((await db.select(db.tags).get()), isEmpty);
+        final tags = TagRepository(db);
+        await tags.create(' Rock ');
+        final tag = (await tags.load()).tags.single;
+        await tags.changeSongs(tag.id, ['stable-id'], add: true);
+        expect((await tags.load()).bySong['stable-id'], {tag.id});
+        expect(
+          (await db.customSelect('PRAGMA foreign_key_check').get()),
+          isEmpty,
+        );
+        expect(
+          (await db.customSelect('PRAGMA user_version').getSingle()).read<int>(
+            'user_version',
+          ),
+          3,
+        );
+      } finally {
+        await db.close();
+      }
+      final reopened = LibraryDatabase(NativeDatabase(file));
+      try {
+        expect(
+          (await reopened.select(reopened.songs).get()).single.id,
+          'stable-id',
+        );
+        expect(
+          (await reopened.select(reopened.songTags).get()).single.songId,
+          'stable-id',
+        );
+      } finally {
+        await reopened.close();
+        await dir.delete(recursive: true);
+      }
+    },
+  );
 
   test(
     'tag names, bulk changes and deletion preserve relationship integrity',

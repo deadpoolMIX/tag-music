@@ -6,6 +6,9 @@ $report = Join-Path $ProjectRoot "artifacts/$Round"
 $versionMatch = [regex]::Match((Get-Content pubspec.yaml -Raw), '(?m)^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+')
 if (!$versionMatch.Success) { throw '无法读取 pubspec 版本。' }
 $version = $versionMatch.Groups[1].Value
+foreach ($package in @("tag-music-$version+$BuildNumber.apk", "tag-music-windows-$version+$BuildNumber.zip")) {
+    if (Test-Path -LiteralPath (Join-Path $report $package)) { throw "候选包已存在，必须使用新构建号：$package" }
+}
 New-Item -ItemType Directory -Force $report | Out-Null
 & "$PSScriptRoot/restore.ps1" -Round $Round
 $lockedDependencies = (Get-FileHash pubspec.lock -Algorithm SHA256).Hash

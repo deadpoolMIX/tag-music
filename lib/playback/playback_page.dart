@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'playback_controller.dart';
 import '../library/library_page.dart';
 import '../library/library_controller.dart';
+import '../library/filter_page.dart';
 
 String formatPosition(Duration duration) {
   final seconds = duration.inSeconds;
@@ -13,7 +14,8 @@ String formatPosition(Duration duration) {
 }
 
 class PlaybackPage extends ConsumerWidget {
-  const PlaybackPage({super.key});
+  const PlaybackPage({this.filtering = false, super.key});
+  final bool filtering;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,7 +33,9 @@ class PlaybackPage extends ConsumerWidget {
           children: [
             if (library != null)
               Expanded(
-                child: LibraryPage(library: library, playback: controller),
+                child: filtering
+                    ? FilterPage(library: library, playback: controller)
+                    : LibraryPage(library: library, playback: controller),
               )
             else ...[
               Padding(
