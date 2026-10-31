@@ -1,6 +1,6 @@
 # 当前交接
 
-更新：2026-10-31 17:47 北京时间。**R4 开发中：Slider语义故障已有针对修复，format/analyze/56项通过；正在准备0.5.0+14双端Release，尚未实际复验。Goal保持active，阶段未验收。** R0～R3已双端通过。+13续测已正常退出0；Android未授权，从未操作手机。
+更新：2026-10-31 17:52 北京时间。**R4 开发中：0.5.0+14自动验证及双端Release审计通过，Windows原生修复和Android实际验收待新批选择；Goal保持active，阶段未验收。** R0～R3已双端通过。+13续测已正常退出0；+14未启动或安装，Android从未操作。
 
 ## 目标与有效计划
 
@@ -10,10 +10,9 @@
 
 ## 分支、版本和产物
 
-- 本地main，实际提交/工作区以git log及git status为准；本检查点包含Slider修复、3项语义回归及pubspec升0.5.0+14。+14尚未构建，下一步提交后双端Release构建及审计，不能覆盖旧+13。
-- 最后已构建正式包：0.5.0+13、包内revision cb0c072；双端Release、固定Android ID/API29/原持久签名、原生/SQLite/8份许可审计通过。
-- APK artifacts/R4/tag-music-0.5.0+13.apk，SHA256 26d5a153e19ea55f5f54fbc534ee7365d57637946009b053a3d60db5ae2d5b06；ZIP tag-music-windows-0.5.0+13.zip，SHA256 cd3934a75c5720ed15f5eab563a4d0fb45c2070a5a1057a63459647b10a901d9。
-- 独立Release性能包编号1/revision6e881c4，artifacts/R4/benchmark内双端产物及package-*-release-1.json。Android包未安装运行。build/app与build/windows当前仍可能是独立基准产物；正式测试只取artifacts对应正式候选，不能猜包身份。
+- 本地main，源码修复提交f0da853；当前文档检查点/工作区以git log及git status为准。正式候选0.5.0+14、包内revision f0da853，双端Release、固定Android ID/API29/原持久签名、原生/SQLite/8份许可审计通过。证据build-all-14.json、build14-console.log、signature-upgrade-comparison-14.json、package-audit-14.json/log。
+- APK artifacts/R4/tag-music-0.5.0+14.apk，SHA256 bd455d9d9403f4efc01234de1e4eeb69f2e38ca9236a0bada6d59fe3f6018442；ZIP tag-music-windows-0.5.0+14.zip，SHA256 fb18601442d34c693892c4a7ef967a1a5e38e9b68d536c871b34db8815cf16e5。已解压windows14/app，EXE哈希/路径见windows14/package.json，未启动。旧+13/cb0c072原包保留不覆盖。
+- 独立Release性能包编号1/revision6e881c4，artifacts/R4/benchmark内双端产物及package-*-release-1.json。Android包未安装运行。build/app与build/windows已由+14正式构建刷新；正式测试仍只取artifacts对应候选，不猜包身份。
 - 手机最后已知R3正式0.4.0+12/bcf31d5，未假定升级。下一次手机操作需新批确认；覆盖安装保留数据/原签名，不卸载或清数据。
 
 ## 已有实际证据
@@ -33,7 +32,7 @@
 
 ## 下一步与授权
 
-1. 保存修复检查点，构建+14双端Release并审计固定身份/签名、原生/SQLite及许可，记录包内revision和SHA256。仅后台构建，不启动应用。
-2. 新候选准备好后，按当批范围交互确认Windows/Android测试方式。Windows复验起播/进度、停止/再播/切歌、弹窗导航及R4七项；原生错误为0是修复验证要求。若仍失败先存证、缩小假设，不无依据重试。
+1. +14候选已准备好，已分别发出Windows/Android新批交互选择，等待回复；范围见[R4验收](rounds/R4-ACCEPTANCE.md)。未回复对应端前不操作该端。
+2. Windows复验起播/进度、停止/再播/切歌、弹窗导航及R4七项；原生错误为0是修复验证要求。若仍失败先存证、缩小假设，不无依据重试。
 3. Android七项和独立Release性能仍未测。用户未选择手机测试方式，严禁安装/启动/输入/采集；旧+13电脑许可不能用于+14新候选。Windows UI仍只由指定Terra/high子Agent通过Windows MCP执行，主Agent不接管。
 4. 双端实际验收及用户最终确认前不complete；候选实际失败继续开发中。用户暂停立即生效。
