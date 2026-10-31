@@ -1,6 +1,6 @@
 # 当前交接
 
-更新：2026-10-31 17:27 北京时间。**R4 开发中：功能已实现，Windows原生无障碍树错误待处理；用户已重新激活Goal，已续查离线诊断，下一批电脑诊断待交互授权。** R0～R3已双端通过。前批电脑测试已收尾；本次未启动应用或操作设备，Android测试方式未选择，从未操作手机。
+更新：2026-10-31 17:35 北京时间。**R4 开发中：功能已实现，Windows原生无障碍树错误待处理；Goal已重新激活，新批Windows诊断因窗口目标确认失败而未完成。** R0～R3已双端通过。本批+13已正常关闭，退出0，无遗留测试进程；Android测试方式未选择，从未操作手机。
 
 ## 目标与当前计划
 
@@ -41,4 +41,5 @@
 - 本轮诊断日志：accessibility-baseline.log（测试fake缺seek，已补）；accessibility-windows-test.log（缺foundation导入，已修）；accessibility-windows-corrected.log（通用弹层孤立节点及测试平台override清理问题）；accessibility-app-baseline.log、accessibility-incremental-baseline.log（修正平台variant后的真实页面通过，覆盖仍不足以解释native AXTree）。这些不是当前候选全量/真机通过证据。
 - 流程优化完成：GUI按断言采集与批次汇报，工具输出限于摘要及证据路径；详细规则见 [AGENTS](../AGENTS.md)。未改业务、SDK、工具脚本或模型配置。
 - 新离线诊断补查缺失子节点，覆盖搜索聚焦/进度通知、真实目录弹窗、完整TagMusicApp导航中销毁和重建播放器。三次针对性真实页面检查通过；通用Slider弹窗对照同时检出孤立节点和缺失子节点，故仍不能认定正式候选问题已修复。草稿、日志及上游修复入口见[R4技术记录](rounds/R4.md#技术记录)。默认测试和业务源码无变更。
-- 下一步按状态分段定位+13首次原生错误：启动空闲→播放并接收进度→目录弹窗→标签/筛选/曲库导航→停止退出，每段保存错误计数及时间、关键截图和stdout/stderr。需要新批电脑交互授权后，由专用Terra/high子Agent使用Windows MCP纯Screenshot执行；不使用已知异常UIA Snapshot路径，不编辑标签/目录、不采音、不操作手机。等待选择期间不启动设备测试。
+- 用户已选择新批Codex测试，Terra/high通过Windows MCP执行；本批目录artifacts/R4/windows13/segmented-20261031-172946，result.md记录启动空闲9首/AXTree错误0、正常退出0。播放Click被自动审批拒绝1次：Screenshot窗口元数据为空，坐标目标无法确认；随后截图显示应用不在前景。拒绝原文及参数见approval-rejection.json。播放、弹窗、导航均未测，旧422条AXTree故障仍未解释。未编辑数据、未录音、未操作手机。
+- 下一步仍需分段定位+13首次原生错误，但先解决明确目标窗口及前景确认；Windows MCP App仅支持按名称切窗，未提供按PID/句柄切窗接口。禁止盲坐标点击、重复历史无效句柄路径或恢复已知异常UIA观测。可由用户改选人工测试后操作界面，Codex只观察和后台记录；再开影响设备的新批须确认范围。当前等待用户选择，不启动应用。
