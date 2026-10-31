@@ -32,6 +32,6 @@
 ## 暂停及下一步边界
 
 - 用户本次仅恢复Android完整性能报告补测和项目压缩规则修改，其他任务不续行；新手机批次方式已发出交互选择，收到回复前不操作手机。
-- 性能报告改为600字符ASCII分段，带总段数/长度/首尾；新增 scripts/audit-filter-benchmark.py 完整恢复及独立计数/P95复核。离线预检六场景、Unicode恢复及缺段/重复/无尾/截断拒绝通过，针对文件格式与analyze通过，证据benchmark/export-preflight-2.json及*export-2.log。待构建新独立Release包2，不覆盖包1。
+- 性能报告改为600字符ASCII分段，带总段数/长度/首尾；新增 scripts/audit-filter-benchmark.py 完整恢复及独立计数/P95复核。离线预检六场景、Unicode恢复及缺段/重复/无尾/截断拒绝通过，针对文件格式与analyze通过，证据benchmark/export-preflight-2.json及*export-2.log。独立Release包2已构建并核对ID/原签名，revision c58e964，APK SHA256 99bd7320756864d279b062b9f853be6122fa5a2d6332c7165f9f25a65adb5f89；package-release-2.json及build-android-2-console.log为证。尚未安装运行，不覆盖包1。
 - 压缩规则最终方案待交互确认：完整任务及MD更新后压缩；无主动入口时提示“现在可以压缩了”，选择继续工作或暂停供用户手动压缩。仅改项目AGENTS，不改全局规范；尚未写入。
 - 不重复Android已通过的七项功能；Windows+14原生/七项仍未测。阶段不complete，后续设备操作按新批授权。
