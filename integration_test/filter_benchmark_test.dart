@@ -23,6 +23,11 @@ void main() {
           reason: scenario['scenario'] as String,
         );
       }
+      const output = String.fromEnvironment('FILTER_BENCHMARK_OUTPUT');
+      if (output.isNotEmpty) {
+        await File(output)
+            .writeAsString(const JsonEncoder.withIndent('  ').convert(report));
+      }
     });
   });
 }

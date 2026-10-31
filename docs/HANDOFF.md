@@ -6,12 +6,12 @@
 
 - 有效计划：[R4 当前执行计划](rounds/R4.md#r4-当前执行计划)。固定三框公式、空框和删标签自动移除语义由用户明确确认，替换原嵌套/待修复约定；PLAN已同步。
 - 已实现：独立筛选导航、即时三框选择/搜索/排序、当前规则保留、schema v3和v1/v2迁移、删标签事务移除各框引用、复用播放快照及控件、损坏规则显式重置。
-- 已验证：首轮完整格式/analyze/53项单元widget通过；复查快速选择后5项相关widget再过。最后两行页面修复后尚待候选完整检查。Windows万首Debug基准六场景通过；双端Release性能未测。
+- 已验证：首轮完整格式/analyze/53项单元widget通过；复查快速选择后5项相关widget再过。候选最终完整格式/analyze/53项再次通过（含快速选择修复），此后仅补独立Release基准报告出口/构建脚本并再次analyze通过。Windows万首Debug基准六场景通过；双端Release性能未测。
 - 已补齐：R4样本/性能报告检查入口、SQLite包审计分支、独立R4 Release性能包构建入口、正式候选防覆盖。
 
 ## 分支、版本与证据
 
-- 本地main；起点c74169d，计划提交d5848b3；功能检查点以git log为准。当前源码版本0.5.0+13，尚无R4正式产物。
+- 本地main；起点c74169d，计划提交d5848b3，功能提交2bdd20d；后续工具检查点以git log为准。当前源码版本0.5.0+13，尚无R4正式产物。
 - 正式设备仍为R3的0.4.0+12，包内bcf31d5；固定Android ID/原签名保持，未安装/启动/采集R4。R3产物与完整验收证据仍在artifacts/R3及rounds/R3.md，不重做已通过项。
 - R4证据：artifacts/R4/format.log、analyze.log、test.log（53项）；filter-widget-rapid-selection.log（5项）；filter-benchmark.json（Debug万首六场景，非Release/真机/真实文件扫描）；library-benchmark.json、tag-benchmark.json；失败日志同目录保留。
 - schema实际DDL：database-schema/v1.json、v2.json保留；新增v3.json。测试验证旧表逐列保留、外键、重开、迁移失败原库保留和删标签写失败整体回滚。
@@ -26,7 +26,7 @@
 
 ## 下一步与授权
 
-1. 保存首轮检查报告后，串行最终完整检查；提交冻结源码，再构建正式0.5.0+13双端并审计包/签名/哈希。
-2. 构建独立Release性能包及Windows Release性能入口；不得把独立包当正式APK，正式安装必须从artifacts/R4取包。
+1. 最终完整检查已过，首轮报告已保留checkpoint1；冻结源码，串行构建正式0.5.0+13双端并审计包/签名/哈希。
+2. 通过scripts/build-filter-benchmark.ps1构建双端独立Release性能包（Windows有独立JSON报告出口），构建不启动；不得把独立包当正式APK，正式安装必须从artifacts/R4取包。
 3. 准备七项双端验收清单，说明构建号、安装/启动/输入/采集影响，分别交互确认人工或Codex测试。Windows界面只由专用GPT 6.1 Terra/high子Agent操作，主Agent不接管。
 4. 对应批次授权前不碰设备。最终双端验收及用户确认前Goal不complete；R5不启动。
