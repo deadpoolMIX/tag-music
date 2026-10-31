@@ -1,6 +1,6 @@
 # R4 候选验收
 
-候选：0.5.0+14，正式包内revision f0da853。双端Release和审计已通过，两端已获Codex测试授权；Windows因点击审批阻塞按用户最新选择保留未测，Android七项功能实测通过，性能完整报告缺口待补；本批已结束，Goal按用户要求paused。Windows Codex测试仍只由专用GPT 6.1 Terra/high按用户指定使用Windows MCP执行；构建和包审计证据见HANDOFF。
+候选：0.5.0+14，正式包内revision f0da853。双端Release和审计已通过；Android七项功能及独立Release性能包2六场景完整报告/外部复核均通过，Windows因点击审批阻塞按用户选择保留未测。手机本批已结束，阶段未验收；用户已将Goal恢复active。Windows Codex测试仍只由专用GPT 6.1 Terra/high按用户指定使用Windows MCP执行；构建和包审计证据见HANDOFF。
 
 ## 当批操作与边界
 
@@ -33,5 +33,5 @@
 
 - Windows：+14仅初始原库观察，播放与七项未完整验证；点击连续两次审批拒绝后已结束，用户选择保留未测。+13七项已核对但原生AXTree错误阻塞阶段；后续分段复现最终746条，应用层修复及56项自动回归已过，须+14原生复验，不能迁移旧候选通过结论。此前2次UIA期间进程消失仍未证实根因。
 - Android：+14七项1～7实测通过，结果及证据见artifacts/R4/android14/run-20261031-1755/result.md。1374首、原0标签/首次安装时间保留；清理后0测试标签、空规则、title升序、空搜索，重启验证且正式App已关闭。听感/输入/朗读体验未代判。
-- Release性能：Windows独立包六场景P95 1.814～18.088ms、加载103.523ms已复核。Android独立Release包1内部六场景结果及≤1s断言通过，但1023字符日志截断，仅两个场景完整采样可恢复；完整六场景外部重算未完成，不能标性能验收通过。包已卸载，证据benchmark/android-release-1-root-audit.json及原始logcat。性能不代表真实文件扫描/UI渲染，初次加载另列。
+- Release性能：Windows独立包六场景P95 1.814～18.088ms、加载103.523ms已复核。Android独立Release包2/c58e964本次六场景内部断言、完整报告及外部复核全部通过：empty/all/any/combined/excludeOnly/crossBoxZero的P95依次22.291/6.144/17.651/5.888/11.241/4.177ms，均≤1s，加载144.514ms。证据benchmark/filter-benchmark-android-release-2.json、android-release-2-root-audit.json及android-release-2/原始日志/清理记录。测试包已卸载，正式+14包信息不变且无进程；本批结束。包1截断失败记录保留。性能不代表真实文件扫描/持久化等待/UI渲染，初次加载另列。
 - 最终用户验收：待确认。任一新失败退回开发中，不能凭构建/自动测试替代当前候选实际验收。
