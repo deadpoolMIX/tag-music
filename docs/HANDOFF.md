@@ -1,6 +1,6 @@
 # 当前交接
 
-更新：2026-10-31 17:52 北京时间。**R4 开发中：0.5.0+14自动验证及双端Release审计通过，Windows原生修复和Android实际验收待新批选择；Goal保持active，阶段未验收。** R0～R3已双端通过。+13续测已正常退出0；+14未启动或安装，Android从未操作。
+更新：2026-10-31 18:21 北京时间。**R4 开发中：+14自动验证/包审计已过，Windows因工具审批阻塞按用户选择保留未测；Android已获Codex授权并正在实际验收。Goal保持active，阶段未验收。** Windows测试进程已关闭；手机已保留数据覆盖升级+14。
 
 ## 目标与有效计划
 
@@ -13,7 +13,7 @@
 - 本地main，源码修复提交f0da853；当前文档检查点/工作区以git log及git status为准。正式候选0.5.0+14、包内revision f0da853，双端Release、固定Android ID/API29/原持久签名、原生/SQLite/8份许可审计通过。证据build-all-14.json、build14-console.log、signature-upgrade-comparison-14.json、package-audit-14.json/log。
 - APK artifacts/R4/tag-music-0.5.0+14.apk，SHA256 bd455d9d9403f4efc01234de1e4eeb69f2e38ca9236a0bada6d59fe3f6018442；ZIP tag-music-windows-0.5.0+14.zip，SHA256 fb18601442d34c693892c4a7ef967a1a5e38e9b68d536c871b34db8815cf16e5。已解压windows14/app，EXE哈希/路径见windows14/package.json，未启动。旧+13/cb0c072原包保留不覆盖。
 - 独立Release性能包编号1/revision6e881c4，artifacts/R4/benchmark内双端产物及package-*-release-1.json。Android包未安装运行。build/app与build/windows已由+14正式构建刷新；正式测试仍只取artifacts对应候选，不猜包身份。
-- 手机最后已知R3正式0.4.0+12/bcf31d5，未假定升级。下一次手机操作需新批确认；覆盖安装保留数据/原签名，不卸载或清数据。
+- 手机由0.4.0+12覆盖升级至正式0.5.0+14，1374首及原空标签集保留，firstInstallTime仍2026-10-29 20:14:50。证据android14/run-20261031-1755内package-before.txt、before/after-library与tags.xml及安装日志；独立性能包尚未运行。
 
 ## 已有实际证据
 
@@ -32,7 +32,8 @@
 
 ## 下一步与授权
 
-1. +14候选已准备好，已分别发出Windows/Android新批交互选择，等待回复；范围见[R4验收](rounds/R4-ACCEPTANCE.md)。未回复对应端前不操作该端。
-2. Windows复验起播/进度、停止/再播/切歌、弹窗导航及R4七项；原生错误为0是修复验证要求。若仍失败先存证、缩小假设，不无依据重试。
-3. Android七项和独立Release性能仍未测。用户未选择手机测试方式，严禁安装/启动/输入/采集；旧+13电脑许可不能用于+14新候选。Windows UI仍只由指定Terra/high子Agent通过Windows MCP执行，主Agent不接管。
+1. 两端+14已选择Codex测试。Windows歌曲点击连续两次被自动审批拒绝，物理前景核对后仍认为截图目标不明；本批已请求正常关闭，进程消失，退出码未知。证据windows14/run-20261031-175543内拒绝原文/exit.json/original.sqlite/root-data-audit.json（六表与启动前相同、完整及外键检查通过）。用户最新选择“先完成手机，Windows保留未测”，不重试电脑控制。
+2. Android当前批次继续：已过升级保留、组合公式、空框/排除及零结果；搜索排序独立、删除联动、重启、播放快照及独立Release万首性能待完成。实际测试标签41401/41402/41403/41404对应A/B/C/E；P/Q/R/S映射及逐项断言在android14/run-20261031-1755/mapping-*.xml和assertions.jsonl。结束只清理本批标签、恢复默认筛选排序并停止播放。
+3. 本批Android授权含正式+14安装/输入/截图日志、播放和独立性能包1安装/运行/卸载，不录音。初次快速ADB文本输入使4个测试名与预期不同，已停止该路径，改为逐字符数字输入并逐项核对修正；筛选框首份XML存在168px旧布局偏移，已改为连续两份目标边界一致才点击。原失败证据/辅助脚本保留该run目录。Windows仍未测，不把空闲零错误当修复通过；人工启动日志脚本windows14/manual-start.ps1仅准备未运行。
 4. 双端实际验收及用户最终确认前不complete；候选实际失败继续开发中。用户暂停立即生效。
+
