@@ -1,6 +1,6 @@
 # 当前交接
 
-更新：2026-10-31 15:30 北京时间。**R4 三框组合筛选自动验证通过，待双端实际测试**，用户已确认计划并要求开发，Goal active；R0～R3已双端通过。当前没有R4设备操作授权。
+更新：2026-10-31 15:32 北京时间。**R4 三框组合筛选自动验证通过，待双端实际测试**，用户已确认计划并要求开发，Goal active；R0～R3已双端通过。当前没有R4设备操作授权。
 
 ## 目标与完成入口
 
@@ -14,6 +14,7 @@
 - 本地main；起点c74169d，计划提交d5848b3，功能提交2bdd20d；后续工具检查点以git log为准。正式候选0.5.0+13已双端Release构建，包内revision cb0c072；Android ID/API29/原签名及双端原生/SQLite/8份许可审计通过。
 - APK：artifacts/R4/tag-music-0.5.0+13.apk，SHA256 26d5a153e19ea55f5f54fbc534ee7365d57637946009b053a3d60db5ae2d5b06。
 - Windows ZIP：artifacts/R4/tag-music-windows-0.5.0+13.zip，SHA256 cd3934a75c5720ed15f5eab563a4d0fb45c2070a5a1057a63459647b10a901d9。
+- 独立Release性能包测试编号1已双端构建，revision 6e881c4；Android APK filter-benchmark-release-1.apk（独立ID app.tagmusic.player.benchmark），Windows ZIP filter-benchmark-windows-release-1.zip，元数据/哈希见artifacts/R4/benchmark/package-release-1.json及package-windows-release-1.json。未安装/启动。当前build/app和build/windows均是独立基准产物，正式安装/运行必须从artifacts/R4的+13正式包解压/安装。
 - 正式设备仍为R3的0.4.0+12，包内bcf31d5；固定Android ID/原签名保持，未安装/启动/采集R4。R3产物与完整验收证据仍在artifacts/R3及rounds/R3.md，不重做已通过项。
 - R4证据：artifacts/R4/format.log、analyze.log、test.log（53项）；filter-widget-rapid-selection.log（5项）；filter-benchmark.json（Debug万首六场景，非Release/真机/真实文件扫描）；library-benchmark.json、tag-benchmark.json；失败日志同目录保留。
 - schema实际DDL：database-schema/v1.json、v2.json保留；新增v3.json。测试验证旧表逐列保留、外键、重开、迁移失败原库保留和删标签写失败整体回滚。
@@ -29,6 +30,6 @@
 ## 下一步与授权
 
 1. 最终完整检查、双端正式Release构建及包审计已过；首轮报告保留checkpoint1，不重跑已通过项。
-2. 通过scripts/build-filter-benchmark.ps1构建双端独立Release性能包（Windows有独立JSON报告出口），构建不启动；不得把独立包当正式APK，正式安装必须从artifacts/R4取包。
-3. 准备七项双端验收清单，说明构建号、安装/启动/输入/采集影响，分别交互确认人工或Codex测试。Windows界面只由专用GPT 6.1 Terra/high子Agent操作，主Agent不接管。
+2. 双端独立Release性能包已构建、哈希核对通过（Windows有独立JSON报告出口），均未启动；不得把独立包当正式候选，正式安装必须从artifacts/R4取包。
+3. 七项双端验收清单已准备，下一步说明构建号、安装/启动/输入/采集影响，分别交互确认人工或Codex测试。Windows界面只由专用GPT 6.1 Terra/high子Agent操作，主Agent不接管。
 4. 对应批次授权前不碰设备。最终双端验收及用户确认前Goal不complete；R5不启动。
