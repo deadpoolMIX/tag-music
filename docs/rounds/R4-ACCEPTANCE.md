@@ -1,6 +1,6 @@
 # R4 候选验收
 
-候选：0.5.0+14，正式包内revision f0da853。产品状态：双端通过（技术验证）；阶段最终用户验收待确认。自动56项、双端Release/审计、Android七项及双端独立Release性能通过；Windows主批与2026-11-01收尾五项共同补齐七项及原生复验证据。Goal active，不complete，不启动R5。
+候选：0.5.0+14，正式包内revision f0da853。产品状态：双端通过（技术验证）；阶段最终用户验收待确认。自动56项、双端Release/审计、Android七项及双端独立Release性能通过；Windows主批与2026-11-01收尾五项共同补齐七项及原生复验证据。Goal执行状态见HANDOFF，不complete，不启动R5。
 
 ## 当批操作与边界
 
