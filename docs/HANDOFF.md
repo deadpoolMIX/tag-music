@@ -1,37 +1,33 @@
 # 当前交接
 
-更新：2026-10-31 19:21 北京时间。**手机剩余性能补测及项目压缩规则修改已完成；R4仍开发中、阶段未验收，Windows保留未测。** 用户已选择“暂停”，Goal已同步paused，不complete；等待用户手动压缩并明确续行，不启动新设备批次或R5。
+更新：2026-11-01 13:36 北京时间。**R4双端技术验证通过，等待用户最终验收；Goal active，不complete，R5未启动。** 用户2026-11-01明确继续并交互选择Windows收尾Codex测试，本批已完成、正常关闭，无剩余Tag Music进程。完成MD/本地检查点后按项目规则提供压缩选项。
 
 ## 目标与有效计划
 
-- [R4计划](rounds/R4.md#r4-当前执行计划)、[七项验收及结果](rounds/R4-ACCEPTANCE.md)。三框组合、独立搜索排序、schema v3迁移、删除联动及快照已实现；R0～R3已双端通过，R5未启动。
-- +14自动格式/analyze/56项通过，含3项Windows语义回归；check14-console.log及format/analyze/test.log在artifacts/R4。旧+13自动日志/基准保留check13-preserved。未升级SDK、未关闭全局语义。
-- Slider仅在seek不可用/可用转换时重建，离线复现修复后通过；Windows原生修复尚未实际验证，旧两次进程消失根因仍未证实。
+- [R4计划](rounds/R4.md#r4-当前执行计划)、[七项验收及结果](rounds/R4-ACCEPTANCE.md)。固定三框交并差、独立搜索排序、schema v3、删标签联动和播放快照已实现；R0～R3已双端通过。
+- 当前产品状态：双端通过；阶段最终放行待用户确认。听感、输入手感及朗读不由工具代判；+14未录音，+13默认输出回环证据保留。
 
-## 分支、版本、产物
+## 分支、版本与产物
 
-- 本地main，业务源码提交f0da853；后续文档提交及工作区以git log/git status为准。正式候选0.5.0+14、包内revision f0da853；双端Release及固定Android ID/API29/原签名、原生/SQLite/8份许可审计通过。证据build-all-14.json、build14-console.log、signature-upgrade-comparison-14.json、package-audit-14.json/log。
-- APK artifacts/R4/tag-music-0.5.0+14.apk，SHA256 bd455d9d9403f4efc01234de1e4eeb69f2e38ca9236a0bada6d59fe3f6018442；Windows ZIP tag-music-windows-0.5.0+14.zip，SHA256 fb18601442d34c693892c4a7ef967a1a5e38e9b68d536c871b34db8815cf16e5。解压windows14/app，EXE路径/哈希见windows14/package.json。旧+13/cb0c072保留，不覆盖候选。
-- Android当前正式+14保留；独立Release性能包1/revision6e881c4及包2/revision c58e964均已运行并卸载。最新build/app为独立性能包2，build/windows仍为+14；正式测试仅取artifacts对应正式包，不能误装build/app。包2及哈希见benchmark/package-release-2.json。artifacts为本地忽略文件，换机器需另带必要证据，不能靠Git假定原始证据存在。
+- 本地main；正式业务源码/包内revision f0da853，候选0.5.0+14。本轮仅补验收证据和MD，未改业务或工具脚本；文档提交及工作区以git log/git status为准，先前检查点f5bf537。
+- 正式APK artifacts/R4/tag-music-0.5.0+14.apk，SHA256 bd455d9d9403f4efc01234de1e4eeb69f2e38ca9236a0bada6d59fe3f6018442；Windows ZIP tag-music-windows-0.5.0+14.zip，SHA256 fb18601442d34c693892c4a7ef967a1a5e38e9b68d536c871b34db8815cf16e5。正式EXE在windows14/app，路径/哈希见windows14/package.json。
+- 自动格式/analyze/56项（含3项Windows语义回归）及双端Release、签名/原生/SQLite/8份许可审计通过：check14-console.log、build-all-14.json、build14-console.log、signature-upgrade-comparison-14.json、package-audit-14.json/log。无新源码变更/疑点，未重复执行。
+- Android正式+14保留。最新build/app是独立Release性能包2（c58e964），不是正式APK；正式安装只取artifacts对应包。独立手机性能包1/2均已卸载。artifacts为本地忽略文件，换机器须另带必要证据，不能靠Git假定其存在。
 
-## 当前实际验收与证据
+## 实际验收与证据
 
-- **Android +14七项功能通过。** 由+12保留数据覆盖升级，1374首、原0标签及firstInstallTime=2026-10-29 20:14:50保留；组合、空框/零结果、搜索排序独立、改名/删除联动、规则排序重启恢复且搜索清空、空结果下原队列P→手动下一首S均已观察，停止再播亦通过。听感/输入手感/无障碍朗读不代判。
-- 手机本批目录artifacts/R4/android14/run-20261031-1755：result.md汇总，assertions.jsonl逐项断言，mapping/ case/cleanup XML与PNG、应用日志/媒体状态/包信息为原证据。实际标签41401/41402/41403/41404对应A/B/C/E，A改名41411；全部本批标签已清理。
-- 手机清理经重启复核：1374首/0标签，三框空（清空按钮disabled）、歌曲名升序、搜索空、无自动播放；正式App已force-stop确认无PID，不宣称Android退出码0。batch-end.json记录18:50:57本批结束；独立性能包已卸载，正式+14保留。已采集App日志无所检索的fatal/Unhandled/Dart ERROR；其他设备驱动日志仍保留，不称全无错误。
-- **Android万首性能补测通过。** 独立Release包2/c58e964运行六场景，10000首/8标签、预热5次/采样20次，内部集合/P95断言通过；6段完整报告恢复并外部重算全部规则计数及P95。最高P95 22.291ms≤1s、初次加载144.514ms。证据benchmark/filter-benchmark-android-release-2.json、android-release-2-root-audit.json；原始日志/截图/安装清理/正式包前后核对在benchmark/android-release-2/。19:18:28本批结束，测试包已卸载，正式+14版本/首次安装/更新时间及路径不变、无进程；已检索fatal/Unhandled/Dart ERROR为0。包1日志1023字符截断及失败审计保留，不改写历史；本基准不代表真实文件扫描、持久化等待或UI渲染。
-- **Windows +14保留未测。** 专用Terra/high使用Windows MCP，只完成启动/原库观察；歌曲点击连续两次审批拒绝后停止。已请求正常关闭，进程消失，退出码未知。windows14/run-20261031-175543内原库备份、拒绝原文/launch/exit.json、root-data-audit.json证明六表与启动前相同（9歌/2标签/3关联）。用户最新选择先完成手机、Windows保留未测；manual-start.ps1仅准备，未运行。
-- 历史Windows +13七项、12秒440Hz回环和独立Release万首六场景已核对；原库迁移/清理对比及27张恢复截图见windows13/run-20261031-153416与相关audit。原生422条错误及新分段746条错误见diagnostic/pure-vision-2与segmented-20261031-173854，不能转移为+14通过。Windows性能原报告及独立重算在benchmark/filter-benchmark-windows-release-1.json、windows-release-1-root-audit.json，P95 1.814～18.088ms，不代表真实文件扫描或UI帧耗时。
+- **Windows +14七项及原生复验闭合。** 主批windows14/run-20261031-192407验证组合、边界、标签联动、重启和快照；起播进度/停止再播/切歌/目录弹窗导航已观察，完整分段日志AXTree及所检索error/fatal/exception均0，两次正常退出0。该批缺口和拒绝历史原文不改写。
+- **2026-11-01收尾五项通过。** windows14/close-20261101-131258/result.md及root-review.json：设置版本0.5.0+14；筛选A下flac为1/2且降序，曲库mp3为2/9且升序（含坏文件.mp3），来回保留各自搜索/排序；仅删除遗留A-renamed/C及4关联，重启后三框/搜索空、title升序、无自动播放。两次退出0、无进程；完整日志AXTree及所检索错误均0。root独立确认最终实际库与快照一致，六表与主批测试前original.sqlite逐行相同：9歌、2原标签、3原关联，完整性ok、外键无异常。截图与启动/退出/库审计均在该目录。
+- **Android +14七项通过。** android14/run-20261031-1755/result.md、assertions.jsonl及XML/PNG/媒体/包日志：由+12保留数据升级，1374首/原0标签及首次安装时间保留，七项和停止再播通过；本批标签已清理，重启默认配置后force-stop确认无PID（末次核对时）。不重测已通过项。
+- **双端Release万首性能通过。** Windows六场景P95 1.814～18.088ms、加载103.523ms，benchmark/filter-benchmark-windows-release-1.json及windows-release-1-root-audit.json。Android包2六场景完整6段报告/内部集合及外部重算通过，最高P95 22.291ms≤1s、加载144.514ms；filter-benchmark-android-release-2.json、android-release-2-root-audit.json及android-release-2/。不代表真实文件扫描、持久化等待或UI渲染。包1截断及失败审计保留。
 
 ## 失败计数与不可重复项
 
-- 完整累计历史见[R4技术记录](rounds/R4.md#技术记录)。关键：旧UIA期间进程消失2次、App switch无效句柄2次，不原样重试；Click审批累计4次（窗口目标确认3次、DPI坐标1次），后者曾解决，不保证其他点击审批可通过。Sky启动审批拒绝1次。
-- 手机：整串输入造成4个测试名失真，已用逐字符数字和输入值核对修正；选择框未打开4次，双快照也曾是稳定旧矩形，滚动刷新仅本批局部有效。UI idle失败2次分别涉及持续播放和系统休息提醒；未沿用失败旧XML，未跳过或修改系统休息设置。另有辅助解析/停止SeekBar假设/空PID Trim/报告JSON解析各1次，均不是直接宣称产品失败或通过的依据。
-- 不回灌完整XML/长日志/base64，不因保存截图重采已存在的证据，不把同一检查无依据重复。用量分析usage-analysis.json只覆盖早期片段，不能当完整对话账单或精确额度分摊。
+- 完整累计及证据见[R4技术记录](rounds/R4.md#技术记录)。旧UIA期间进程消失2次、App switch无效句柄2次，不重试旧路径；根因未证实。旧Click审批4次，上主批排序/删除误判3次，本次收尾无新审批拒绝，不清零。
+- 本次截图转存长调用被中断，复用响应经文件中转落盘；不在模型代码中转录大base64。不为存档重拍，不回灌长日志/XML。前景失焦造成mp3误入Codex项目草稿，未发送也未清除；目标进程存活，核对前景/命中后继续，非产品崩溃。草稿由用户决定是否删除。
+- GUI继续须专用GPT6.1Terra/high使用Windows MCP；根据当前PID/HWND和新截图确认目标，旧坐标/旧窗口不能复用。新批授权不等于可以绕过自动审批，不通过改库完成被拒操作。
 
-## 当前检查点及下一步边界
+## 下一步与授权
 
-- 用户已分别确认最终压缩规则及本批Android Codex五项范围；手机性能补测和清理全部完成，授权批次结束，不复用于后续设备操作。
-- 性能报告改为600字符ASCII分段，带总段数/长度/首尾；scripts/audit-filter-benchmark.py负责完整恢复及独立计数/P95复核。离线预检及针对格式/analyze通过，实际手机完整导出验证通过（最长日志行663字符）。实现提交c58e964；正式业务源码仍f0da853。复用入口见README，不重复已通过检查。
-- 用户确认的完整任务结束压缩规则已写入项目AGENTS，未改全局规范。当前工具无主动压缩入口；完成文档检查/本地检查点后提供“现在可以压缩了：继续工作 / 暂停”。用户已选择暂停，停止后续工作，等待手动压缩并明确续行；尚未声称已压缩。
-- R4仅剩Windows+14原生/七项实际验证；没有当前新批授权，继续工作选项不能替代新批测试确认。手机七项及本次性能无新疑点不重测；阶段不complete，不启动R5。
+- 本批授权已结束；不再操作设备。等待用户最终验收R4，以及项目压缩选项；无主动压缩接口，不声称已主动压缩。
+- 选择继续工作仅续行已授权事项；新设备批次仍须交互确认。R4放行后，如启动R5须先按项目Plan规则确认目标/行为/验收，不凭Goal active自动跳阶段。用户选择暂停则同步Goal和本交接并立即停止。
