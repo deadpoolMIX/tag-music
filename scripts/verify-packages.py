@@ -15,6 +15,9 @@ parser.add_argument('--round', default='R1')
 parser.add_argument('--version', default='0.2.0')
 parser.add_argument('--build', type=int, default=9)
 parser.add_argument('--native-reference-round', default=None)
+parser.add_argument('--android-archive', type=Path)
+parser.add_argument('--windows-archive', type=Path)
+parser.add_argument('--output', type=Path)
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 report_dir = root / 'artifacts' / args.round
@@ -27,15 +30,15 @@ result = {'version': args.version, 'build': args.build}
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
-apk = report_dir / f'tag-music-{args.version}+{args.build}.apk'
+apk = args.android_archive or report_dir / f'tag-music-{args.version}+{args.build}.apk'
 with zipfile.ZipFile(apk) as archive:
     actual = {name: digest(archive.read(name)) for name in expected}
     assert actual == expected, 'APK native binary mismatch'
     for name, data in licenses.items():
         assert archive.read(f'assets/flutter_assets/assets/licenses/native/{name}') == data, name
-    result['android'] = {'sha256': digest(apk.read_bytes()), 'nativeBinaries': actual, 'licenseFiles': sorted(licenses)}
+    result['android'] = {'archive': apk.name, 'sha256': digest(apk.read_bytes()), 'nativeBinaries': actual, 'licenseFiles': sorted(licenses)}
 
-windows = report_dir / f'tag-music-windows-{args.version}+{args.build}.zip'
+windows = args.windows_archive or report_dir / f'tag-music-windows-{args.version}+{args.build}.zip'
 with zipfile.ZipFile(windows) as archive:
     for name in ['tag_music.exe', 'flutter_windows.dll', 'data/app.so']:
         assert name in archive.namelist(), name
@@ -45,7 +48,7 @@ with zipfile.ZipFile(windows) as archive:
     assert actual == recorded, 'Windows native binary mismatch'
     for name, data in licenses.items():
         assert archive.read(f'licenses/native/{name}') == data, name
-    result['windows'] = {'sha256': digest(windows.read_bytes()), 'nativeSha256': actual, 'licenseFiles': sorted(licenses)}
+    result['windows'] = {'archive': windows.name, 'sha256': digest(windows.read_bytes()), 'nativeSha256': actual, 'licenseFiles': sorted(licenses)}
 
 if args.round in ('R2', 'R3', 'R4', 'R5'):
     config = json.loads((root / '.dart_tool/package_config.json').read_text(encoding='utf-8'))
@@ -63,7 +66,7 @@ if args.round in ('R2', 'R3', 'R4', 'R5'):
             original = root / f'build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/{entry}'
             expected_hash = hashes[f'libsqlite3.{asset_arch}.android.so']
             assert digest(original.read_bytes()) == expected_hash, f'SQLite input hash mismatch: {abi}'
-            checked = report_dir / f'sqlite3-{abi}-strip-check.so'
+            checked = report_dir / f'sqlite3-{args.build}-{abi}-strip-check.so'
             subprocess.run([str(strip), '--strip-unneeded', '-o', str(checked), str(original)], check=True)
             assert actual == digest(checked.read_bytes()), f'SQLite strip transformation mismatch: {abi}'
             transforms[abi] = {'originalSha256': expected_hash, 'packagedSha256': actual,
@@ -85,5 +88,7 @@ if args.round in ('R2', 'R3', 'R4', 'R5'):
         'androidTransforms': transforms,
         'source': 'https://github.com/simolus3/sqlite3.dart/releases/tag/sqlite3-3.5.2'}
 
-(report_dir / f'package-audit-{args.build}.json').write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding='utf-8')
+output = args.output or report_dir / f'package-audit-{args.build}.json'
+with output.open('x', encoding='utf-8') as audit_file:
+    audit_file.write(json.dumps(result, indent=2, ensure_ascii=False))
 print(f'Both {args.version}+{args.build} packages: native hashes, runtime files and {len(licenses)} license texts match.')

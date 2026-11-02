@@ -81,10 +81,19 @@ class _AppShellState extends ConsumerState<AppShell>
       return Scaffold(
         appBar: AppBar(
           title: const Text('Tag Music'),
-          actions: const [
+          actions: [
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Chip(label: Text('R4 · 组合筛选')),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: constraints.maxWidth / 2),
+                child: const Chip(
+                  label: Text(
+                    'R5 · 歌单与队列',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -312,7 +321,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       const SizedBox(height: 8),
                       SelectableText('版本 ${info.version}+${info.buildNumber}'),
                       const SizedBox(height: 8),
-                      const Text('R4 · 组合筛选'),
+                      const Text('R5 · 歌单与队列'),
                       const SizedBox(height: 12),
                       TextButton.icon(
                         key: const ValueKey('copy-diagnostics'),
