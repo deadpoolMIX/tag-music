@@ -49,18 +49,20 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 - **资源生命周期已实现**：切歌/通知操作串行，停止旧曲后关闭应用持有的播放 FD 再开新曲；元数据只读借用 FD、finally 释放，不靠 GC。业务万首队列只为当前与有限预取建立播放对象/句柄。
 - **R5播放接口**：`playSongs(List<QueueSong>, target)`接收歌曲UUID及文件信息快照，每个`QueueEntry`另有UUID；来源变更不改队列。`LibraryController.resolveSong`在打开前按歌曲UUID取有效位置；`ProbeTrack`仅作文件访问对象。旧`playSnapshot`已移除，目录技术探测仍使用独立transient locator，不能作为业务身份。
 - **R5状态边界**：优先待播只消费一次、完整条目保留；四种互斥模式共用状态机。2026-11-02用户取消队列/进度恢复，冷启动空队列、默认随机、不出声。歌单存储及阶段进度见[R5计划](rounds/R5.md#r5-当前执行计划)和HANDOFF。
-- **队列界面接口**：空队列也可打开完整列表和模式选择；条目按独立ID显示/点播/移除，`selectEntry(entryId)`在串行执行时定位，陈旧ID不点错歌曲。拖动改完整顺序、待播仍按FIFO编号；清空须确认，保存完整队列按显示顺序首次去重。`QueueAddButton`固定按下时的来源快照，只添加可用歌曲；曲库/普通歌单多选含跨搜索项并保持来源排序，添加不切换当前歌曲。
+- **队列界面接口**：空队列也可打开完整列表和模式选择；条目按独立ID显示/点播/移除，`selectEntry(entryId)`在串行执行时定位，陈旧ID不点错歌曲。追加默认FIFO，手动拖动可改变队列及待播相对顺序，随机本轮顺序不重洗；清空须确认，保存完整队列按显示顺序首次去重。`QueueAddButton`固定按下时的来源快照，只添加可用歌曲；曲库/普通歌单多选含跨搜索项并保持来源排序，添加不切换当前歌曲。
 - **标签已实现**：扁平多标签引用歌曲UUID，名称trim/小写唯一键；批量关系事务、删除级联与数量确认，多选按UUID跨搜索保留，不改变播放快照；R3验收见HANDOFF。R4新增版本化三框配置及删除标签时事务移除规则引用；R5歌单按当前计划演进，R8备份/整体回滚仍为后续阶段。
 - 固定 ID/签名、锁定依赖、本机受限补丁见 [TOOLCHAIN](TOOLCHAIN.md)；实际原生库与再分发来源缺口见 [THIRD_PARTY](THIRD_PARTY.md)。相关变更即核对，不等 R9 从零处理。
 
 ## 验证入口与维护
 
-- `& ./scripts/check.ps1 -Round R4`（PowerShell 7）：依赖恢复、格式、analyze、全套单元/widget；不含原生集成、双端构建、手机验收。R4 准备曲库样本、万首合成标签和三框筛选基准，不代表手机/真实万首文件。
+- `& ./scripts/check.ps1 -Round R5`（PowerShell 7）：依赖恢复、格式、analyze、全套单元/widget及7项Python报告审计测试；准备真实合成音频/封面样本，并输出曲库/标签/筛选/队列主机基准。不含原生集成、双端构建、手机验收，不代表真实万首文件或设备Release性能。
 - 候选参数：`scripts/build.ps1 -Target all -BuildNumber <新构建号> -Round <当前阶段>`；`verify-apk.ps1` 显式传 `-Version/-BuildNumbers/-Round`；`verify-packages.py` 传 `--version/--build/--round`，当前音频基线另传 `--native-reference-round R1`。示意值须取实际 pubspec/交接。
-- 手动 Flutter 先 `. ./scripts/env.ps1`，再 `& ./scripts/restore.ps1 -Round R4`。所有 Flutter 检查/测试/构建串行，避免共享注册文件互改。按模块表先做相关回归，候选/阶段收口完整验证，具体门禁见 [PLAN §4](PLAN.md#4-验证与质量门禁)。
-- 现有 check 在 R1～R4 按阶段准备样本，SQLite 包审计分支在 R2/R3/R4 启用；后续阶段 Plan 要先核对覆盖，不能把 skip 当通过。脚本默认参数及 Android 播放/卡片脚本仍有 R1 路径/样本假设，使用前核对，显式传当前参数。
+- 手动 Flutter 先 `. ./scripts/env.ps1`，再 `& ./scripts/restore.ps1 -Round R5`。所有 Flutter 检查/测试/构建串行，避免共享注册文件互改。按模块表先做相关回归，候选/阶段收口完整验证，具体门禁见 [PLAN §4](PLAN.md#4-验证与质量门禁)。
+- check在R1～R5按阶段准备样本，SQLite包审计分支在R2～R5启用；后续阶段Plan先核对覆盖，不能把skip当通过。脚本默认参数及Android播放/卡片脚本仍有R1路径/样本假设，使用前核对，显式传当前参数。
 - 固定日志名重跑前保留旧失败证据到同轮构建号/问题子目录，候选不复用构建号覆盖。`install-android.ps1` 还会启动应用与抓日志，须取得涵盖这些操作的本批交互确认。
 - 独立设备性能包（R3标签/R4三框）：`& ./scripts/build-filter-benchmark.ps1 -Target all -BenchmarkBuildNumber <新测试编号>`，双端Release模式；Android独立ID `app.tagmusic.player.benchmark`、临时合成库，Windows单列打包并内置JSON报告出口；脚本只构建审计，不安装运行。正式APK安装从artifacts取包，不能从最新build/app输出推定候选身份。R4使用`integration_test/filter_benchmark_test.dart`，报告实际规则重算/搜索排序，初次加载单列，不计真实文件扫描或UI渲染。Android完整分段日志用 `python scripts/audit-filter-benchmark.py <本批日志> --report <新报告.json> --audit <新审计.json>` 恢复并复核六场景；缺段/重复/截断拒绝，勿用摘要替代原始数据。
+- R5隔离性能入口：[build-queue-benchmark.ps1](../scripts/build-queue-benchmark.ps1)的`-Target all -BenchmarkBuildNumber <新编号>`只构建，复用独立Android ID并写入构建号/revision；Windows单列ZIP和报告路径，运行须当批授权。[queue_benchmark_test.dart](../integration_test/queue_benchmark_test.dart)共用[test/support/queue_benchmark.dart](../test/support/queue_benchmark.dart)，10000条目替换/批量加/删当前与非当前/反向重排/切入随机及跨轮构建各5次预热+20样本，逐次校验成员/独立ID/当前/FIFO；只计状态机操作，排除准备、校验、UI和播放FD。普通歌单11000输入去重为10000的保存/加载含事务等待、另计，不套队列阈值。
+- R5报告用[审计脚本](../scripts/audit-queue-benchmark.py)校验：`python scripts/audit-queue-benchmark.py <本批源文件> --input-format log --platform android --build <编号> --revision <包内revision> --report <新完整报告.json> --audit <新审计.json>`；Windows原始JSON用`--input-format json --platform windows`。默认要求Release身份；主机调试结果须显式`--mode debug --build 0 --revision host-test`，不冒充设备通过。源/报告/审计必须不同，输出文件必须未存在；共用[分段恢复器](../scripts/benchmark_report.py)拒绝缺段/重复/乱序/截断，独立复算数量、顺序校验值和P95；实际逐次完整成员断言在包内。报告审计故障注入在[scripts/test_benchmark_audits.py](../scripts/test_benchmark_audits.py)。
 - 仅文档改动验 diff、链接/事实/改动范围，不重建应用。改公共接口先查调用方/已有实现并验证，避免重复功能或闲置抽象。临时修复记录原因、范围、验证与撤除条件；改模块/接口/命令同步对应长期文档。
 
 ## 文档各司其职

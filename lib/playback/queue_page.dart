@@ -174,7 +174,7 @@ class _QueuePageState extends State<QueuePage> {
           ),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Text('优先待播按编号播放一次，再续原序列；已播条目保留。拖动调整完整队列顺序，待播编号不变。'),
+            child: Text('优先待播按编号播放一次，再续原序列；已播条目保留。拖动可调整队列和待播顺序。'),
           ),
           if (playback.error case final error?)
             Text(error, key: const ValueKey('queue-error')),

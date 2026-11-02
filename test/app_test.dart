@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:tag_music/app.dart';
 import 'package:tag_music/core/settings.dart';
+import 'package:tag_music/library/database.dart';
+import 'package:tag_music/library/library_controller.dart';
+import 'package:tag_music/playback/playback_controller.dart';
+import 'package:tag_music/playback/playback_page.dart';
 
 import 'settings_test.dart' show MemorySettings;
+import 'library_test.dart' show FakeDocuments;
+import 'playlists_page_test.dart' show PlaylistPlayback;
 
 void main() {
   setUp(() {
@@ -57,9 +64,63 @@ void main() {
     expect(find.text('曲库尚未就绪'), findsOneWidget);
     await tester.tap(find.text('歌单'));
     await tester.pumpAndSettle();
-    expect(find.text('留住每一次灵感'), findsOneWidget);
+    expect(
+      tester.widget<PlaybackPage>(find.byType(PlaybackPage)).playlists,
+      isTrue,
+    );
+    expect(find.text('让音乐有自己的归属'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  for (final size in [const Size(390, 844), const Size(1280, 800)]) {
+    testWidgets(
+      'playlist navigation opens both saved kinds and empty queue at $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final library = LibraryController(
+          LibraryDatabase(NativeDatabase.memory()),
+          FakeDocuments(),
+        );
+        final playback = PlaylistPlayback()..current = null;
+        await tester.runAsync(() async {
+          await library.initialize();
+          await library.createPlaylist('导航歌单', []);
+        });
+        try {
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                settingsStoreProvider.overrideWithValue(MemorySettings()),
+                libraryProvider.overrideWithValue(library),
+                playbackProvider.overrideWithValue(playback),
+              ],
+              child: const TagMusicApp(),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('歌单'));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('create-playlist')), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('create-smart-playlist')),
+            findsOneWidget,
+          );
+          expect(find.text('导航歌单'), findsOneWidget);
+          await tester.tap(find.byKey(const ValueKey('open-playback-queue')));
+          await tester.pumpAndSettle();
+          expect(find.text('队列为空，从曲库、筛选或歌单添加歌曲'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        } finally {
+          await tester.pumpWidget(const SizedBox());
+          await tester.runAsync(library.shutdown);
+          playback.dispose();
+        }
+      },
+    );
+  }
 
   testWidgets('small screen and large text can scroll settings', (
     tester,
