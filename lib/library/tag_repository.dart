@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'database.dart';
 import 'filter_repository.dart';
 import 'filter_rule.dart';
+import 'playlist_repository.dart';
 
 class TagSnapshot {
   const TagSnapshot(this.tags, this.bySong);
@@ -65,11 +66,32 @@ class TagRepository {
     await db.transaction(() async {
       final filters = FilterRepository(db);
       final current = currentFilter ?? await filters.load();
+      final smart =
+          await (db.select(db.playlists)
+                ..where((t) => t.kind.equals('smart'))
+                ..orderBy([(t) => OrderingTerm.asc(t.nameKey)]))
+              .get();
+      // Decode every rule before deleting anything; unreadable rules cannot be
+      // assumed to have no reference to the tag.
+      final affected = <String, FilterPreferences>{};
+      for (final list in smart) {
+        final preferences = PlaylistRepository.preferences(list);
+        if (preferences.rule.referencedIds.contains(id)) {
+          affected[list.id] = preferences.without(id);
+        }
+      }
       final changed = await (db.delete(
         db.tags,
       )..where((t) => t.id.equals(id))).go();
       if (changed != 1) throw StateError('标签不存在');
       await filters.save(current.without(id));
+      for (final entry in affected.entries) {
+        await (db.update(
+          db.playlists,
+        )..where((t) => t.id.equals(entry.key))).write(
+          PlaylistsCompanion(ruleJson: Value(entry.value.rule.encode())),
+        );
+      }
     });
   }
 

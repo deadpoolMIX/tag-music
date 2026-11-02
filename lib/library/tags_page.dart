@@ -124,19 +124,22 @@ class TagsPage extends StatelessWidget {
 
   Future<void> _delete(BuildContext context, String id, String name) async {
     final count = library.countForTag(id);
-    final rule = library.filterPreferences.rule;
-    final boxes = [
-      if (rule.allTagIds.contains(id)) '全部具备',
-      if (rule.anyTagIds.contains(id)) '任一具备',
-      if (rule.excludedTagIds.contains(id)) '排除标签',
-    ];
+    late final List<String> effects;
+    try {
+      effects = library.tagDeletionEffects(id);
+    } catch (error) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('无法预览删除影响：$error')));
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialog) => AlertDialog(
+        scrollable: true,
         title: Text('删除标签“$name”？'),
         content: Text(
           '将移除 $count 首歌曲与该标签的关联。歌曲记录和音乐文件不会删除。'
-          '${boxes.isEmpty ? '' : '\n还将从筛选的“${boxes.join('、')}”框移除此标签并重算，结果范围可能扩大或缩小；两个包含框都空时从全部可用歌曲开始筛选。已有播放队列保持不变。'}',
+          '${effects.isEmpty ? '' : '\n将从以下规则的所有框移除此标签并重算（当前可用歌曲）：\n${effects.join('\n')}\n结果范围可能扩大或缩小；两个包含框都空时从全部可用歌曲开始筛选。'}\n已有播放队列保持不变。',
         ),
         actions: [
           TextButton(

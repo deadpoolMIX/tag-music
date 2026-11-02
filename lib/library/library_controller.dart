@@ -240,11 +240,88 @@ class LibraryController extends ChangeNotifier {
   }
 
   List<LibraryTrack> playlistTracks(String id) {
+    final list = playlists.where((p) => p.id == id).firstOrNull;
+    if (list?.kind == 'smart') {
+      return matchingTracks(smartPreferences(list!));
+    }
     final byId = {for (final track in tracks) track.song.id: track};
     return List.unmodifiable([
       for (final songId in playlistSongIds[id] ?? const <String>[])
         ?byId[songId],
     ]);
+  }
+
+  FilterPreferences smartPreferences(Playlist list) {
+    final preferences = PlaylistRepository.preferences(list);
+    if (!tags
+        .map((t) => t.id)
+        .toSet()
+        .containsAll(preferences.rule.referencedIds)) {
+      throw const FormatException('智能歌单引用的标签不存在');
+    }
+    return preferences;
+  }
+
+  List<LibraryTrack> matchingTracks(FilterPreferences preferences) {
+    final rows = tracks
+        .where(
+          (t) =>
+              t.available &&
+              preferences.rule.matches(tagIdsBySong[t.song.id] ?? const {}),
+        )
+        .toList();
+    _sortTracks(rows, preferences.sort, preferences.descending);
+    return List.unmodifiable(rows);
+  }
+
+  Future<String> createSmartPlaylist(
+    String name,
+    FilterPreferences preferences,
+  ) async {
+    final id = await playlistsStore.createSmart(name, preferences);
+    await reloadPlaylists();
+    return id;
+  }
+
+  Future<void> editSmartPlaylist(
+    String id,
+    FilterPreferences preferences,
+  ) async {
+    await playlistsStore.editSmart(id, preferences);
+    await reloadPlaylists();
+  }
+
+  /// Compare actual available membership, including the loss of song-tag links.
+  /// Preview fails closed if any stored rule is unreadable.
+  List<String> tagDeletionEffects(String id) {
+    if (filterLoadError != null) throw StateError(filterLoadError!);
+    final rules = <String, FilterPreferences>{
+      '当前筛选': filterPreferences,
+      for (final list in playlists.where((p) => p.kind == 'smart'))
+        '智能歌单“${list.name}”': smartPreferences(list),
+    };
+    return [
+      for (final entry in rules.entries)
+        if (entry.value.rule.referencedIds.contains(id))
+          _tagRuleEffect(entry.key, entry.value.rule, id),
+    ];
+  }
+
+  String _tagRuleEffect(String name, FilterRule rule, String id) {
+    final next = rule.without(id);
+    var before = 0;
+    var after = 0;
+    for (final track in tracks.where((t) => t.available)) {
+      final tags = tagIdsBySong[track.song.id] ?? const <String>{};
+      if (rule.matches(tags)) before++;
+      if (next.matches({...tags}..remove(id))) after++;
+    }
+    final boxes = [
+      if (rule.allTagIds.contains(id)) '全部具备',
+      if (rule.anyTagIds.contains(id)) '任一具备',
+      if (rule.excludedTagIds.contains(id)) '排除标签',
+    ];
+    return '$name：$before → $after 首（${boxes.join('、')}）';
   }
 
   Future<void> reloadPlaylists() async {
@@ -293,11 +370,16 @@ class LibraryController extends ChangeNotifier {
     ),
   );
 
-  Future<void> reloadTags() async {
+  Future<void> reloadTags({bool withPlaylists = false}) async {
     final snapshot = await tagsStore.load();
+    final saved = withPlaylists ? await playlistsStore.load() : null;
     tags = snapshot.tags;
     tagIdsBySong = snapshot.bySong;
     tagCounts = _countTags(snapshot.bySong);
+    if (saved != null) {
+      playlists = saved.playlists;
+      playlistSongIds = saved.songIds;
+    }
     _invalidateFilter();
     _publish();
   }
@@ -325,7 +407,9 @@ class LibraryController extends ChangeNotifier {
       );
       filterPreferences = filterPreferences.without(id);
       if (filterLoadError == null) filterSaveError = null;
-      await reloadTags();
+      // Publish pruned rules and tags together, avoiding an intermediate frame
+      // in which a valid saved rule appears to reference a missing tag.
+      await reloadTags(withPlaylists: true);
     } finally {
       filterDeletingTag = false;
       _publish();

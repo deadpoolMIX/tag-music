@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import 'database.dart';
+import 'filter_rule.dart';
 
 class PlaylistSnapshot {
   const PlaylistSnapshot(this.playlists, this.songIds);
@@ -9,11 +10,71 @@ class PlaylistSnapshot {
   final Map<String, List<String>> songIds;
 }
 
-/// Regular playlists contain stable song IDs, including unavailable songs.
-/// All membership rewrites are transactional, so order is never partially saved.
+/// Both playlist kinds share names. Regular members use stable song IDs,
+/// including unavailable songs; smart members are computed from saved rules.
+/// Membership and rule writes are transactional.
 class PlaylistRepository {
   PlaylistRepository(this.db);
   final LibraryDatabase db;
+
+  static FilterPreferences preferences(Playlist playlist) {
+    if (playlist.kind != 'smart' || playlist.ruleJson == null) {
+      throw const FormatException('智能歌单规则缺失');
+    }
+    final sort = LibrarySort.values
+        .where((s) => s.name == playlist.sortOrder)
+        .firstOrNull;
+    if (sort == null) throw const FormatException('智能歌单排序记录损坏');
+    return FilterPreferences(
+      rule: FilterRule.decode(playlist.ruleJson!),
+      sort: sort,
+      descending: playlist.descending,
+    );
+  }
+
+  Future<void> _checkRule(FilterPreferences preferences) async {
+    final ids = (await db.select(db.tags).get()).map((t) => t.id).toSet();
+    if (!ids.containsAll(preferences.rule.referencedIds)) {
+      throw const FormatException('规则引用的标签已不存在，请重新选择');
+    }
+  }
+
+  Future<String> createSmart(String input, FilterPreferences preferences) =>
+      db.transaction(() async {
+        final name = await _checkName(input);
+        await _checkRule(preferences);
+        final id = const Uuid().v4();
+        await db
+            .into(db.playlists)
+            .insert(
+              PlaylistsCompanion.insert(
+                id: id,
+                name: name,
+                nameKey: name.toLowerCase(),
+                kind: 'smart',
+                ruleJson: Value(preferences.rule.encode()),
+                sortOrder: Value(preferences.sort.name),
+                descending: Value(preferences.descending),
+              ),
+            );
+        return id;
+      });
+
+  Future<void> editSmart(String id, FilterPreferences preferences) =>
+      db.transaction(() async {
+        await _checkRule(preferences);
+        final changed =
+            await (db.update(
+              db.playlists,
+            )..where((t) => t.id.equals(id) & t.kind.equals('smart'))).write(
+              PlaylistsCompanion(
+                ruleJson: Value(preferences.rule.encode()),
+                sortOrder: Value(preferences.sort.name),
+                descending: Value(preferences.descending),
+              ),
+            );
+        if (changed != 1) throw StateError('智能歌单不存在');
+      });
 
   Future<PlaylistSnapshot> load() async => db.transaction(() async {
     final lists = await (db.select(

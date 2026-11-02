@@ -4,6 +4,8 @@ import '../playback/playback_controller.dart';
 import 'database.dart';
 import 'library_controller.dart';
 import 'playlist_actions.dart';
+import 'filter_rule.dart';
+import 'smart_playlist_editor.dart';
 
 class PlaylistsPage extends StatefulWidget {
   const PlaylistsPage({
@@ -54,6 +56,40 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
     }
   }
 
+  Future<void> _editSmart(Playlist list) async {
+    FilterPreferences initial;
+    try {
+      initial = widget.library.smartPreferences(list);
+    } catch (error) {
+      final rebuild = await showDialog<bool>(
+        context: context,
+        builder: (dialog) => AlertDialog(
+          title: const Text('重建无法读取的规则？'),
+          content: Text('$error\n将从全部可用歌曲和默认排序开始编辑，保存后替换旧规则；取消会保留原记录。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialog, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialog, true),
+              child: const Text('重建规则'),
+            ),
+          ],
+        ),
+      );
+      if (rebuild != true || !mounted) return;
+      initial = FilterPreferences();
+    }
+    if (!mounted) return;
+    await editSmartPlaylist(
+      context,
+      widget.library,
+      playlist: list,
+      initial: initial,
+    );
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: widget.library,
@@ -61,7 +97,14 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
       final library = widget.library;
       final list = library.playlists.where((p) => p.id == openedId).firstOrNull;
       if (list == null) return _overview(library);
-      final all = library.playlistTracks(list.id);
+      final smart = list.kind == 'smart';
+      String? ruleError;
+      List<LibraryTrack> all = [];
+      try {
+        all = library.playlistTracks(list.id);
+      } catch (error) {
+        ruleError = '无法读取智能歌单：$error';
+      }
       final needle = query.trim().toLowerCase();
       final rows = all
           .where(
@@ -75,7 +118,7 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                 ].any((value) => value.toLowerCase().contains(needle)),
           )
           .toList();
-      final reordering = needle.isEmpty && !selecting && !busy;
+      final reordering = !smart && needle.isEmpty && !selecting && !busy;
       Widget row(int i) {
         final track = rows[i];
         return ListTile(
@@ -168,10 +211,24 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                                 );
                               }
                               if (action == 'delete') _delete(list);
+                              if (action == 'edit') {
+                                _editSmart(list);
+                              }
                             },
-                            itemBuilder: (_) => const [
-                              PopupMenuItem(value: 'rename', child: Text('改名')),
-                              PopupMenuItem(value: 'delete', child: Text('删除')),
+                            itemBuilder: (_) => [
+                              if (smart)
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Text('编辑规则'),
+                                ),
+                              const PopupMenuItem(
+                                value: 'rename',
+                                child: Text('改名'),
+                              ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Text('删除'),
+                              ),
                             ],
                           ),
                         ],
@@ -189,28 +246,30 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text('${rows.length} / ${all.length} 首'),
-                          TextButton.icon(
-                            key: const ValueKey('playlist-add-songs'),
-                            onPressed: busy
-                                ? null
-                                : () => pickPlaylistSongs(
-                                    context,
-                                    library,
-                                    list.id,
-                                  ),
-                            icon: const Icon(Icons.add),
-                            label: const Text('添加歌曲'),
-                          ),
-                          TextButton(
-                            key: const ValueKey('playlist-select'),
-                            onPressed: busy
-                                ? null
-                                : () => setState(() {
-                                    selecting = !selecting;
-                                    selected.clear();
-                                  }),
-                            child: Text(selecting ? '退出多选' : '多选'),
-                          ),
+                          if (!smart)
+                            TextButton.icon(
+                              key: const ValueKey('playlist-add-songs'),
+                              onPressed: busy
+                                  ? null
+                                  : () => pickPlaylistSongs(
+                                      context,
+                                      library,
+                                      list.id,
+                                    ),
+                              icon: const Icon(Icons.add),
+                              label: const Text('添加歌曲'),
+                            ),
+                          if (!smart)
+                            TextButton(
+                              key: const ValueKey('playlist-select'),
+                              onPressed: busy
+                                  ? null
+                                  : () => setState(() {
+                                      selecting = !selecting;
+                                      selected.clear();
+                                    }),
+                              child: Text(selecting ? '退出多选' : '多选'),
+                            ),
                           if (selecting) ...[
                             Text('已选 ${selected.length} 首'),
                             TextButton(
@@ -232,9 +291,20 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                         ],
                       ),
                       Text(
-                        needle.isEmpty ? '拖动歌曲调整顺序；多选可批量移除' : '搜索中不能重排歌曲',
+                        smart
+                            ? '规则和排序独立保存，结果随曲库和标签变化。'
+                            : needle.isEmpty
+                            ? '拖动歌曲调整顺序；多选可批量移除'
+                            : '搜索中不能重排歌曲',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
+                      if (ruleError != null)
+                        Text(
+                          ruleError,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
                       if (busy) const LinearProgressIndicator(),
                     ],
                   ),
@@ -244,7 +314,13 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
             Expanded(
               child: rows.isEmpty
                   ? Center(
-                      child: Text(all.isEmpty ? '空歌单，添加歌曲后即可播放' : '没有匹配的歌曲'),
+                      child: Text(
+                        ruleError != null
+                            ? '修复规则后显示结果'
+                            : all.isEmpty
+                            ? (smart ? '没有匹配的可用歌曲' : '空歌单，添加歌曲后即可播放')
+                            : '没有匹配的歌曲',
+                      ),
                     )
                   : reordering
                   ? ReorderableListView.builder(
@@ -274,7 +350,7 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
   });
 
   Widget _overview(LibraryController library) {
-    final lists = library.playlists.where((p) => p.kind == 'regular').toList();
+    final lists = library.playlists;
     return Column(
       children: [
         Padding(
@@ -287,6 +363,16 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                 onPressed: () => savePlaylist(context, library, const []),
                 icon: const Icon(Icons.add),
                 label: const Text('新建普通歌单'),
+              ),
+              TextButton.icon(
+                key: const ValueKey('create-smart-playlist'),
+                onPressed: () => editSmartPlaylist(
+                  context,
+                  library,
+                  initial: FilterPreferences(),
+                ),
+                icon: const Icon(Icons.auto_awesome),
+                label: const Text('新建智能歌单'),
               ),
               TextButton.icon(
                 key: const ValueKey('save-queue-playlist'),
@@ -312,10 +398,16 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                     final list = lists[i];
                     return ListTile(
                       key: ValueKey('playlist-${list.id}'),
-                      leading: const Icon(Icons.queue_music),
+                      leading: Icon(
+                        list.kind == 'smart'
+                            ? Icons.auto_awesome
+                            : Icons.queue_music,
+                      ),
                       title: Text(list.name),
                       subtitle: Text(
-                        '${library.playlistSongIds[list.id]?.length ?? 0} 首',
+                        list.kind == 'smart'
+                            ? '智能歌单 · 按规则动态更新'
+                            : '普通歌单 · ${library.playlistSongIds[list.id]?.length ?? 0} 首',
                       ),
                       onTap: () => setState(() {
                         openedId = list.id;

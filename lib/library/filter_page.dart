@@ -6,28 +6,8 @@ import '../playback/playback_controller.dart';
 import 'filter_rule.dart';
 import 'library_controller.dart';
 import 'playlist_actions.dart';
-
-const _boxTitles = ['全部具备', '任一具备', '排除标签'];
-const _boxHints = ['同时有这些标签', '至少有其中一个标签', '有任一标签就排除'];
-
-Set<String> _ids(FilterRule rule, int box) => switch (box) {
-  0 => rule.allTagIds,
-  1 => rule.anyTagIds,
-  _ => rule.excludedTagIds,
-};
-
-void _replace(LibraryController library, int box, Iterable<String> ids) {
-  final rule = library.filterPreferences.rule;
-  unawaited(
-    library.updateFilter(
-      rule: FilterRule(
-        allTagIds: box == 0 ? ids : rule.allTagIds,
-        anyTagIds: box == 1 ? ids : rule.anyTagIds,
-        excludedTagIds: box == 2 ? ids : rule.excludedTagIds,
-      ),
-    ),
-  );
-}
+import 'rule_editor.dart';
+import 'smart_playlist_editor.dart';
 
 class FilterPage extends StatefulWidget {
   const FilterPage({required this.library, required this.playback, super.key});
@@ -112,6 +92,18 @@ class _FilterPageState extends State<FilterPage> {
                         label: const Text('保存结果为普通歌单'),
                       ),
                       TextButton.icon(
+                        key: const ValueKey('save-smart-playlist'),
+                        onPressed: enabled
+                            ? () => editSmartPlaylist(
+                                context,
+                                library,
+                                initial: preferences,
+                              )
+                            : null,
+                        icon: const Icon(Icons.auto_awesome),
+                        label: const Text('保存为智能歌单'),
+                      ),
+                      TextButton.icon(
                         key: const ValueKey('clear-filter'),
                         onPressed: enabled && !preferences.rule.isEmpty
                             ? () => library.updateFilter(rule: FilterRule())
@@ -121,7 +113,7 @@ class _FilterPageState extends State<FilterPage> {
                       ),
                     ],
                   ),
-                  const Text('前两框结果合并，再扣除排除标签。前两框都空时，从全部可用歌曲中排除。'),
+                  const Text(ruleExplanation),
                   if (library.filterLoadError case final error?) ...[
                     Text(
                       error,
@@ -132,31 +124,12 @@ class _FilterPageState extends State<FilterPage> {
                     TextButton(onPressed: _reset, child: const Text('重置筛选记录')),
                   ],
                   const SizedBox(height: 8),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final boxes = [
-                        for (var i = 0; i < 3; i++)
-                          _FilterBox(
-                            library: library,
-                            box: i,
-                            enabled: enabled,
-                          ),
-                      ];
-                      return constraints.maxWidth >= 840
-                          ? Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                for (var i = 0; i < boxes.length; i++) ...[
-                                  if (i > 0) const SizedBox(width: 8),
-                                  Expanded(child: boxes[i]),
-                                ],
-                              ],
-                            )
-                          : Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: boxes,
-                            );
-                    },
+                  RuleEditor(
+                    library: library,
+                    rule: preferences.rule,
+                    enabled: enabled,
+                    onChanged: (rule) =>
+                        unawaited(library.updateFilter(rule: rule)),
                   ),
                   if (library.filterSaveError case final error?)
                     Wrap(
@@ -298,175 +271,5 @@ class _FilterPageState extends State<FilterPage> {
         ],
       );
     },
-  );
-}
-
-class _FilterBox extends StatelessWidget {
-  const _FilterBox({
-    required this.library,
-    required this.box,
-    required this.enabled,
-  });
-  final LibraryController library;
-  final int box;
-  final bool enabled;
-  @override
-  Widget build(BuildContext context) {
-    final ids = _ids(library.filterPreferences.rule, box);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              _boxTitles[box],
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            Text(_boxHints[box]),
-            Wrap(
-              spacing: 4,
-              children: [
-                for (final tag in library.tags.where(
-                  (tag) => ids.contains(tag.id),
-                ))
-                  InputChip(
-                    key: ValueKey('filter-chip-$box-${tag.id}'),
-                    label: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 220),
-                      child: Text(
-                        tag.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    onDeleted: enabled
-                        ? () => _replace(
-                            library,
-                            box,
-                            _ids(
-                              library.filterPreferences.rule,
-                              box,
-                            ).where((id) => id != tag.id),
-                          )
-                        : null,
-                  ),
-              ],
-            ),
-            Wrap(
-              spacing: 8,
-              children: [
-                TextButton.icon(
-                  key: ValueKey('filter-pick-$box'),
-                  onPressed: enabled
-                      ? () => showDialog<void>(
-                          context: context,
-                          builder: (_) =>
-                              _TagPicker(library: library, box: box),
-                        )
-                      : null,
-                  icon: const Icon(Icons.add),
-                  label: const Text('选择标签'),
-                ),
-                TextButton(
-                  key: ValueKey('filter-clear-$box'),
-                  onPressed: enabled && ids.isNotEmpty
-                      ? () => _replace(library, box, [])
-                      : null,
-                  child: const Text('清空此框'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TagPicker extends StatefulWidget {
-  const _TagPicker({required this.library, required this.box});
-  final LibraryController library;
-  final int box;
-  @override
-  State<_TagPicker> createState() => _TagPickerState();
-}
-
-class _TagPickerState extends State<_TagPicker> {
-  String query = '';
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text('选择${_boxTitles[widget.box]}的标签'),
-    content: SizedBox(
-      width: 520,
-      height: MediaQuery.sizeOf(context).height * .5,
-      child: Column(
-        children: [
-          TextField(
-            key: const ValueKey('filter-tag-search'),
-            onChanged: (value) =>
-                setState(() => query = value.trim().toLowerCase()),
-            decoration: const InputDecoration(
-              labelText: '搜索标签',
-              prefixIcon: Icon(Icons.search),
-            ),
-          ),
-          Expanded(
-            child: ListenableBuilder(
-              listenable: widget.library,
-              builder: (context, _) {
-                final library = widget.library;
-                final tags = library.tags
-                    .where((tag) => tag.name.toLowerCase().contains(query))
-                    .toList();
-                final selected = _ids(
-                  library.filterPreferences.rule,
-                  widget.box,
-                );
-                return tags.isEmpty
-                    ? Center(
-                        child: Text(
-                          library.tags.isEmpty ? '尚无标签，请先在标签页创建。' : '没有匹配的标签',
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: tags.length,
-                        itemBuilder: (context, index) {
-                          final tag = tags[index];
-                          return CheckboxListTile(
-                            key: ValueKey('filter-tag-${tag.id}'),
-                            title: Text(tag.name),
-                            value: selected.contains(tag.id),
-                            onChanged: library.filterDeletingTag
-                                ? null
-                                : (value) {
-                                    final next = {
-                                      ..._ids(
-                                        library.filterPreferences.rule,
-                                        widget.box,
-                                      ),
-                                    };
-                                    if (value == true) {
-                                      next.add(tag.id);
-                                    } else {
-                                      next.remove(tag.id);
-                                    }
-                                    _replace(library, widget.box, next);
-                                  },
-                          );
-                        },
-                      );
-              },
-            ),
-          ),
-        ],
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('关闭'),
-      ),
-    ],
   );
 }
