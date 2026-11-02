@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'playback_controller.dart';
+import 'queue_page.dart';
 import '../library/library_page.dart';
 import '../library/library_controller.dart';
 import '../library/filter_page.dart';
@@ -179,6 +180,19 @@ class PlaybackPage extends ConsumerWidget {
                       ),
               ),
             ],
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                PlaybackModeButton(playback: controller),
+                TextButton.icon(
+                  key: const ValueKey('open-playback-queue'),
+                  onPressed: () =>
+                      showPlaybackQueue(context, controller, library),
+                  icon: const Icon(Icons.queue_music),
+                  label: Text('播放队列 · ${controller.queue.entries.length}'),
+                ),
+              ],
+            ),
             if (current != null)
               Material(
                 color: Theme.of(context).colorScheme.surfaceContainer,
@@ -252,40 +266,7 @@ class PlaybackPage extends ConsumerWidget {
                           Text(formatPosition(state.duration)),
                         ],
                       ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          IconButton(
-                            tooltip: '上一首',
-                            onPressed: controller.canPrevious
-                                ? controller.previous
-                                : null,
-                            icon: const Icon(Icons.skip_previous),
-                          ),
-                          IconButton.filled(
-                            key: const ValueKey('play-pause'),
-                            tooltip: controller.playing ? '暂停' : '播放',
-                            onPressed: controller.togglePlayPause,
-                            icon: Icon(
-                              controller.playing
-                                  ? Icons.pause
-                                  : Icons.play_arrow,
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: '停止',
-                            onPressed: controller.stop,
-                            icon: const Icon(Icons.stop),
-                          ),
-                          IconButton(
-                            tooltip: '下一首',
-                            onPressed: controller.canNext
-                                ? controller.next
-                                : null,
-                            icon: const Icon(Icons.skip_next),
-                          ),
-                        ],
-                      ),
+                      PlaybackControls(playback: controller),
                     ],
                   ),
                 ),

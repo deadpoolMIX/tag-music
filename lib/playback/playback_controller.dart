@@ -259,6 +259,11 @@ class PlaybackController extends ChangeNotifier {
 
   Future<void> select(int target) => _serial(() => _select(target));
 
+  Future<void> selectEntry(String entryId) => _serial(() async {
+    final target = queue.entries.indexWhere((e) => e.entryId == entryId);
+    if (target >= 0) await _select(target);
+  });
+
   // Search, sorting and rescanning never mutate this playback snapshot.
   Future<void> playSongs(List<QueueSong> snapshot, int target) =>
       _serial(() async {

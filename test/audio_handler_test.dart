@@ -23,6 +23,8 @@ class HandlerPlayer implements Player {
 
 class HandlerController extends ChangeNotifier implements PlaybackController {
   @override
+  final PlaybackQueue queue = PlaybackQueue();
+  @override
   final HandlerPlayer player = HandlerPlayer();
   @override
   bool get playing => player.state.playing;

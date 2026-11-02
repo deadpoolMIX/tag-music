@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../playback/playback_controller.dart';
+import '../playback/queue_actions.dart';
 import 'filter_rule.dart';
 import 'library_controller.dart';
 import 'playlist_actions.dart';
@@ -78,6 +79,13 @@ class _FilterPageState extends State<FilterPage> {
                       Text(
                         '组合筛选',
                         style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      QueueAddButton(
+                        key: const ValueKey('enqueue-filter'),
+                        playback: widget.playback,
+                        songs: enabled
+                            ? rows.map((t) => t.queueSong).toList()
+                            : const [],
                       ),
                       TextButton.icon(
                         key: const ValueKey('save-filter-playlist'),
@@ -259,6 +267,12 @@ class _FilterPageState extends State<FilterPage> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 selected: widget.playback.currentSongId == track.song.id,
+                trailing: QueueAddButton(
+                  key: ValueKey('enqueue-filter-${track.song.id}'),
+                  playback: widget.playback,
+                  songs: enabled ? [track.queueSong] : const [],
+                  compact: true,
+                ),
                 onTap: widget.playback.busy || !enabled
                     ? null
                     : () => widget.playback.playSongs(

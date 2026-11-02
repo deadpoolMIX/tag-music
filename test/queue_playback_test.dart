@@ -282,6 +282,29 @@ void main() {
     );
   }
 
+  test(
+    'entry selection survives queued reorder and ignores removed identities',
+    () async {
+      await controller.addToQueue([song('A'), song('A'), song('C')]);
+      final ids = controller.queue.entries.map((e) => e.entryId).toList();
+      final reordered = controller.reorderQueue([ids[2], ids[0], ids[1]]);
+      final selected = controller.selectEntry(ids[1]);
+      await reordered;
+      await selected;
+      expect(controller.queue.current?.entryId, ids[1]);
+      expect(controller.index, 2);
+      final removed = controller.removeFromQueue(ids[1]);
+      final stale = controller.selectEntry(ids[1]);
+      await removed;
+      final stops = player.stops;
+      final current = controller.queue.current?.entryId;
+      await stale;
+      expect(controller.queue.current?.entryId, current);
+      expect(player.stops, stops);
+      expect(controller.error, isNull);
+    },
+  );
+
   test('sequential natural end releases media, stop/replay and clear remain usable', () async {
     await controller.setMode(PlaybackMode.sequential);
     await controller.playSongs([song('A')], 0);

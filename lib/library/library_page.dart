@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../playback/documents.dart';
 import '../playback/playback_controller.dart';
+import '../playback/queue_actions.dart';
 import 'library_controller.dart';
 import 'library_search.dart';
 import 'tags_page.dart';
@@ -97,6 +98,14 @@ class _LibraryPageState extends State<LibraryPage> {
                             label: Text(selecting ? '退出多选' : '多选歌曲'),
                           ),
                           Text('${rows.length} / ${library.tracks.length} 首'),
+                          QueueAddButton(
+                            key: const ValueKey('enqueue-library'),
+                            playback: playback,
+                            songs: rows
+                                .where((t) => t.available)
+                                .map((t) => t.queueSong)
+                                .toList(),
+                          ),
                           TextButton.icon(
                             key: const ValueKey('save-library-playlist'),
                             onPressed: () => savePlaylist(
@@ -116,6 +125,15 @@ class _LibraryPageState extends State<LibraryPage> {
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Text('已选 ${selected.length} 首'),
+                            QueueAddButton(
+                              key: const ValueKey('enqueue-library-selected'),
+                              playback: playback,
+                              songs: library
+                                  .selectedTracks(selected)
+                                  .where((t) => t.available)
+                                  .map((t) => t.queueSong)
+                                  .toList(),
+                            ),
                             TextButton(
                               onPressed: selected.isEmpty
                                   ? null
@@ -275,14 +293,29 @@ class _LibraryPageState extends State<LibraryPage> {
                           ),
                           trailing: selecting
                               ? null
-                              : IconButton(
-                                  tooltip: '编辑${track.title}的标签',
-                                  onPressed: () => showTagActions(
-                                    context,
-                                    library,
-                                    {track.song.id},
-                                  ),
-                                  icon: const Icon(Icons.sell_outlined),
+                              : Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    QueueAddButton(
+                                      key: ValueKey(
+                                        'enqueue-library-${track.song.id}',
+                                      ),
+                                      playback: playback,
+                                      songs: track.available
+                                          ? [track.queueSong]
+                                          : const [],
+                                      compact: true,
+                                    ),
+                                    IconButton(
+                                      tooltip: '编辑${track.title}的标签',
+                                      onPressed: () => showTagActions(
+                                        context,
+                                        library,
+                                        {track.song.id},
+                                      ),
+                                      icon: const Icon(Icons.sell_outlined),
+                                    ),
+                                  ],
                                 ),
                           onLongPress: () => setState(() {
                             selecting = true;

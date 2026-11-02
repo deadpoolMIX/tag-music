@@ -31,7 +31,7 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 | 普通歌单存储、编辑、列表/队列保存 | [playlist_repository.dart](../lib/library/playlist_repository.dart)、[playlists_page.dart](../lib/library/playlists_page.dart)、[playlist_actions.dart](../lib/library/playlist_actions.dart)；LibraryController共用DB与曲库UUID | `playlist_test`、`playlists_page_test` |
 | 智能规则、动态结果、删标签预览/联动 | `PlaylistRepository.createSmart/editSmart/preferences`、[smart_playlist_editor.dart](../lib/library/smart_playlist_editor.dart)、[rule_editor.dart](../lib/library/rule_editor.dart)；复用上述歌单页、TagRepository和LibraryController | `smart_playlist_test`、`smart_playlist_page_test`、`filter_page_test` |
 | 播放、串行切换、媒体会话 | [playback_controller.dart](../lib/playback/playback_controller.dart) / `PlaybackController`、`TagAudioHandler`；[playback_page.dart](../lib/playback/playback_page.dart) 组装曲库 UI | `audio_handler_test`、`playback_semantics_test`（Windows进度条启用转换）、集成 `playback_test` |
-| 临时队列、优先待播、四模式与随机历史 | [playback_queue.dart](../lib/playback/playback_queue.dart) / `PlaybackQueue`、`QueueSong`、`QueueEntry`；播放控制器共用串行链 | `playback_queue_test`、`queue_playback_test`；实际设备证据按HANDOFF |
+| 临时队列、优先待播、四模式与随机历史 | [playback_queue.dart](../lib/playback/playback_queue.dart) / `PlaybackQueue`、`QueueSong`、`QueueEntry`；[queue_page.dart](../lib/playback/queue_page.dart) 完整队列/模式/共用播放控件，[queue_actions.dart](../lib/playback/queue_actions.dart) 各来源追加入口；播放控制器共用串行链 | `playback_queue_test`、`queue_playback_test`、`queue_page_test`；实际设备证据按HANDOFF |
 | 共用文件/元数据/FD 适配 | [documents.dart](../lib/playback/documents.dart) / `DocumentAccess`；[descriptor_file.dart](../lib/playback/descriptor_file.dart) | `documents_test`、`descriptor_file_test` |
 | Android 原生桥 | [DocumentBridge.kt](../android/app/src/main/kotlin/app/tagmusic/player/DocumentBridge.kt)、[MainActivity.kt](../android/app/src/main/kotlin/app/tagmusic/player/MainActivity.kt) | 桥测试 + 真机日志/媒体会话 |
 | Windows 壳、工程工具 | [windows/runner/](../windows/runner/)、[scripts/](../scripts/)、[diagnostics.dart](../lib/core/diagnostics.dart) | 原生集成、Release 运行、输出回环分列 |
@@ -49,6 +49,7 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 - **资源生命周期已实现**：切歌/通知操作串行，停止旧曲后关闭应用持有的播放 FD 再开新曲；元数据只读借用 FD、finally 释放，不靠 GC。业务万首队列只为当前与有限预取建立播放对象/句柄。
 - **R5播放接口**：`playSongs(List<QueueSong>, target)`接收歌曲UUID及文件信息快照，每个`QueueEntry`另有UUID；来源变更不改队列。`LibraryController.resolveSong`在打开前按歌曲UUID取有效位置；`ProbeTrack`仅作文件访问对象。旧`playSnapshot`已移除，目录技术探测仍使用独立transient locator，不能作为业务身份。
 - **R5状态边界**：优先待播只消费一次、完整条目保留；四种互斥模式共用状态机。2026-11-02用户取消队列/进度恢复，冷启动空队列、默认随机、不出声。歌单存储及阶段进度见[R5计划](rounds/R5.md#r5-当前执行计划)和HANDOFF。
+- **队列界面接口**：空队列也可打开完整列表和模式选择；条目按独立ID显示/点播/移除，`selectEntry(entryId)`在串行执行时定位，陈旧ID不点错歌曲。拖动改完整顺序、待播仍按FIFO编号；清空须确认，保存完整队列按显示顺序首次去重。`QueueAddButton`固定按下时的来源快照，只添加可用歌曲；曲库/普通歌单多选含跨搜索项并保持来源排序，添加不切换当前歌曲。
 - **标签已实现**：扁平多标签引用歌曲UUID，名称trim/小写唯一键；批量关系事务、删除级联与数量确认，多选按UUID跨搜索保留，不改变播放快照；R3验收见HANDOFF。R4新增版本化三框配置及删除标签时事务移除规则引用；R5歌单按当前计划演进，R8备份/整体回滚仍为后续阶段。
 - 固定 ID/签名、锁定依赖、本机受限补丁见 [TOOLCHAIN](TOOLCHAIN.md)；实际原生库与再分发来源缺口见 [THIRD_PARTY](THIRD_PARTY.md)。相关变更即核对，不等 R9 从零处理。
 

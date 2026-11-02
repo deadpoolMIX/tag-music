@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../playback/playback_controller.dart';
+import '../playback/queue_actions.dart';
 import 'database.dart';
 import 'library_controller.dart';
 import 'playlist_actions.dart';
@@ -139,15 +140,29 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
             track.available ? track.song.name : '文件失联 · 记录仍保留',
             maxLines: 1,
           ),
-          trailing: reordering
-              ? ReorderableDragStartListener(
-                  index: i,
-                  child: Tooltip(
-                    message: '拖动${track.title}排序',
-                    child: const Icon(Icons.drag_handle),
-                  ),
-                )
-              : null,
+          trailing: selecting
+              ? null
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    QueueAddButton(
+                      key: ValueKey('enqueue-playlist-${track.song.id}'),
+                      playback: widget.playback,
+                      songs: !busy && track.available
+                          ? [track.queueSong]
+                          : const [],
+                      compact: true,
+                    ),
+                    if (reordering)
+                      ReorderableDragStartListener(
+                        index: i,
+                        child: Tooltip(
+                          message: '拖动${track.title}排序',
+                          child: const Icon(Icons.drag_handle),
+                        ),
+                      ),
+                  ],
+                ),
           onTap: busy
               ? null
               : selecting
@@ -246,6 +261,16 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text('${rows.length} / ${all.length} 首'),
+                          QueueAddButton(
+                            key: const ValueKey('enqueue-playlist'),
+                            playback: widget.playback,
+                            songs: busy
+                                ? const []
+                                : rows
+                                      .where((t) => t.available)
+                                      .map((t) => t.queueSong)
+                                      .toList(),
+                          ),
                           if (!smart)
                             TextButton.icon(
                               key: const ValueKey('playlist-add-songs'),
@@ -272,6 +297,20 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                             ),
                           if (selecting) ...[
                             Text('已选 ${selected.length} 首'),
+                            QueueAddButton(
+                              key: const ValueKey('enqueue-playlist-selected'),
+                              playback: widget.playback,
+                              songs: busy
+                                  ? const []
+                                  : all
+                                        .where(
+                                          (t) =>
+                                              selected.contains(t.song.id) &&
+                                              t.available,
+                                        )
+                                        .map((t) => t.queueSong)
+                                        .toList(),
+                            ),
                             TextButton(
                               onPressed: busy || selected.isEmpty
                                   ? null
