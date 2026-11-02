@@ -1,32 +1,39 @@
 # 当前交接
 
-更新：2026-11-02 19:14 北京时间。**R5自动验证通过，双端正式候选0.6.0+15及隔离性能包3已构建并完成包审计；实际运行、Release性能及用户验收未测。** Goal active，本地main；候选源码/四包revision均f41dcda，本单元最终文档检查点以git log为准。完整阶段未验收，不进R6。
+更新：2026-11-02 20:16 北京时间。**用户明确“直接暂停”，Goal工具已返回paused；Windows A批中途停止，未清理或关闭现场，不自动续行。** 产品状态仍自动验证通过，实际验收不完整，完整R5未验收，不进R6。本地main，候选源码/四包revision f41dcda；本次暂停文档提交以git log为准。
 
-## 目标与有效计划
+## 目标与入口
 
-- [R5当前执行计划](rounds/R5.md#r5-当前执行计划)是行为、顺序、八组验收及交付入口。启动空队列、默认随机、不出声；不持久临时播放状态，歌单/标签/筛选持久化。
-- 前五功能/工具检查点保留原证据。本单元更新0.6.0+15及R5阶段显示，修复320宽/2倍字号顶栏长标签溢出；完整检查通过，四个Release包及审计完成。
-- **[A批八项清单](rounds/R5-ACCEPTANCE.md#a批性能升级及歌单队列核心行为)已准备，等待分别选择Windows/手机人工或Codex测试**：隔离Release性能、保留数据升级、普通歌单、FIFO/快照、智能/删标签、模式、队列编辑、清理重启；明确安装/启动/输入/播放/采集/数据库升级影响。Windows Codex仅专用Terra/high子Agent使用Windows MCP；手机人工仅用户操作、Codex只读监测。B批原生故障/FD、格式/后台/回环/通知锁屏另行授权，最终仍需完整验收。
-- R0～R4已验收；[R4记录](rounds/R4.md)及[验收](rounds/R4-ACCEPTANCE.md)保留原证据，无新疑点不重复。正式Android固定ID/持久签名升级保留数据；隔离性能包不打开用户库。
+- [R5当前计划](rounds/R5.md#r5-当前执行计划)管完整目标/八组验收；[A批与当前结果](rounds/R5-ACCEPTANCE.md#实际结果)管本次具体范围及部分完成项。
+- 先前检查点已完成队列/UUID、schema4/普通歌单、智能/删标签原子联动、队列/模式UI、工具和候选构建。启动空队列、默认随机、不持久临时播放状态；歌单/标签/筛选持久化。
+- 用户先要求本批结束后暂停，随后明确改为直接暂停；已立即中断测试Agent，不收完6–8、不启动手机/B批、不做暂停后的应用查询或采集。
 
-## 版本、产物与证据
+## 暂停现场（最近已知，不是新查询）
 
-- 正式0.6.0+15：artifacts/R5/tag-music-0.6.0+15.apk、tag-music-windows-0.6.0+15.zip；Windows已展开artifacts/R5/windows15/app/tag_music.exe，未启动。
-- 隔离队列性能3：artifacts/R5/benchmark/queue-benchmark-release-3.apk、queue-benchmark-windows-release-3.zip；Windows已展开benchmark/windows3/app/tag_music.exe，未启动。Android独立ID app.tagmusic.player.benchmark，与正式包签名一致；编号3承接已有最高2，不复用。
-- 四包均Release、revision f41dcda（干净源码提交）；build-all-15.json、benchmark/package-release-3.json、package-windows-release-3.json记录身份。checkpoint6-release-manifest.json汇总四包路径/大小/SHA256/CRC及审计引用；SHA256SUMS.txt为正式双端哈希。**最新build/app已是隔离性能APK，安装正式包必须从上述artifacts取包。**
-- checkpoint6-production-build-15.log、checkpoint6-benchmark-build-3.log均退出0；原始分端日志build-android-15.log、build-windows-15.log、benchmark/build-release-3.log、build-windows-release-3.log。
-- package-audit-15.json、benchmark/package-audit-3.json及各checkpoint6-*-package-audit-*.log均通过：原生音频库匹配R1基线、双端SQLite输入/剥离/包内哈希一致、8份原生许可匹配。正式apk-signature-15.txt、apk-manifest-15.txt及隔离manifest/signature-release-3.txt核对ID/版本/API29；checkpoint6-production-identity-15.json证明与R4+14签名连续、Windows版本0.6.0+15，checkpoint6-benchmark-identity-3.json记录隔离0.6.0+3/同签名。checkpoint6-release-validation.log退出0复核四包CRC/SHA256和未产生性能报告。
-- checkpoint6-full-check-2.log退出0：55个Dart文件0格式变化、analyze无问题、127项Flutter测试无跳过、7项Python审计通过；内层固定日志/本次主机报告完整快照在checkpoint6-full-final。checkpoint6-script-parse.log为修改后PowerShell语法及Python编译通过。
-- artifacts/R5/fixtures真实合成文件样本通过，主机debug基准及旧独立审计保留。**构建/包审计、主机debug或fake测试均不代表真实音频、设备交互/升级、有限FD、后台/锁屏或双端Release性能通过。** Windows性能运行后应新建benchmark/queue-benchmark-windows-release-3.json，当前不存在。
+- 正式+15 PID38780、监测器pwsh PID35996未关闭；最后画面为列表循环、0:19/0:24、播放按钮三角（暂停）、6项队列。后续是否仍存活未复查。
+- **未清理**：普通`R5-15-A-Ordinary-Renamed`、`R5-15-A-QueueSave`，智能`R5-15-A-Smart1/2`，标签`R5-15-A-TagB`及P=m4a/R=mp3关联。TagA已删除；当前筛选排除B、标题升序，两页搜索此前均空。原筛选配置尚未恢复，不能宣称原库完全回到测试前。
+- 实际正式库已schema4；原schema3只读备份仅作证据，**不得回写或用旧R4打开新库**。未改音乐字节/原标签/原歌单；原数据保留有中途对照，不替代最终清理复核。
+- `artifacts/R5/acceptance-A/windows/run-20261102-1918/paused-state.txt`保存Agent最后已有状态。旧工具调用g5:71已300秒超时返回，不能再当活句柄等待；最后已知应用/monitor仍在，续行先核对实际状态，不因旧超时重启。
 
-## 失败累计与不可重复项
+## 已验证与证据边界
 
-- 全部真实失败/次数见[R5技术记录](rounds/R5.md#技术记录)，不清零。本单元checkpoint6-full-check-1.log退出1为126通过/1失败：新阶段标签在320宽/2倍字号顶栏溢出27px，累计1次；限制宽度并单行省略后small-screen-2最小复现和full-check-2均通过。首轮内层日志/报告在checkpoint6-full-attempt1；上轮完整输出在checkpoint5-full-final。
-- 旧导航、迁移事务、生命周期、拖动/定位问题保留原证据；当前无未修复自动检查或构建失败。四包及身份/原生审计均首轮通过。
-- 正式15、性能3不可覆盖复用；固定日志/报告重跑前保存旧证据。以后每批Android包须在下一次构建覆盖merged原生输入前审计，SQLite剥离复核按构建号存档；报告审计拒绝覆盖。无新变更/疑点不重复已通过检查。
-- GUI仅当批授权的专用Terra/high子Agent使用Windows MCP；不复用旧坐标/许可，不转录大base64，不为存档重拍已有证据。本单元未安装或启动任何设备应用。
+- 正式0.6.0+15和隔离性能3四包Release/revision f41dcda；包路径/大小/SHA256见artifacts/R5/checkpoint6-release-manifest.json，双端原生/SQLite/8许可及签名/CRC审计通过。正式Windows为windows15/app/tag_music.exe；性能为benchmark/windows3/app/tag_music.exe。**最新build/app是隔离APK，不当正式包。**
+- checkpoint6-full-check-2.log：55文件0格式变化、静态分析无问题、127 Flutter无跳过、7 Python通过；快照checkpoint6-full-final，无新疑点不重复。
+- Windows隔离性能包3只运行一次，完整报告benchmark/queue-benchmark-windows-release-3.json；root-audit.json/log独立审计通过，7项队列P95≤6.716ms，歌单保存58.438/加载17.115ms另计。该包/报告不得重启覆盖；隔离进程已关闭。
+- 实际schema3→4：本批original.sqlite和formal-schema4.sqlite及root-upgrade-audit.json/log证明6张原表结构/每行相同，新歌单表空、完整性ok/外键0。此为迁移后中途快照，不是当前最终清理结果。
+- root-smart-delete-state.json/log独立确认删A后Smart1=9、Smart2=7、当前规则修剪/无悬空引用，原歌曲/目录/原标签及3原关联保留，仅B关联P/R；界面观察及队列6项见Agent既有截图，完整复核未结束。
+- A批1性能通过；2迁移数据通过但应用内版本等未完；3–5有已覆盖子项但未完整复核；6仅顺序末项自然停止，列表循环等未完；7部分QueueSave去重已观察；8未执行，现场未清理。手机、B批格式/后台/回环/通知锁屏/原生故障/FD及最终用户验收未测。听感、手感、可读性/朗读不由工具代判。
+- 所有本批证据在artifacts/R5/acceptance-A/windows/run-20261102-1918。screenshot-recovery/no-tree-recovery-1/core-gui-recovery-1/pause-recovery JSON记录原始图片的调用ID/时间/SHA256；已直接从原工具响应恢复4+3+42+29张既有图，未为存档重拍。后29张仅存档，暂停后未继续业务复核。
 
-## 执行与授权
+## 失败/工具限制与不可重复项
 
-- 用户已选择继续工作，Goal active；已准备A批具体范围，等待逐端测试方式/操作影响的交互答复。2026-11-02 19:10只读就绪检查无ADB设备、无tag_music.exe进程；未安装、启动或采集设备界面，性能报告仍未生成。收到确认前不开始对应端。选择手机Codex方式还须用户连接USB、解锁并确认调试；没有连接时不轮询等待。
-- **A批两端均尚未授权**。不安装/启动前台应用、切窗输入或操作手机；完整清单及本次交互选择共同界定授权范围，旧批许可不复用。若选人工，界面操作由用户执行；听感/手感/可读性/朗读留用户判断。
+- R5历史真实失败累计见当轮技术记录，不清零。本轮旧R4启动自动审批拒绝1次，未重试；添加R测试B标签的点击被拒1次，经授权/目标证据与同通道重审通过，未绕过或写库替代UI。原文auto-review-rejection*.txt及approval-recheck-tag-r.md保留。
+- Screenshot快路径曾与前景窗口矛盾、任务栏定位尝试1次即停；只读显示器/桌面调查未解释根因。已实证本批无树Snapshot（use_ui_tree=false/use_vision=true/use_dom=false/display=[0]）能正确显示窗口并核对输入，禁止启用历史不安全UIA树/旧App switch，不把局部路线推广。
+- 截图转存触发64000字节限制1次，后直接读本地原响应文件提图解决，不转录/分段传base64；恢复器首轮未识别input_image已修正。Type空字符串工具异常1次但实际清空，未原样重试。
+- 直接重定向启动1次超时后进程消失，原因未明；改独立隐藏monitor成功采集，外层调用300秒超时后应用/monitor仍存活，不当应用崩溃或重启理由。新stdout/stderr和launch文件保留，最终退出文件/完整日志尚未收口，不冒称已全部无错误。
+
+## 续行条件
+
+- **保持paused，等待用户明确续行。** 不自动操作现场、关闭进程或清理残留；不再请求继续/暂停或启动新批次，尚未主动压缩。
+- 恢复时先读本页、核对Git和实际现场/证据，按AGENTS说明剩余Windows测试/清理范围并确认当批方式；仅原Goal恢复不充当新设备许可。Windows仍须专用GPT6.1 Terra/high子Agent用Windows MCP；主Agent不接管。
+- 手机旧方式问题未答复且现已暂停，不能把延迟点击当自动恢复；无手机/B批操作授权。原始候选不变，是否重建取决于后续实际发现，不能为续行覆盖旧包/日志。
