@@ -67,8 +67,45 @@ class CurrentFilters extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+class Playlists extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get nameKey => text().unique()();
+  TextColumn get kind => text().check(
+    const CustomExpression<bool>("\"kind\" IN ('regular', 'smart')"),
+  )();
+  TextColumn get ruleJson => text().nullable()();
+  TextColumn get sortOrder => text().withDefault(const Constant('title'))();
+  BoolColumn get descending => boolean().withDefault(const Constant(false))();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class PlaylistSongs extends Table {
+  TextColumn get playlistId =>
+      text().references(Playlists, #id, onDelete: KeyAction.cascade)();
+  TextColumn get songId => text().references(Songs, #id)();
+  IntColumn get position =>
+      integer().check(const CustomExpression<bool>('"position" >= 0'))();
+  @override
+  Set<Column> get primaryKey => {playlistId, songId};
+  @override
+  List<Set<Column>> get uniqueKeys => [
+    {playlistId, position},
+  ];
+}
+
 @DriftDatabase(
-  tables: [Songs, LibraryRoots, SongLocations, Tags, SongTags, CurrentFilters],
+  tables: [
+    Songs,
+    LibraryRoots,
+    SongLocations,
+    Tags,
+    SongTags,
+    CurrentFilters,
+    Playlists,
+    PlaylistSongs,
+  ],
 )
 class LibraryDatabase extends _$LibraryDatabase {
   LibraryDatabase([QueryExecutor? executor])
@@ -82,7 +119,7 @@ class LibraryDatabase extends _$LibraryDatabase {
             ),
       );
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
@@ -91,20 +128,22 @@ class LibraryDatabase extends _$LibraryDatabase {
         'CREATE INDEX song_tags_tag_id_idx ON song_tags (tag_id)',
       );
     },
-    onUpgrade: (m, from, to) async {
-      if ((from == 1 || from == 2) && to == 3) {
-        if (from == 1) {
+    onUpgrade: (m, from, to) => transaction(() async {
+      if (from >= 1 && from <= 3 && to == 4) {
+        if (from < 2) {
           await m.createTable(tags);
           await m.createTable(songTags);
           await customStatement(
             'CREATE INDEX song_tags_tag_id_idx ON song_tags (tag_id)',
           );
         }
-        await m.createTable(currentFilters);
+        if (from < 3) await m.createTable(currentFilters);
+        await m.createTable(playlists);
+        await m.createTable(playlistSongs);
         return;
       }
       throw StateError('不支持的数据库升级 $from → $to');
-    },
+    }),
     beforeOpen: (_) => customStatement('PRAGMA foreign_keys = ON'),
   );
 }

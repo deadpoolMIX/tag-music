@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../playback/playback_controller.dart';
 import 'filter_rule.dart';
 import 'library_controller.dart';
+import 'playlist_actions.dart';
 
 const _boxTitles = ['全部具备', '任一具备', '排除标签'];
 const _boxHints = ['同时有这些标签', '至少有其中一个标签', '有任一标签就排除'];
@@ -97,6 +98,18 @@ class _FilterPageState extends State<FilterPage> {
                       Text(
                         '组合筛选',
                         style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      TextButton.icon(
+                        key: const ValueKey('save-filter-playlist'),
+                        onPressed: enabled
+                            ? () => savePlaylist(
+                                context,
+                                library,
+                                rows.map((t) => t.song.id),
+                              )
+                            : null,
+                        icon: const Icon(Icons.playlist_add),
+                        label: const Text('保存结果为普通歌单'),
                       ),
                       TextButton.icon(
                         key: const ValueKey('clear-filter'),

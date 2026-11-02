@@ -23,11 +23,12 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 | 职责 | 代码入口 / 符号 | 相关验证 |
 |---|---|---|
 | 初始化、导航、设置 | [main.dart](../lib/main.dart)、[app.dart](../lib/app.dart)、[core/](../lib/core/) | `app_test`、`settings_test`、集成 `smoke_test` |
-| 数据表、连接、迁移 | [database.dart](../lib/library/database.dart) / `LibraryDatabase`；`database.g.dart` 为生成文件 | `test/library_test.dart`、`test/tag_test.dart`、[schema v3 DDL](database-schema/v3.json) |
+| 数据表、连接、迁移 | [database.dart](../lib/library/database.dart) / `LibraryDatabase`；`database.g.dart` 为生成文件 | `library_test`、`tag_test`、`playlist_test`、[schema v4 DDL](database-schema/v4.json) |
 | 扫描事务、增量/失联、搜索排序 | [library_controller.dart](../lib/library/library_controller.dart) / `LibraryController` | 单元/集成 `library_test` |
 | 曲库 UI、封面、输入连接 | [library_page.dart](../lib/library/library_page.dart)、[library_search.dart](../lib/library/library_search.dart) | `test/library_page_test.dart`、真机输入 |
 | 标签关系与管理、多选操作 | [tag_repository.dart](../lib/library/tag_repository.dart)、[tags_page.dart](../lib/library/tags_page.dart)；曲库controller共用DB及状态 | `tag_test`、`tags_page_test`、设备 `tag_benchmark_test` |
 | 三框组合筛选、当前规则保留 | [filter_rule.dart](../lib/library/filter_rule.dart)、[filter_repository.dart](../lib/library/filter_repository.dart)、[filter_page.dart](../lib/library/filter_page.dart)；LibraryController复用曲库/标签数据 | `filter_test`、`filter_page_test`、双端 `filter_benchmark_test` |
+| 普通歌单存储、编辑、列表/队列保存 | [playlist_repository.dart](../lib/library/playlist_repository.dart)、[playlists_page.dart](../lib/library/playlists_page.dart)、[playlist_actions.dart](../lib/library/playlist_actions.dart)；LibraryController共用DB与曲库UUID | `playlist_test`、`playlists_page_test`；智能歌单功能见当前轮进度 |
 | 播放、串行切换、媒体会话 | [playback_controller.dart](../lib/playback/playback_controller.dart) / `PlaybackController`、`TagAudioHandler`；[playback_page.dart](../lib/playback/playback_page.dart) 组装曲库 UI | `audio_handler_test`、`playback_semantics_test`（Windows进度条启用转换）、集成 `playback_test` |
 | 临时队列、优先待播、四模式与随机历史 | [playback_queue.dart](../lib/playback/playback_queue.dart) / `PlaybackQueue`、`QueueSong`、`QueueEntry`；播放控制器共用串行链 | `playback_queue_test`、`queue_playback_test`；实际设备证据按HANDOFF |
 | 共用文件/元数据/FD 适配 | [documents.dart](../lib/playback/documents.dart) / `DocumentAccess`；[descriptor_file.dart](../lib/playback/descriptor_file.dart) | `documents_test`、`descriptor_file_test` |
@@ -40,7 +41,8 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 
 - 产品完整语义见 [PLAN §1～2](PLAN.md#2-技术结构与关键行为)。音乐只读、标签仅入库；Android 保留 SAF URI/授权，不转真实路径；Windows 仅软件内操作和后台播放，不做 SMTC、系统媒体键、托盘播放按钮。
 - **曲库已实现**：`Songs.id` 是 UUID，根目录/`SongLocations` 关联位置。重叠根目录按位置去重，异位置同内容不合并；单根完整成功才事务提交，取消/授权失败保留旧数据，失联/重现保持 UUID。后续标签/歌单用歌曲 ID，不能把路径当永久 ID。
-- **迁移已开始**：R4 当前 schema v3，v1→v2→v3 或 v2→v3 显式迁移标签关系及当前筛选表；未知升级抛错。变表即升版本并验证旧库数据、外键及失败处理。[v1.json](database-schema/v1.json) 和 [v2.json](database-schema/v2.json)、[v3.json](database-schema/v3.json) 是实际 SQLite DDL 基线，不覆盖，也不是 Drift CLI schema JSON。
+- **数据库迁移**：当前schema v4；v1/v2/v3直接升v4，在同一事务补齐标签/当前筛选/歌单表，失败回滚，未知升级抛错。变表即升版本并验证旧库数据、外键及中途失败。[v1.json](database-schema/v1.json)、[v2.json](database-schema/v2.json)、[v3.json](database-schema/v3.json)、[v4.json](database-schema/v4.json)是实际SQLite DDL基线，不覆盖，也不是Drift CLI schema JSON。
+- **普通歌单接口**：`PlaylistRepository.create/add/remove/reorder/rename/delete`与`LibraryController`对应封装；歌曲UUID去重保留首次顺序，失联关联保留，成员/排序事务改写。名称trim/小写键跨两类唯一，`Playlists.kind/ruleJson/sortOrder/descending`留智能规则，`PlaylistSongs`保存普通歌曲及顺序；不保存队列。界面列表/完整队列保存先固定源快照，搜索中不重排，播放复用`playSongs`。
 - **资源生命周期已实现**：切歌/通知操作串行，停止旧曲后关闭应用持有的播放 FD 再开新曲；元数据只读借用 FD、finally 释放，不靠 GC。业务万首队列只为当前与有限预取建立播放对象/句柄。
 - **R5播放接口**：`playSongs(List<QueueSong>, target)`接收歌曲UUID及文件信息快照，每个`QueueEntry`另有UUID；来源变更不改队列。`LibraryController.resolveSong`在打开前按歌曲UUID取有效位置；`ProbeTrack`仅作文件访问对象。旧`playSnapshot`已移除，目录技术探测仍使用独立transient locator，不能作为业务身份。
 - **R5状态边界**：优先待播只消费一次、完整条目保留；四种互斥模式共用状态机。2026-11-02用户取消队列/进度恢复，冷启动空队列、默认随机、不出声。歌单存储及阶段进度见[R5计划](rounds/R5.md#r5-当前执行计划)和HANDOFF。

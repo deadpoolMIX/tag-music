@@ -7,6 +7,7 @@ import 'playback_controller.dart';
 import '../library/library_page.dart';
 import '../library/library_controller.dart';
 import '../library/filter_page.dart';
+import '../library/playlists_page.dart';
 
 String formatPosition(Duration duration) {
   final seconds = duration.inSeconds;
@@ -14,8 +15,13 @@ String formatPosition(Duration duration) {
 }
 
 class PlaybackPage extends ConsumerWidget {
-  const PlaybackPage({this.filtering = false, super.key});
+  const PlaybackPage({
+    this.filtering = false,
+    this.playlists = false,
+    super.key,
+  });
   final bool filtering;
+  final bool playlists;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -41,7 +47,7 @@ class PlaybackPage extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-            if (filtering && controller.error != null)
+            if ((filtering || playlists) && controller.error != null)
               Padding(
                 padding: const EdgeInsets.all(8),
                 child: Text(
@@ -53,7 +59,9 @@ class PlaybackPage extends ConsumerWidget {
               ),
             if (library != null)
               Expanded(
-                child: filtering
+                child: playlists
+                    ? PlaylistsPage(library: library, playback: controller)
+                    : filtering
                     ? FilterPage(library: library, playback: controller)
                     : LibraryPage(library: library, playback: controller),
               )

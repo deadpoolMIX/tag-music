@@ -172,6 +172,8 @@ void main() {
         200,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.ensureVisible(target);
+      await tester.pumpAndSettle();
       await tester.tap(target);
       await tester.pumpAndSettle();
       expect(playback.tracks.map((t) => t.location).toList(), expected);

@@ -135,7 +135,7 @@ class _AppShellState extends ConsumerState<AppShell>
                           }
                         : _selected == 2
                         ? const PlaybackPage(filtering: true)
-                        : const EmptyPage(index: 2),
+                        : const PlaybackPage(playlists: true),
                   ),
                 ],
               ),

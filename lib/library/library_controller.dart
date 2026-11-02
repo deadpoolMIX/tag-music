@@ -10,6 +10,7 @@ import 'database.dart';
 import 'tag_repository.dart';
 import 'filter_rule.dart';
 import 'filter_repository.dart';
+import 'playlist_repository.dart';
 import '../playback/playback_queue.dart';
 
 export 'filter_rule.dart' show LibrarySort;
@@ -31,10 +32,14 @@ class LibraryTrack {
 class LibraryController extends ChangeNotifier {
   LibraryController(this.db, this.documents, {FilterRepository? filterStore})
     : tagsStore = TagRepository(db),
+      playlistsStore = PlaylistRepository(db),
       filterStore = filterStore ?? FilterRepository(db);
   final LibraryDatabase db;
   final DocumentAccess documents;
   final TagRepository tagsStore;
+  final PlaylistRepository playlistsStore;
+  List<Playlist> playlists = [];
+  Map<String, List<String>> playlistSongIds = {};
   final FilterRepository filterStore;
   FilterPreferences filterPreferences = FilterPreferences();
   String filterQuery = '';
@@ -166,6 +171,12 @@ class LibraryController extends ChangeNotifier {
     return _visibleCache = List.unmodifiable(rows);
   }
 
+  List<LibraryTrack> selectedTracks(Set<String> ids) {
+    final rows = tracks.where((t) => ids.contains(t.song.id)).toList();
+    _sortTracks(rows, sort, descending);
+    return rows;
+  }
+
   void _sortTracks(List<LibraryTrack> rows, LibrarySort sort, bool descending) {
     String value(LibraryTrack t) => switch (sort) {
       LibrarySort.title => t.title,
@@ -226,6 +237,52 @@ class LibraryController extends ChangeNotifier {
   ProbeTrack? resolveSong(String songId) {
     final track = tracks.where((t) => t.song.id == songId).firstOrNull;
     return track?.available == true ? track!.probe : null;
+  }
+
+  List<LibraryTrack> playlistTracks(String id) {
+    final byId = {for (final track in tracks) track.song.id: track};
+    return List.unmodifiable([
+      for (final songId in playlistSongIds[id] ?? const <String>[])
+        ?byId[songId],
+    ]);
+  }
+
+  Future<void> reloadPlaylists() async {
+    final snapshot = await playlistsStore.load();
+    playlists = snapshot.playlists;
+    playlistSongIds = snapshot.songIds;
+    _publish();
+  }
+
+  Future<String> createPlaylist(String name, Iterable<String> songIds) async {
+    final id = await playlistsStore.create(name, songIds);
+    await reloadPlaylists();
+    return id;
+  }
+
+  Future<void> renamePlaylist(String id, String name) async {
+    await playlistsStore.rename(id, name);
+    await reloadPlaylists();
+  }
+
+  Future<void> deletePlaylist(String id) async {
+    await playlistsStore.delete(id);
+    await reloadPlaylists();
+  }
+
+  Future<void> addPlaylistSongs(String id, Iterable<String> songs) async {
+    await playlistsStore.add(id, songs);
+    await reloadPlaylists();
+  }
+
+  Future<void> removePlaylistSongs(String id, Iterable<String> songs) async {
+    await playlistsStore.remove(id, songs);
+    await reloadPlaylists();
+  }
+
+  Future<void> reorderPlaylist(String id, List<String> ordered) async {
+    await playlistsStore.reorder(id, ordered);
+    await reloadPlaylists();
   }
 
   int countForTag(String tagId) => tagCounts[tagId] ?? 0;
@@ -313,6 +370,9 @@ class LibraryController extends ChangeNotifier {
     tags = tagSnapshot.tags;
     tagIdsBySong = tagSnapshot.bySong;
     tagCounts = _countTags(tagSnapshot.bySong);
+    final playlistSnapshot = await playlistsStore.load();
+    playlists = playlistSnapshot.playlists;
+    playlistSongIds = playlistSnapshot.songIds;
     _invalidateFilter();
     _publish();
   }

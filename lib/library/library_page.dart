@@ -7,6 +7,7 @@ import '../playback/playback_controller.dart';
 import 'library_controller.dart';
 import 'library_search.dart';
 import 'tags_page.dart';
+import 'playlist_actions.dart';
 
 class LibraryPage extends StatefulWidget {
   const LibraryPage({required this.library, required this.playback, super.key});
@@ -96,6 +97,16 @@ class _LibraryPageState extends State<LibraryPage> {
                             label: Text(selecting ? '退出多选' : '多选歌曲'),
                           ),
                           Text('${rows.length} / ${library.tracks.length} 首'),
+                          TextButton.icon(
+                            key: const ValueKey('save-library-playlist'),
+                            onPressed: () => savePlaylist(
+                              context,
+                              library,
+                              rows.map((t) => t.song.id),
+                            ),
+                            icon: const Icon(Icons.playlist_add),
+                            label: const Text('保存列表为歌单'),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -121,6 +132,19 @@ class _LibraryPageState extends State<LibraryPage> {
                                       Set.of(selected),
                                     ),
                               child: const Text('批量编辑标签'),
+                            ),
+                            TextButton(
+                              key: const ValueKey('batch-add-playlist'),
+                              onPressed: selected.isEmpty
+                                  ? null
+                                  : () => addToPlaylist(
+                                      context,
+                                      library,
+                                      library
+                                          .selectedTracks(selected)
+                                          .map((t) => t.song.id),
+                                    ),
+                              child: const Text('添加到歌单'),
                             ),
                           ],
                         ),
