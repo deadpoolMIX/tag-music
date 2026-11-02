@@ -1,33 +1,27 @@
 # 当前交接
 
-更新：2026-11-01 13:39 北京时间。**用户已交互确认R4验收通过，并选择暂停；Goal paused，R5未启动。** 正式0.5.0+14/f0da853双端通过，Windows收尾及清理已完成。暂停等待用户手动压缩并明确续行；不再测试、开发或操作设备，不声称已主动压缩。验收证据检查点b4b6e18，后续状态提交以git log为准。
+更新：2026-11-02 17:17 北京时间。**R5首个队列状态机/播放接入检查点完成，Goal active，产品整体仍开发中。** 起点本地main/d4f8372；当前提交/工作区以git log/status为准。
 
 ## 目标与有效计划
 
-- [R4计划](rounds/R4.md#r4-当前执行计划)、[七项验收及结果](rounds/R4-ACCEPTANCE.md)。固定三框交并差、独立搜索排序、schema v3、删标签联动和播放快照已实现；R0～R3已双端通过。
-- 当前产品状态：双端通过；用户2026-11-01已明确确认R4最终验收通过。听感、输入手感及朗读不由工具代判；+14未录音，+13默认输出回环证据保留。
+- [R5当前执行计划](rounds/R5.md#r5-当前执行计划)是行为、顺序、八组验收及交付入口。关键调整：取消临时播放状态恢复；启动空队列、默认随机、不出声。歌单/标签/筛选持久化。
+- 已完成队列状态机、歌曲UUID/独立条目ID、优先待播、四模式/随机历史、现有串行播放/媒体回调、失败有限跳过及音频焦点拒绝处理。曲库/筛选及相应测试已改用playSongs，打开前按UUID取有效位置。
+- 下一单元：歌单/schema v4及普通歌单编辑/播放。智能歌单、删除标签联动、队列/模式界面、R5工具覆盖、双端构建/实际验收均待做。schema仍v3，未提前标整阶段通过。
+- R0～R4已验收；[R4记录](rounds/R4.md)及[验收](rounds/R4-ACCEPTANCE.md)保留原证据，无新疑点不重复旧验证。
 
-## 分支、版本与产物
+## 版本、产物与验证
 
-- 本地main；正式业务源码/包内revision f0da853，候选0.5.0+14。本轮仅补验收证据和MD，未改业务或工具脚本；文档提交及工作区以git log/git status为准，先前检查点f5bf537。
-- 正式APK artifacts/R4/tag-music-0.5.0+14.apk，SHA256 bd455d9d9403f4efc01234de1e4eeb69f2e38ca9236a0bada6d59fe3f6018442；Windows ZIP tag-music-windows-0.5.0+14.zip，SHA256 fb18601442d34c693892c4a7ef967a1a5e38e9b68d536c871b34db8815cf16e5。正式EXE在windows14/app，路径/哈希见windows14/package.json。
-- 自动格式/analyze/56项（含3项Windows语义回归）及双端Release、签名/原生/SQLite/8份许可审计通过：check14-console.log、build-all-14.json、build14-console.log、signature-upgrade-comparison-14.json、package-audit-14.json/log。无新源码变更/疑点，未重复执行。
-- Android正式+14保留。最新build/app是独立Release性能包2（c58e964），不是正式APK；正式安装只取artifacts对应包。独立手机性能包1/2均已卸载。artifacts为本地忽略文件，换机器须另带必要证据，不能靠Git假定其存在。
+- 最新正式版仍0.5.0+14，包内revision f0da853；R4双端通过且用户已确认。R5计划0.6.0，正式构建号+15起，不覆盖旧包。
+- R4正式包在artifacts/R4/，Windows在windows14/app；最新build/app可能为隔离性能包，不能当正式APK。R5无候选/设备结果。
+- R5检查点：格式40文件0改动、analyze无问题；7份受影响测试50项通过，含18项纯队列/13项播放控制器及旧媒体/快照/标签/Windows语义回归。日志artifacts/R5/checkpoint1/format-final.log、analyze-2.log、regression-final-1.log，均退出0。
+- 本批仅自动测试及fake引擎/FD断言；未做原生运行、音频采集、双端Release或手机验收。R5检查脚本/SQLite审计/隔离性能入口仍待补，不把skip当通过。
 
-## 实际验收与证据
+## 失败累计与不可重复项
 
-- **Windows +14七项及原生复验闭合。** 主批windows14/run-20261031-192407验证组合、边界、标签联动、重启和快照；起播进度/停止再播/切歌/目录弹窗导航已观察，完整分段日志AXTree及所检索error/fatal/exception均0，两次正常退出0。该批缺口和拒绝历史原文不改写。
-- **2026-11-01收尾五项通过。** windows14/close-20261101-131258/result.md及root-review.json：设置版本0.5.0+14；筛选A下flac为1/2且降序，曲库mp3为2/9且升序（含坏文件.mp3），来回保留各自搜索/排序；仅删除遗留A-renamed/C及4关联，重启后三框/搜索空、title升序、无自动播放。两次退出0、无进程；完整日志AXTree及所检索错误均0。root独立确认最终实际库与快照一致，六表与主批测试前original.sqlite逐行相同：9歌、2原标签、3原关联，完整性ok、外键无异常。截图与启动/退出/库审计均在该目录。
-- **Android +14七项通过。** android14/run-20261031-1755/result.md、assertions.jsonl及XML/PNG/媒体/包日志：由+12保留数据升级，1374首/原0标签及首次安装时间保留，七项和停止再播通过；本批标签已清理，重启默认配置后force-stop确认无PID（末次核对时）。不重测已通过项。
-- **双端Release万首性能通过。** Windows六场景P95 1.814～18.088ms、加载103.523ms，benchmark/filter-benchmark-windows-release-1.json及windows-release-1-root-audit.json。Android包2六场景完整6段报告/内部集合及外部重算通过，最高P95 22.291ms≤1s、加载144.514ms；filter-benchmark-android-release-2.json、android-release-2-root-audit.json及android-release-2/。不代表真实文件扫描、持久化等待或UI渲染。包1截断及失败审计保留。
-
-## 失败计数与不可重复项
-
-- 完整累计及证据见[R4技术记录](rounds/R4.md#技术记录)。旧UIA期间进程消失2次、App switch无效句柄2次，不重试旧路径；根因未证实。旧Click审批4次，上主批排序/删除误判3次，本次收尾无新审批拒绝，不清零。
-- 本次截图转存长调用被中断，复用响应经文件中转落盘；不在模型代码中转录大base64。不为存档重拍，不回灌长日志/XML。前景失焦造成mp3误入Codex项目草稿，未发送也未清除；目标进程存活，核对前景/命中后继续，非产品崩溃。草稿由用户决定是否删除。
-- GUI继续须专用GPT6.1Terra/high使用Windows MCP；根据当前PID/HWND和新截图确认目标，旧坐标/旧窗口不能复用。新批授权不等于可以绕过自动审批，不通过改库完成被拒操作。
+- R5累计：num编译问题1次（首轮会话ID/退出码未转出，日志明确失败）、fake初值断言1次（退出1）、旧调用方/lint的analyze1次（退出1）；均已修复并通过，原始日志及说明见R5技术记录。R4累计见[R4技术记录](rounds/R4.md#技术记录)：旧UIA进程消失2次、App switch无效句柄2次、旧Click审批4次、排序/删除误判3次；不清零、不原样重试旧路径。
+- GUI仅专用Terra/high子Agent使用Windows MCP；按新PID/HWND及观测定位，不复用旧窗口/坐标，不绕过自动审批。不在模型代码转录大base64，不为存档重拍既有证据。
 
 ## 下一步与授权
 
-- 用户已选择暂停，Goal paused；设备批次均已结束，不再操作设备、开发或开始R5。等待用户手动压缩并明确续行，不重复询问继续/暂停。
-- 后续明确续行时，R4无需重验；若启动R5，先按项目Plan规则确认目标、行为及验收。新设备批次仍须交互确认，原有证据和失败累计保留。
+- 首个完整单元已验证并记录，建立本地检查点后按AGENTS压缩规则提示选择继续/暂停；当前工具无主动压缩入口，不声称已压缩。等待用户选择期间不自动启动下一单元。
+- **无有效设备批次授权**。不安装/启动前台应用、切窗输入、录音或操作手机；候选准备好后另行说明范围并交互确认。

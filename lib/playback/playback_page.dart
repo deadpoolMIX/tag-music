@@ -31,6 +31,26 @@ class PlaybackPage extends ConsumerWidget {
         final current = controller.current;
         return Column(
           children: [
+            if (controller.playbackNotice != null && controller.error == null)
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  controller.playbackNotice!,
+                  key: const ValueKey('playback-notice'),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            if (filtering && controller.error != null)
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  controller.error!,
+                  key: const ValueKey('playback-error'),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             if (library != null)
               Expanded(
                 child: filtering
@@ -229,7 +249,7 @@ class PlaybackPage extends ConsumerWidget {
                         children: [
                           IconButton(
                             tooltip: '上一首',
-                            onPressed: controller.index > 0
+                            onPressed: controller.canPrevious
                                 ? controller.previous
                                 : null,
                             icon: const Icon(Icons.skip_previous),
@@ -251,8 +271,7 @@ class PlaybackPage extends ConsumerWidget {
                           ),
                           IconButton(
                             tooltip: '下一首',
-                            onPressed:
-                                controller.index + 1 < controller.tracks.length
+                            onPressed: controller.canNext
                                 ? controller.next
                                 : null,
                             icon: const Icon(Icons.skip_next),

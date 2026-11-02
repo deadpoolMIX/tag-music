@@ -27,6 +27,12 @@ class HandlerController extends ChangeNotifier implements PlaybackController {
   @override
   bool get playing => player.state.playing;
   @override
+  bool get canNext => false;
+  @override
+  bool get canPrevious => false;
+  @override
+  String? get currentSongId => null;
+  @override
   ProbeTrack? current = const ProbeTrack(
     location: 'test://song',
     name: 'sample.flac',
@@ -35,6 +41,8 @@ class HandlerController extends ChangeNotifier implements PlaybackController {
   TrackMetadata? metadata = const TrackMetadata(title: '测试曲目', artist: '测试艺术家');
   @override
   String? error;
+  @override
+  String? playbackNotice;
   @override
   bool busy = false;
   @override
@@ -299,8 +307,7 @@ void main() {
       final controller = PlaybackController(player, TransitionDocuments())
         ..tracks = [
           const ProbeTrack(location: 'test://first', name: 'first.flac'),
-        ]
-        ..index = 0;
+        ];
       player.state = player.state.copyWith(playing: false);
       final handler = TagAudioHandler(controller);
       addTearDown(controller.shutdown);

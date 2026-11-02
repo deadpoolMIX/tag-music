@@ -77,6 +77,7 @@ Future<void> main() async {
       playback?.documents ?? DocumentAccess(),
     );
     await library.initialize();
+    playback?.resolveSong = library.resolveSong;
   } catch (e) {
     await library?.shutdown();
     library = null;

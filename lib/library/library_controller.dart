@@ -10,6 +10,7 @@ import 'database.dart';
 import 'tag_repository.dart';
 import 'filter_rule.dart';
 import 'filter_repository.dart';
+import '../playback/playback_queue.dart';
 
 export 'filter_rule.dart' show LibrarySort;
 
@@ -24,6 +25,7 @@ class LibraryTrack {
       song.title?.trim().isNotEmpty == true ? song.title! : song.name;
   ProbeTrack get probe =>
       ProbeTrack(location: location ?? song.location, name: song.name);
+  QueueSong get queueSong => QueueSong(songId: song.id, track: probe);
 }
 
 class LibraryController extends ChangeNotifier {
@@ -220,6 +222,11 @@ class LibraryController extends ChangeNotifier {
 
   Set<String> tagsForSong(String songId) =>
       Set.unmodifiable(tagIdsBySong[songId] ?? const <String>{});
+
+  ProbeTrack? resolveSong(String songId) {
+    final track = tracks.where((t) => t.song.id == songId).firstOrNull;
+    return track?.available == true ? track!.probe : null;
+  }
 
   int countForTag(String tagId) => tagCounts[tagId] ?? 0;
 

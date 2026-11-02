@@ -272,11 +272,11 @@ class _FilterPageState extends State<FilterPage> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                selected: widget.playback.current?.location == track.location,
+                selected: widget.playback.currentSongId == track.song.id,
                 onTap: widget.playback.busy || !enabled
                     ? null
-                    : () => widget.playback.playSnapshot(
-                        rows.map((t) => t.probe).toList(),
+                    : () => widget.playback.playSongs(
+                        rows.map((t) => t.queueSong).toList(),
                         index,
                       ),
               );

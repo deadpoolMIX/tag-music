@@ -70,8 +70,8 @@ void main() {
       await library.scan();
       await library.createTag('收藏');
     });
-    await playback.playSnapshot(
-      library.tracks.map((track) => track.probe).toList(),
+    await playback.playSongs(
+      library.tracks.map((track) => track.queueSong).toList(),
       0,
     );
     final originalQueue = playback.tracks;

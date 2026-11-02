@@ -29,11 +29,12 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 | 标签关系与管理、多选操作 | [tag_repository.dart](../lib/library/tag_repository.dart)、[tags_page.dart](../lib/library/tags_page.dart)；曲库controller共用DB及状态 | `tag_test`、`tags_page_test`、设备 `tag_benchmark_test` |
 | 三框组合筛选、当前规则保留 | [filter_rule.dart](../lib/library/filter_rule.dart)、[filter_repository.dart](../lib/library/filter_repository.dart)、[filter_page.dart](../lib/library/filter_page.dart)；LibraryController复用曲库/标签数据 | `filter_test`、`filter_page_test`、双端 `filter_benchmark_test` |
 | 播放、串行切换、媒体会话 | [playback_controller.dart](../lib/playback/playback_controller.dart) / `PlaybackController`、`TagAudioHandler`；[playback_page.dart](../lib/playback/playback_page.dart) 组装曲库 UI | `audio_handler_test`、`playback_semantics_test`（Windows进度条启用转换）、集成 `playback_test` |
+| 临时队列、优先待播、四模式与随机历史 | [playback_queue.dart](../lib/playback/playback_queue.dart) / `PlaybackQueue`、`QueueSong`、`QueueEntry`；播放控制器共用串行链 | `playback_queue_test`、`queue_playback_test`；实际设备证据按HANDOFF |
 | 共用文件/元数据/FD 适配 | [documents.dart](../lib/playback/documents.dart) / `DocumentAccess`；[descriptor_file.dart](../lib/playback/descriptor_file.dart) | `documents_test`、`descriptor_file_test` |
 | Android 原生桥 | [DocumentBridge.kt](../android/app/src/main/kotlin/app/tagmusic/player/DocumentBridge.kt)、[MainActivity.kt](../android/app/src/main/kotlin/app/tagmusic/player/MainActivity.kt) | 桥测试 + 真机日志/媒体会话 |
 | Windows 壳、工程工具 | [windows/runner/](../windows/runner/)、[scripts/](../scripts/)、[diagnostics.dart](../lib/core/diagnostics.dart) | 原生集成、Release 运行、输出回环分列 |
 
-定位用 `rg --files lib test integration_test`、`rg -n 'playSnapshot|LibraryController' lib test integration_test -g '!*.g.dart'`，再查 import/调用方。默认不扫生成代码、build、artifacts、SDK。`DocumentAccess` 虽在 playback 目录，已由曲库复用，不另写第二套平台访问；页面只做输入/展示与组装，不新增 SQL/FD 管理。当前跨模块 UI 组装不为整理而搬迁。
+定位用 `rg --files lib test integration_test`、`rg -n 'playSongs|LibraryController' lib test integration_test -g '!*.g.dart'`，再查 import/调用方。默认不扫生成代码、build、artifacts、SDK。`DocumentAccess` 虽在 playback 目录，已由曲库复用，不另写第二套平台访问；页面只做输入/展示与组装，不新增 SQL/FD 管理。当前跨模块 UI 组装不为整理而搬迁。
 
 ## 长期有效的接口与约束
 
@@ -41,8 +42,9 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 - **曲库已实现**：`Songs.id` 是 UUID，根目录/`SongLocations` 关联位置。重叠根目录按位置去重，异位置同内容不合并；单根完整成功才事务提交，取消/授权失败保留旧数据，失联/重现保持 UUID。后续标签/歌单用歌曲 ID，不能把路径当永久 ID。
 - **迁移已开始**：R4 当前 schema v3，v1→v2→v3 或 v2→v3 显式迁移标签关系及当前筛选表；未知升级抛错。变表即升版本并验证旧库数据、外键及失败处理。[v1.json](database-schema/v1.json) 和 [v2.json](database-schema/v2.json)、[v3.json](database-schema/v3.json) 是实际 SQLite DDL 基线，不覆盖，也不是 Drift CLI schema JSON。
 - **资源生命周期已实现**：切歌/通知操作串行，停止旧曲后关闭应用持有的播放 FD 再开新曲；元数据只读借用 FD、finally 释放，不靠 GC。业务万首队列只为当前与有限预取建立播放对象/句柄。
-- **R2→R5 边界**：点击播放是不可变快照，搜索/扫描不改播放；当前 `ProbeTrack` 仍用 location/name，R5 要接稳定歌曲 ID 后做持久队列/进度恢复，重启默认暂停。
-- **标签已实现**：扁平多标签引用歌曲UUID，名称trim/小写唯一键；批量关系事务、删除级联与数量确认，多选按UUID跨搜索保留，不改变播放快照；R3验收见HANDOFF。R4新增版本化三框配置及删除标签时事务移除规则引用；R5歌单和队列、R8备份/整体回滚仍属未来接口。
+- **R5播放接口**：`playSongs(List<QueueSong>, target)`接收歌曲UUID及文件信息快照，每个`QueueEntry`另有UUID；来源变更不改队列。`LibraryController.resolveSong`在打开前按歌曲UUID取有效位置；`ProbeTrack`仅作文件访问对象。旧`playSnapshot`已移除，目录技术探测仍使用独立transient locator，不能作为业务身份。
+- **R5状态边界**：优先待播只消费一次、完整条目保留；四种互斥模式共用状态机。2026-11-02用户取消队列/进度恢复，冷启动空队列、默认随机、不出声。歌单存储及阶段进度见[R5计划](rounds/R5.md#r5-当前执行计划)和HANDOFF。
+- **标签已实现**：扁平多标签引用歌曲UUID，名称trim/小写唯一键；批量关系事务、删除级联与数量确认，多选按UUID跨搜索保留，不改变播放快照；R3验收见HANDOFF。R4新增版本化三框配置及删除标签时事务移除规则引用；R5歌单按当前计划演进，R8备份/整体回滚仍为后续阶段。
 - 固定 ID/签名、锁定依赖、本机受限补丁见 [TOOLCHAIN](TOOLCHAIN.md)；实际原生库与再分发来源缺口见 [THIRD_PARTY](THIRD_PARTY.md)。相关变更即核对，不等 R9 从零处理。
 
 ## 验证入口与维护
@@ -68,4 +70,4 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 | [TOOLCHAIN](TOOLCHAIN.md) / [THIRD_PARTY](THIRD_PARTY.md) | 环境/补丁及许可，相关任务读 |
 | [原始计划](archive/PLAN.original.md) | 原件保留，仅溯源时读 |
 
-历史入口（非必读）：[R0](rounds/R0.md)/[验收](rounds/R0-ACCEPTANCE.md)、[R1](rounds/R1.md)/[验收](rounds/R1-ACCEPTANCE.md)、[R2](rounds/R2.md)/[验收](rounds/R2-ACCEPTANCE.md)、[R3](rounds/R3.md)/[验收](rounds/R3-ACCEPTANCE.md)；当前 [R4](rounds/R4.md)/[验收](rounds/R4-ACCEPTANCE.md)。历史旧路径按本索引/Git 定位，不改写原始失败记录。
+历史入口（非必读）：[R0](rounds/R0.md)/[验收](rounds/R0-ACCEPTANCE.md)、[R1](rounds/R1.md)/[验收](rounds/R1-ACCEPTANCE.md)、[R2](rounds/R2.md)/[验收](rounds/R2-ACCEPTANCE.md)、[R3](rounds/R3.md)/[验收](rounds/R3-ACCEPTANCE.md)、[R4](rounds/R4.md)/[验收](rounds/R4-ACCEPTANCE.md)；当前[R5](rounds/R5.md)。历史旧路径按本索引/Git定位，不改写原始失败记录。

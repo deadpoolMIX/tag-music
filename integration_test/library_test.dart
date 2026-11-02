@@ -53,8 +53,8 @@ void main() {
         );
         final queue = library.visible.where((t) => t.available).toList();
         await playback.player.setVolume(20);
-        await playback.playSnapshot(
-          queue.map((t) => t.probe).toList(),
+        await playback.playSongs(
+          queue.map((t) => t.queueSong).toList(),
           queue.indexOf(art),
         );
         await Future<void>.delayed(const Duration(milliseconds: 800));

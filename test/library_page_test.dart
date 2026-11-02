@@ -20,6 +20,9 @@ class CoverDocuments extends DocumentAccess {
 }
 
 class SnapshotController extends HandlerController {
+  String? selectedSongId;
+  @override
+  String? get currentSongId => selectedSongId;
   @override
   DocumentAccess get documents => _documents;
   final _documents = CoverDocuments();
@@ -28,9 +31,10 @@ class SnapshotController extends HandlerController {
   @override
   int get index => 0;
   @override
-  Future<void> playSnapshot(List<ProbeTrack> snapshot, int target) async {
-    tracks = List.unmodifiable(snapshot);
+  Future<void> playSongs(List<QueueSong> snapshot, int target) async {
+    tracks = List.unmodifiable(snapshot.map((song) => song.track));
     current = tracks[target];
+    selectedSongId = snapshot[target].songId;
     notifyListeners();
   }
 }

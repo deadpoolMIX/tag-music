@@ -9,11 +9,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 
 import 'documents.dart';
+import 'playback_queue.dart';
+
+export 'playback_queue.dart'
+    show PlaybackMode, PlaybackQueue, QueueEntry, QueueSong;
 
 final playbackProvider = Provider<PlaybackController?>((ref) => null);
 
+class _AudioFocusDenied implements Exception {
+  @override
+  String toString() => '系统未授予音频焦点，请稍后重试';
+}
+
 class PlaybackController extends ChangeNotifier {
-  PlaybackController(this.player, this.documents) {
+  PlaybackController(
+    this.player,
+    this.documents, {
+    PlaybackQueue? playbackQueue,
+  }) : queue = playbackQueue ?? PlaybackQueue() {
     _subscriptions.addAll([
       player.stream.playing.listen((_) => _publish()),
       player.stream.position.listen((_) => _publish()),
@@ -24,14 +37,24 @@ class PlaybackController extends ChangeNotifier {
         if (completed &&
             !_playbackFailed &&
             !changingTrack &&
-            index + 1 < tracks.length) {
-          unawaited(next());
+            _playIntent &&
+            _completionHandled != _selection) {
+          final selection = _selection;
+          _completionHandled = selection;
+          unawaited(
+            _serial(() async {
+              if (_selection == selection && _playIntent) {
+                await _advance(natural: true);
+              }
+            }),
+          );
         }
       }),
       player.stream.error.listen((message) {
         _playbackFailed = true;
         error = '播放失败：$message。可选择其他歌曲重试。';
         final failedSelection = _selection;
+        final failedEntry = queue.current?.entryId;
         debugPrint(
           'R1 ${jsonEncode({'event': 'playbackError', 'message': message})}',
         );
@@ -42,8 +65,16 @@ class PlaybackController extends ChangeNotifier {
         unawaited(
           _serial(() async {
             if (_selection != failedSelection || !_playbackFailed) return;
+            if (failedEntry != null) _failedEntries.add(failedEntry);
+            playbackNotice = error;
             await _unload();
             await session?.setActive(false);
+            final nextEntry = queue.next(excluded: _failedEntries);
+            if (nextEntry != null) {
+              await _openCurrent(play: _playIntent, resetFailures: false);
+            } else {
+              _playIntent = false;
+            }
           }),
         );
       }),
@@ -52,15 +83,32 @@ class PlaybackController extends ChangeNotifier {
 
   final Player player;
   final DocumentAccess documents;
+  final PlaybackQueue queue;
+  FutureOr<ProbeTrack?> Function(String songId)? resolveSong;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
-  List<ProbeTrack> tracks = [];
+  List<ProbeTrack> _tracks = const [];
+  List<ProbeTrack> get tracks => _tracks;
+  // Only the standalone directory probe/test path uses transient locator IDs.
+  // Product entrypoints call playSongs with persistent library UUIDs.
+  set tracks(List<ProbeTrack> value) {
+    _diagnosticQueue = true;
+    queue.replace(
+      value
+          .map((t) => QueueSong(songId: 'probe:${t.location}', track: t))
+          .toList(),
+      0,
+    );
+    _syncTracks();
+  }
+
   List<String> roots = [];
-  int index = -1;
+  int get index => queue.index;
   int? _playbackFd;
   TrackMetadata? metadata;
   AudioSession? session;
   String? error;
   String? metadataWarning;
+  String? playbackNotice;
   bool busy = false;
   bool changingTrack = false;
   bool notificationsEnabled = true;
@@ -69,10 +117,25 @@ class PlaybackController extends ChangeNotifier {
   bool _closed = false;
   bool _playbackFailed = false;
   int _selection = 0;
+  int _completionHandled = -1;
+  bool _playIntent = false;
+  bool _diagnosticQueue = false;
+  final Set<String> _failedEntries = {};
+  ProbeTrack? _resolvedTrack;
+  String? _resolvedEntryId;
   bool get playing => !_playbackFailed && player.state.playing;
+  bool get canNext => queue.canNext;
+  bool get canPrevious => queue.canPrevious;
+  String? get currentSongId =>
+      _diagnosticQueue ? null : queue.current?.song.songId;
   Future<void> _pending = Future.value();
-  ProbeTrack? get current =>
-      index >= 0 && index < tracks.length ? tracks[index] : null;
+  ProbeTrack? get current => queue.current?.entryId == _resolvedEntryId
+      ? _resolvedTrack
+      : queue.current?.song.track;
+
+  void _syncTracks() => _tracks = List.unmodifiable(
+    queue.entries.map((entry) => entry.song.track),
+  );
 
   void _publish() {
     if (!_closed) notifyListeners();
@@ -189,7 +252,6 @@ class PlaybackController extends ChangeNotifier {
       _playbackFailed = false;
       await _unload();
       tracks = loaded;
-      index = -1;
       metadata = null;
       metadataWarning = null;
     });
@@ -198,45 +260,143 @@ class PlaybackController extends ChangeNotifier {
   Future<void> select(int target) => _serial(() => _select(target));
 
   // Search, sorting and rescanning never mutate this playback snapshot.
-  Future<void> playSnapshot(List<ProbeTrack> snapshot, int target) =>
+  Future<void> playSongs(List<QueueSong> snapshot, int target) =>
       _serial(() async {
         if (target < 0 || target >= snapshot.length) return;
-        tracks = List.unmodifiable(snapshot);
-        await _select(target);
+        _diagnosticQueue = false;
+        queue.replace(snapshot, target);
+        _syncTracks();
+        await _openCurrent(play: true);
       });
+
+  Future<void> addToQueue(List<QueueSong> songs) => _serial(() async {
+    if (queue.entries.isEmpty) _diagnosticQueue = false;
+    queue.add(songs);
+    _syncTracks();
+  });
+
+  Future<void> setMode(PlaybackMode mode) => _serial(() async {
+    queue.setMode(mode);
+  });
+
+  Future<void> reorderQueue(List<String> orderedIds) => _serial(() async {
+    queue.reorder(orderedIds);
+    _syncTracks();
+  });
+
+  Future<void> removeFromQueue(String entryId) => _serial(() async {
+    final wasCurrent = queue.current?.entryId == entryId;
+    final wasPlaying = playing;
+    queue.remove(entryId);
+    _syncTracks();
+    if (!wasCurrent) return;
+    if (queue.current != null) {
+      await _openCurrent(play: wasPlaying);
+    } else {
+      await _clearMedia();
+    }
+  });
+
+  Future<void> clearQueue() => _serial(() async {
+    await _clearMedia();
+    queue.clear();
+    _syncTracks();
+  });
+
+  Future<void> _clearMedia() async {
+    _selection++;
+    _playIntent = false;
+    _playbackFailed = false;
+    await _unload();
+    await session?.setActive(false);
+    _resolvedTrack = null;
+    _resolvedEntryId = null;
+    metadata = null;
+    metadataWarning = null;
+    error = null;
+    playbackNotice = null;
+  }
 
   Future<void> _select(int target) async {
     if (target < 0 || target >= tracks.length) return;
-    _selection++;
-    _playbackFailed = false;
+    queue.select(queue.entries[target].entryId);
+    await _openCurrent(play: true);
+  }
+
+  Future<void> _openCurrent({
+    required bool play,
+    bool resetFailures = true,
+  }) async {
+    if (resetFailures) {
+      _failedEntries.clear();
+      playbackNotice = null;
+    }
+    _playIntent = play;
     changingTrack = true;
-    error = null;
-    metadataWarning = null;
     _publish();
     try {
-      await _unload();
-      index = target;
-      metadata = null;
-      final track = tracks[target];
-      try {
-        metadata = await documents.metadata(track);
-        debugPrint(
-          'R1 ${jsonEncode({'event': 'metadata', 'name': track.name, 'title': metadata?.title, 'artist': metadata?.artist})}',
-        );
-      } catch (e) {
-        metadataWarning = '元数据不可读，使用文件名：$e';
+      while (queue.current != null) {
+        final entry = queue.current!;
+        _selection++;
+        _playbackFailed = false;
+        error = null;
+        metadataWarning = null;
+        try {
+          await _unload();
+          metadata = null;
+          final track = !_diagnosticQueue && resolveSong != null
+              ? await resolveSong!(entry.song.songId)
+              : entry.song.track;
+          if (track == null) throw StateError('文件失联或目录不可访问');
+          _resolvedEntryId = entry.entryId;
+          _resolvedTrack = track;
+          try {
+            metadata = await documents.metadata(track);
+            debugPrint(
+              'R1 ${jsonEncode({'event': 'metadata', 'name': track.name, 'title': metadata?.title, 'artist': metadata?.artist})}',
+            );
+          } catch (e) {
+            metadataWarning = '元数据不可读，使用文件名：$e';
+          }
+          final location = documents.android
+              ? 'fd://${_playbackFd = await documents.open(track.location)}'
+              : track.location;
+          await player.open(Media(location), play: false);
+          if (_playbackFailed) throw StateError(error ?? '播放失败');
+          if (play) {
+            await _play();
+          } else {
+            await session?.setActive(false);
+          }
+          if (_playbackFailed) throw StateError(error ?? '播放失败');
+          debugPrint(
+            'R1 ${jsonEncode({'event': 'opened', 'name': track.name, 'diagnostics': await documents.diagnostics()})}',
+          );
+          return;
+        } catch (e) {
+          if (e is _AudioFocusDenied) {
+            _selection++;
+            _playIntent = false;
+            _playbackFailed = true;
+            error = e.toString();
+            await _unload();
+            await session?.setActive(false);
+            return;
+          }
+          _failedEntries.add(entry.entryId);
+          error = '播放失败：$e';
+          playbackNotice = '已跳过不可播放歌曲：${entry.song.track.name}。$e';
+          await _unload();
+          await session?.setActive(false);
+          if (queue.next(excluded: _failedEntries) == null) {
+            _selection++; // Invalidate queued decoder cleanup for this attempt.
+            _playbackFailed = true;
+            _playIntent = false;
+            error = '$error。没有可继续播放的歌曲，可修复后重试。';
+            return;
+          }
+        }
       }
-      final location = documents.android
-          ? 'fd://${_playbackFd = await documents.open(track.location)}'
-          : track.location;
-      await player.open(Media(location), play: false);
-      if (!_playbackFailed) await _play();
-      debugPrint(
-        'R1 ${jsonEncode({'event': 'opened', 'name': track.name, 'diagnostics': await documents.diagnostics()})}',
-      );
-    } catch (_) {
-      await _unload();
-      rethrow;
     } finally {
       changingTrack = false;
       _publish();
@@ -257,9 +417,13 @@ class PlaybackController extends ChangeNotifier {
 
   Future<void> _play() async {
     if (session != null && !await session!.setActive(true)) {
-      throw StateError('系统未授予音频焦点，请稍后重试');
+      _playIntent = false;
+      throw _AudioFocusDenied();
     }
+    error = null;
     if (player.state.completed) await player.seek(Duration.zero);
+    _playIntent = true;
+    _completionHandled = -1;
     await player.play();
   }
 
@@ -270,13 +434,14 @@ class PlaybackController extends ChangeNotifier {
   Future<void> _resume() async {
     if (current == null) return;
     if (_playbackFailed || player.state.playlist.medias.isEmpty) {
-      await _select(index);
+      await _openCurrent(play: true);
     } else {
       await _play();
     }
   }
 
   Future<void> _pause() async {
+    _playIntent = false;
     await player.pause();
     await session?.setActive(false);
   }
@@ -295,11 +460,24 @@ class PlaybackController extends ChangeNotifier {
     _selection++;
     _playbackFailed = false;
     error = null;
+    _playIntent = false;
     await _unload();
     await session?.setActive(false);
   });
-  Future<void> next() => _serial(() => _select(index + 1));
-  Future<void> previous() => _serial(() => _select(index - 1));
+  Future<void> _advance({bool natural = false}) async {
+    if (queue.next(natural: natural) != null) {
+      await _openCurrent(play: true);
+    } else if (natural) {
+      _playIntent = false;
+      await _unload();
+      await session?.setActive(false);
+    }
+  }
+
+  Future<void> next() => _serial(() => _advance());
+  Future<void> previous() => _serial(() async {
+    if (queue.previous() != null) await _openCurrent(play: true);
+  });
   Future<void> seek(Duration position) => _serial(() async {
     final milliseconds = position.inMilliseconds.clamp(
       0,
@@ -340,7 +518,7 @@ class TagAudioHandler extends BaseAudioHandler {
     if (!controller.changingTrack && current != null) {
       final title = controller.metadata?.title ?? current.name;
       final item = MediaItem(
-        id: current.location,
+        id: controller.currentSongId ?? current.location,
         title: title,
         artist: controller.metadata?.artist,
         album: controller.metadata?.album,

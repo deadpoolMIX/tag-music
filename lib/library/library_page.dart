@@ -218,9 +218,7 @@ class _LibraryPageState extends State<LibraryPage> {
                             .join('、');
                         return ListTile(
                           key: ValueKey(track.song.id),
-                          selected:
-                              track.probe.location ==
-                              playback.current?.location,
+                          selected: track.song.id == playback.currentSongId,
                           leading: Icon(
                             selecting
                                 ? selected.contains(track.song.id)
@@ -274,8 +272,8 @@ class _LibraryPageState extends State<LibraryPage> {
                                   final snapshot = rows
                                       .where((t) => t.available)
                                       .toList();
-                                  playback.playSnapshot(
-                                    snapshot.map((t) => t.probe).toList(),
+                                  playback.playSongs(
+                                    snapshot.map((t) => t.queueSong).toList(),
                                     snapshot.indexOf(track),
                                   );
                                 },
