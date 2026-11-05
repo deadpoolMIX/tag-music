@@ -1,6 +1,6 @@
 # R5 候选实际验收
 
-候选：正式0.6.0+15、隔离队列性能包3，四包Release、revision f41dcda。产品状态：开发中（+15诊断报告轮次仍写R4，待修）；用户2026-11-05明确续行并重新选择电脑端Codex测试，Windows A批续测已结束并清理，Goal active。性能/升级数据及最终原库恢复对照通过，诊断轮次缺陷和功能缺口尚未收口，手机/B批未授权未测。当前现场以[HANDOFF](../HANDOFF.md)为准；包路径、哈希及自动检查以HANDOFF和artifacts/R5/checkpoint6-release-manifest.json为准；完整范围见[R5计划](R5.md#验收与交付)。
+候选：正式0.6.0+15、隔离队列性能包3，四包Release、revision f41dcda。产品状态：开发中（+15诊断报告轮次仍写R4，待修）；用户2026-11-05明确续行并重新选择电脑端Codex测试，Windows A批续测已结束并清理；检查点06fb613后用户选择暂停，Goal paused。性能/升级数据及最终原库恢复对照通过，诊断轮次缺陷和功能缺口尚未收口，手机/B批未授权未测。当前现场以[HANDOFF](../HANDOFF.md)为准；包路径、哈希及自动检查以HANDOFF和artifacts/R5/checkpoint6-release-manifest.json为准；完整范围见[R5计划](R5.md#验收与交付)。
 
 ## A批：性能、升级及歌单/队列核心行为
 
