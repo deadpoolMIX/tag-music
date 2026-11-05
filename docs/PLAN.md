@@ -134,6 +134,6 @@ R0/R1 的底座→技术关卡，R3→R4 的标签→规则，R6 的体验完善
 - 2026-10-30 R2 确定单根扫描事务、位置去重和失联保留，启动恢复曲库但不含 R5 队列/进度恢复；长期接口见项目索引，当前验收状态见 HANDOFF。
 - 2026-10-30 本次工作流审计只整理已有文档和阶段内验证顺序：替换强制通读/每轮新对话规则、分开手机交互与工程排错、明确按任务检查点交接；移除 PLAN 内旧状态补丁，历史由 Git 与原轮次日志保存。R0～R9 核心范围不变，无待批准的重大重划。
 
-Plan 与 Goal 分别用于路径确认和持续交付目标，采用 [OpenAI 官方说明](https://developers.openai.com/blog/mastering-codex-remote-for-engineering#4-use-plan-for-the-path-and-goal-for-the-outcome) 的用法；具体工具可用性依宿主而定。额度、压缩和换对话由用户管理；助手只按本规范高效执行并维护可恢复记录。
+Plan 与 Goal 分别用于路径确认和持续交付目标，采用 [OpenAI 官方说明](https://developers.openai.com/blog/mastering-codex-remote-for-engineering#4-use-plan-for-the-path-and-goal-for-the-outcome) 的用法；具体工具可用性依宿主而定。额度和换对话由用户管理；检查点压缩及无法主动压缩时的交互流程见 [AGENTS](../AGENTS.md#读取与恢复)。
 
 - 2026-10-31 R4 Plan 经用户确认改为固定三框，两个包含框结果取并集，再减排除并集；删除标签确认影响后自动移除规则引用，替换任意嵌套及待修复语义。
