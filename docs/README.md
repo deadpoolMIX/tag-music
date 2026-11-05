@@ -72,9 +72,9 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 | [AGENTS](../AGENTS.md) | 协作、阶段/Goal、验证责任、失败与交接规则 |
 | 本索引 | 架构/模块/长期接口，按上述任务路由读取 |
 | [PLAN](PLAN.md) | 产品边界、R0～R9 及跨阶段验证；阶段启动/相关规则时读 |
-| [HANDOFF](HANDOFF.md) | 唯一当前快照，每次结束/中断前更新，不堆旧状态 |
-| `rounds/Rxx.md` / `Rxx-ACCEPTANCE.md` | 顶部为当前计划；下方追加证据，另附5～8项手机清单；历史按依赖读 |
-| [开发日志](开发日志.md) | 给人看的已完成摘要，不作恢复依据、不默认通读 |
+| [HANDOFF](HANDOFF.md) | 唯一当前状态和入口，每次结束/中断前更新；详细验收结论引用验收记录 |
+| `rounds/Rxx.md` / `Rxx-ACCEPTANCE.md` | 当轮计划及技术记录 / 详细验收结论与证据索引；手机清单5～8项，历史按依赖读 |
+| [开发日志](开发日志.md) | 每次收口一句已完成摘要，不作恢复依据、不默认通读 |
 | [TOOLCHAIN](TOOLCHAIN.md) / [THIRD_PARTY](THIRD_PARTY.md) | 环境/补丁及许可，相关任务读 |
 | [原始计划](archive/PLAN.original.md) | 原件保留，仅溯源时读 |
 
