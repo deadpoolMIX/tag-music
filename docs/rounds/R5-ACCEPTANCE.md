@@ -1,6 +1,15 @@
 # R5 候选实际验收
 
-候选：正式0.6.0+15、隔离队列性能包3，四包Release、revision f41dcda。产品状态：开发中（+15诊断报告轮次仍写R4，待修）；用户2026-11-05明确续行并重新选择电脑端Codex测试，Windows A批续测已结束并清理；检查点06fb613后用户选择暂停，Goal paused。性能/升级数据及最终原库恢复对照通过，诊断轮次缺陷和功能缺口尚未收口，手机/B批未授权未测。当前现场以[HANDOFF](../HANDOFF.md)为准；包路径及哈希见artifacts/R5/checkpoint6-release-manifest.json，自动检查见[R5技术记录](R5.md#技术记录)；完整范围见[R5计划](R5.md#验收与交付)。
+当前候选：正式0.6.0+16/326755a，自动验证通过、尚未实际运行。隔离性能包3/f41dcda及旧+15结果保留，分别记录。Goal active；完整R5仍未验收，当前状态/授权以[HANDOFF](../HANDOFF.md)为准，完整范围见[R5计划](R5.md#验收与交付)。下面的旧A批清单及实际结果均对应+15，不冒充+16验收。
+
+## +16 候选准备
+
+- 改动仅诊断轮次R4→R5及版本0.6.0+16；源码提交、双端包内revision均为`326755a`。设备内复制诊断、版本及全部功能仍待本候选实测；旧+15诊断失败历史保留。
+- 自动检查：`artifacts/R5/checkpoint7/app-test-1.log`相关5项通过；`full-check-1.log`及exit.txt记录完整检查退出0，55文件0格式变化、analyze无问题、127项Flutter无跳过、7项Python通过。旧固定报告先归档`previous-fixed-reports/`，未更改队列、数据库或依赖。
+- 双端Release构建退出0：`checkpoint7/production-build-16.log`及exit.txt；APK ID/API29/版本/持久签名通过，签名与+15一致；原生音频基线、SQLite三ABI原始/strip/包内链及Windows库、8份许可通过。证据`checkpoint7/apk-verify-16.log`、`package-audit-16.json`、`checkpoint7/package-audit-16.log`及exit.txt。
+- 最终CRC/SHA256/元数据交叉验证退出0：`checkpoint7/release-validation.log`及exit.txt。两个包、大小、SHA256和全部入口集中在`artifacts/R5/checkpoint7-release-manifest.json`；Windows展开到`artifacts/R5/windows16/app/tag_music.exe`，未启动。最新build/app APK为正式+16。
+- 额外Windows身份核验失败1次：命令错误预期FileVersion字符串为0.6.0.16；Runner.rc和旧+15证明应为0.6.0+16。未改产品或重建包，修正断言后字符串与数值0/6/0/16均通过；`checkpoint7/windows-identity-attempt1.txt`及`package-identity-16.json`保留原因和结果，不算产品失败。
+- 未安装、启动、录音或操作电脑/手机；隔离性能3未重建/重跑。Windows补测八项草案在`artifacts/R5/checkpoint7/windows-A-supplement-draft.md`：版本/诊断、普通/智能细项、FIFO/快照、重复条目随机/重排、非零进度编辑、删当前/保存、持久化及清理。实际操作前须确认新批范围及方式，手机和B批仍未授权。
 
 ## A批：性能、升级及歌单/队列核心行为
 
