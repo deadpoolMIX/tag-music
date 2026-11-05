@@ -16,7 +16,7 @@ String diagnosticReport(PackageInfo info) =>
     '''Tag Music
 版本：${info.version}+${info.buildNumber}
 应用标识：${info.packageName}
-轮次：R4
+轮次：R5
 代码：$gitRevision
 系统：${Platform.operatingSystem} ${Platform.operatingSystemVersion}
 Dart：${Platform.version.split(' ').first}
