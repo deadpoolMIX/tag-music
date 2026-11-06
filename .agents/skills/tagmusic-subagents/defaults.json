@@ -1,0 +1,12 @@
+{
+  "primary": { "model": "gpt-6-luna", "reasoning_effort": "high" },
+  "planner": { "model": "gpt-6.1-sol", "reasoning_effort": "medium" },
+  "simple": { "model": "gpt-6-luna", "reasoning_effort": "high" },
+  "normal": { "model": "gpt-6.1-sol", "reasoning_effort": "medium" },
+  "high_risk": { "model": "gpt-6.1-sol", "reasoning_effort": "high" },
+  "command_runner": { "model": "gpt-6-luna", "reasoning_effort": "high" },
+  "acceptance": { "model": "gpt-6.1-sol", "reasoning_effort": "medium" },
+  "phone_script": { "model": "gpt-6-luna", "reasoning_effort": "high" },
+  "phone_visual": { "model": "gpt-6.1-terra", "reasoning_effort": "high" },
+  "windows_gui": { "model": "gpt-6.1-terra", "reasoning_effort": "high" }
+}
