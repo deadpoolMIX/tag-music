@@ -1,15 +1,36 @@
 # R5 候选实际验收
 
-当前候选：正式0.6.0+16/326755a，自动验证通过、尚未实际运行。隔离性能包3/f41dcda及旧+15结果保留，分别记录。用户在f0636dd后选择暂停，Goal paused；完整R5仍未验收，当前状态/授权以[HANDOFF](../HANDOFF.md)为准，完整范围见[R5计划](R5.md#验收与交付)。下面的旧A批清单及实际结果均对应+15，不冒充+16验收。
+当前候选：正式0.6.0+16/326755a，自动验证通过；电脑最终集中批次已结束并清理，部分断言未证实，不能记为电脑全部通过。Goal active，手机及完整R5未验收。当前状态/授权见[HANDOFF](../HANDOFF.md)，完整范围见[R5计划](R5.md#验收与交付)。隔离性能3/f41dcda及旧+15结果分别保留；下方旧A批结果不替代+16。
+
+## Windows +16 最终集中测试
+
+2026-11-05用户交互选择Codex测试合并补测/Windows B，专用Terra/high通过Windows MCP执行；中断时尚在清理。2026-11-06再次确认空闲并明确“开始”后，另一专用Terra/high完成原批清理、冷启及关闭，未重测或新增录音。范围与完整结果集中在 `artifacts/R5/windows-final-16/batch-plan.md`、`result.md`、`evidence-index.md`；旧性能3未重跑，手机未操作。
+
+| 项目 | 当前结论与证据边界 |
+|---|---|
+| 身份、冷启、诊断 | +16实际运行和冷启空队列/随机有记录；诊断复制因无法保证完整恢复原非文本剪贴板而未测。允许覆盖的选项未获答复，收口不覆盖；源码R5修复及包身份自动证据仍有效。 |
+| 普通/智能歌单、删测试标签 | 子Agent观测普通跨搜索4成员、重排/改名、智能三框/排序及删除预览取消/确认；标签关联后FLAC结果1/1和局部搜索离开重进为空经Root抽查。原0/0截图在规则编辑前，不能拼成同一规则完整0→1时序；完整交叉/快照等仍不概称通过。 |
+| FIFO、重复条目随机 | 仅观测部分优先顺序和重排后long→m4a。FIFO返回原快照的中间时序、重复条目整轮/跨轮及重排不重抽均未证实；不再穷举或以旧不同歌曲随机结果填补。 |
+| 非零进度与队列编辑 | Root核对1395→1422原图，同long曲从0:06到0:51，间隔约44秒；中间仅重排/切模式，无定位或重选，支持本次进度保持。其他播放删中间、暂停编辑等为子Agent部分观测，不外推全部分支。 |
+| 六格式与实际输出 | MP3/FLAC/M4A-AAC/WAV/OGG-Vorbis/Opus的起播、定位、停止再播有子Agent观测及原图索引；不能据进度推定每格式实际声音。两段35秒默认输出录音已用尽，固定500Hz断言均false；第二段有440/600/900Hz信号，但未闭合目标曲和最小化时间对应，后台回环未证实，未录第三段。 |
+| 失联、坏文件 | 子Agent观测本批FLAC失联成员保留/单根恢复、坏Opus跳有效FLAC；Root复核单坏Opus停止及恢复文件后0:07再播。未覆盖所有故障排列/权限或实际竞态。 |
+| 资源、竞态、体验 | 总句柄首尾PID24236为970→966、PID16900为721→720，无首尾净增长；不是峰值或精确音频FD证明。实际短间隔竞态未证实。用户对已观察合成声音/文字/反馈回答未发现体验问题，不扩大为朗读或完整阶段验收。 |
+| 清理及数据 | UI删除3测试歌单、1测试标签；关应用后精确事务删新增7歌曲/7位置/1根（含long），只移除偏好新增根，不回写旧库。最终冷启9/9、随机、队列0并关闭，无本批残留进程。9原音乐哈希及偏好JSON相等。 |
+
+Root独立 `root-final-audit.json/log/exit.txt` 严格对照退出1：唯一差异为原3个 `library_roots.scanned_at` 被已执行的全目录刷新更新，其余7表完整结构/行相等，根表其余字段相等，schema4/integrity/FK正常。保留真实时间戳，不修改断言掩盖差异、不写回备份。最终快照 `final-clean.sqlite` SHA256 `2eb74b60cf33553fb663eba4b8321d955e92a3d6597f2c5cf601751191311774`；清理明细 `cleanup-result.md`、事务前快照 `pre-transaction.sqlite`、事务脚本/报告及 `final-processes.json` 可复核。
+
+已知本批异常与累计：回环采集判据失败2次后停止（首段时序失配，第二段有信号但目标/状态映射不足）；另Python3.14/音频依赖兼容启动失败1次，改用兼容解释器；误全根刷新1次保留3扫描时间差异；Root只读摘要误将列表当对象1次、根据目录文件数误算初始图片数1次（实际4+101+20=125张，全部哈希有效）均已修；清理检查 `cleanup-before.json` 重跑覆盖1次，仅代表UI删除后/事务前，UI删除前原始观察仍在journal，未冒称原快照完整。没有新增已确认产品缺陷，不把证据缺口或工具失败当产品通过。
+
+原测试105张新截图、收口20张；Root只读取15张原测试图和1张最终冷启图，直接恢复其余原图，不重采。总新截图仍多，不能宣称总量已减少；当前改进主要是减少Root重复读图。所有图的调用行/时间/SHA见三份恢复清单，关键结论与收窄依据见 `root-ui-review.md`。本批仅更新文档/证据，不重复Flutter检查、构建或旧性能报告。
 
 ## +16 候选准备
 
-- 改动仅诊断轮次R4→R5及版本0.6.0+16；源码提交、双端包内revision均为`326755a`。设备内复制诊断、版本及全部功能仍待本候选实测；旧+15诊断失败历史保留。
+- 改动仅诊断轮次R4→R5及版本0.6.0+16；源码提交、双端包内revision均为`326755a`。构建时未进行设备实测；当前实际结论见上方Windows收口，旧+15诊断失败历史保留。
 - 自动检查：`artifacts/R5/checkpoint7/app-test-1.log`相关5项通过；`full-check-1.log`及exit.txt记录完整检查退出0，55文件0格式变化、analyze无问题、127项Flutter无跳过、7项Python通过。旧固定报告先归档`previous-fixed-reports/`，未更改队列、数据库或依赖。
 - 双端Release构建退出0：`checkpoint7/production-build-16.log`及exit.txt；APK ID/API29/版本/持久签名通过，签名与+15一致；原生音频基线、SQLite三ABI原始/strip/包内链及Windows库、8份许可通过。证据`checkpoint7/apk-verify-16.log`、`package-audit-16.json`、`checkpoint7/package-audit-16.log`及exit.txt。
-- 最终CRC/SHA256/元数据交叉验证退出0：`checkpoint7/release-validation.log`及exit.txt。两个包、大小、SHA256和全部入口集中在`artifacts/R5/checkpoint7-release-manifest.json`；Windows展开到`artifacts/R5/windows16/app/tag_music.exe`，未启动。最新build/app APK为正式+16。
+- 最终CRC/SHA256/元数据交叉验证退出0：`checkpoint7/release-validation.log`及exit.txt。两个包、大小、SHA256和全部入口集中在`artifacts/R5/checkpoint7-release-manifest.json`；Windows展开到`artifacts/R5/windows16/app/tag_music.exe`，构建单元未启动。最新build/app APK为正式+16。
 - 额外Windows身份核验失败1次：命令错误预期FileVersion字符串为0.6.0.16；Runner.rc和旧+15证明应为0.6.0+16。未改产品或重建包，修正断言后字符串与数值0/6/0/16均通过；`checkpoint7/windows-identity-attempt1.txt`及`package-identity-16.json`保留原因和结果，不算产品失败。
-- 未安装、启动、录音或操作电脑/手机；隔离性能3未重建/重跑。Windows补测八项草案在`artifacts/R5/checkpoint7/windows-A-supplement-draft.md`：版本/诊断、普通/智能细项、FIFO/快照、重复条目随机/重排、非零进度编辑、删当前/保存、持久化及清理。实际操作前须确认新批范围及方式，手机和B批仍未授权。
+- 候选准备单元未安装、启动、录音或操作电脑/手机；隔离性能3未重建/重跑。Windows补测八项草案在`artifacts/R5/checkpoint7/windows-A-supplement-draft.md`：版本/诊断、普通/智能细项、FIFO/快照、重复条目随机/重排、非零进度编辑、删当前/保存、持久化及清理。该草案随后合入上方已结束的Windows集中批次；手机仍未授权。
 
 ## A批：性能、升级及歌单/队列核心行为
 
