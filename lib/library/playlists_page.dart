@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/reorder_handle.dart';
 import '../playback/playback_controller.dart';
 import '../playback/queue_actions.dart';
 import 'database.dart';
@@ -154,13 +155,7 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                       compact: true,
                     ),
                     if (reordering)
-                      ReorderableDragStartListener(
-                        index: i,
-                        child: Tooltip(
-                          message: '拖动${track.title}排序',
-                          child: const Icon(Icons.drag_handle),
-                        ),
-                      ),
+                      ReorderHandle(index: i, label: '拖动${track.title}排序'),
                   ],
                 ),
           onTap: busy
@@ -179,7 +174,7 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
         );
       }
 
-      return LayoutBuilder(
+      final detail = LayoutBuilder(
         builder: (context, constraints) => Column(
           children: [
             ConstrainedBox(
@@ -195,14 +190,7 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                         children: [
                           IconButton(
                             tooltip: '返回歌单',
-                            onPressed: busy
-                                ? null
-                                : () => setState(() {
-                                    openedId = null;
-                                    query = '';
-                                    selected.clear();
-                                    selecting = false;
-                                  }),
+                            onPressed: busy ? null : _closePlaylist,
                             icon: const Icon(Icons.arrow_back),
                           ),
                           Expanded(
@@ -381,12 +369,29 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
           ],
         ),
       );
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop && !busy) _closePlaylist();
+        },
+        child: detail,
+      );
     },
   );
 
   void _toggle(String id) => setState(() {
     if (!selected.add(id)) selected.remove(id);
   });
+
+  void _closePlaylist() {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      openedId = null;
+      query = '';
+      selected.clear();
+      selecting = false;
+    });
+  }
 
   Widget _overview(LibraryController library) {
     final lists = library.playlists;

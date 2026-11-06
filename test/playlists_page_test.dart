@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tag_music/library/database.dart';
 import 'package:tag_music/library/filter_page.dart';
+import 'package:tag_music/library/filter_rule.dart';
 import 'package:tag_music/library/library_controller.dart';
 import 'package:tag_music/library/library_page.dart';
 import 'package:tag_music/library/playlists_page.dart';
@@ -60,6 +61,59 @@ void main() {
   }
 
   Widget page() => PlaylistsPage(library: library, playback: playback);
+
+  for (final offset in [Offset.zero, const Offset(20, 0)]) {
+    testWidgets(
+      'holding the playlist handle at $offset before dragging changes stored order',
+      (tester) async {
+        final id = await library.createPlaylist('Held drag', [
+          ids['A']!,
+          ids['B']!,
+        ]);
+        await mount(tester, page());
+        await tester.tap(find.byKey(ValueKey('playlist-$id')));
+        await tester.pumpAndSettle();
+        final start =
+            tester.getCenter(find.byType(ReorderableDragStartListener).first) +
+            offset;
+        final gesture = await tester.startGesture(start);
+        await tester.pump(const Duration(milliseconds: 800));
+        await gesture.moveBy(const Offset(0, 20));
+        await tester.pump();
+        await gesture.moveTo(start + const Offset(0, 160));
+        await tester.pumpAndSettle();
+        await gesture.up();
+        await tester.pumpAndSettle();
+        expect(library.playlistSongIds[id], [ids['B'], ids['A']]);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+  }
+
+  for (final smart in [false, true]) {
+    testWidgets(
+      'system back returns ${smart ? 'smart' : 'ordinary'} detail to overview',
+      (tester) async {
+        final id = smart
+            ? await library.createSmartPlaylist('Back', FilterPreferences())
+            : await library.createPlaylist('Back', [ids['A']!]);
+        await mount(tester, page());
+        await tester.tap(find.byKey(ValueKey('playlist-$id')));
+        await tester.pumpAndSettle();
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('create-playlist')), findsOneWidget);
+        expect(find.byKey(ValueKey('playlist-$id')), findsOneWidget);
+        await tester.tap(find.byKey(ValueKey('playlist-$id')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(ValueKey('playlist-search-$id')), findsOneWidget);
+        await tester.tap(find.byTooltip('返回歌单'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('create-playlist')), findsOneWidget);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+  }
 
   testWidgets(
     'empty create, searchable batch picker, drag order and selection removal',

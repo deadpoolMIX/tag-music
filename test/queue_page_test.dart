@@ -141,6 +141,7 @@ void main() {
           find.byType(ReorderableDragStartListener).first,
         );
         final gesture = await tester.startGesture(start);
+        await tester.pump(const Duration(milliseconds: 800));
         await gesture.moveBy(const Offset(0, 20));
         await tester.pump(const Duration(milliseconds: 200));
         await gesture.moveTo(Offset(start.dx, start.dy + 160));

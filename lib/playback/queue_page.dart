@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/reorder_handle.dart';
 import '../library/library_controller.dart';
 import '../library/playlist_actions.dart';
 import 'playback_controller.dart';
@@ -233,16 +234,10 @@ class _QueuePageState extends State<QueuePage> {
                                     ),
                               icon: const Icon(Icons.remove_circle_outline),
                             ),
-                            ReorderableDragStartListener(
+                            ReorderHandle(
                               index: i,
                               enabled: !busy,
-                              child: const Tooltip(
-                                message: '拖动队列条目排序',
-                                child: Padding(
-                                  padding: EdgeInsets.all(12),
-                                  child: Icon(Icons.drag_handle),
-                                ),
-                              ),
+                              label: '拖动队列条目排序',
                             ),
                           ],
                         ),
