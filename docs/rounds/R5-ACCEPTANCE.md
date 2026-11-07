@@ -1,6 +1,6 @@
 # R5 候选实际验收
 
-当前产品：自动验证通过。正式0.6.0+17/746af32已安装，手机两项修复人工复验通过；既有+17集中批次的部分断言保留，R5仍未全部手机验收。2026-11-07用户明确续行授权后，专用手机Agent在V2309A / 10ADCL04J2002RM上完成部分系统媒体控制、歌单清理和冷启动观察，随后因执行程序失误及设备文件影响未决由主协调停止。不得将未测项记为产品失败，也不得声称完成全部手机验收、听感或清理。既有离线证据审阅有限结论不变。当前续行结果、证据索引、隐私提示及未决文件风险见[本批结果记录](../../artifacts/R5/android17/resume-20261107-190322/result.md)；下一步先评估未知文件影响，不继续操作或清理设备。Windows+16旧候选证据缺口不重开、不作为+17通过。R5当前保留/忽略项见下方[收口取舍](#r5-收口取舍)；完整R5仍未验收。当前状态见[HANDOFF](../HANDOFF.md)。
+当前产品：自动验证通过。正式0.6.0+17/746af32已安装，手机两项修复人工复验通过；+17续行已完成部分媒体控制、测试歌单清理、坏样本有限观察和冷启动状态检查，但未完成R5手机验收。坏样本播放状态、按类型及SHA精确删除、扫描后失联行保留等有限结果见[坏样本子批结果记录](../../artifacts/R5/android17/bad-resume-20261107-193510/result.md)。旧续行的通用设备路径 `/sdcard/window.xml` 写入前未检查/备份，影响仍未知；未再检查、清理或恢复。用户要求暂停R5后续测试，未经用户续行指令不恢复。不要将有限状态观察外推为持续播放、听感或完整清理通过；R5未验收，不进入R6。Windows+16旧候选证据缺口不重开、不作为+17通过。R5当前保留/忽略项见下方[收口取舍](#r5-收口取舍)；当前状态见[HANDOFF](../HANDOFF.md)。
 
 ## R5 收口取舍
 
@@ -29,7 +29,7 @@
 |---|---|---|
 | 1. 后台通知与媒体会话控制 | 部分通过 | 媒体会话/标题仅有限核对；播放、暂停、继续、下一首至 R51702-M4A、上一首回 R51701-FLAC 通过。两次位置观测采用相同250ms基准，只能支持当时状态为 `PLAYING`，不能证明持续推进或听感。证据见本批报告索引中的 `continued-*-media.txt`。 |
 | 2. 锁屏跳过 | 未测 | `keyguard-policy.txt` 显示 `secure=true, mTrusted=false`；未输入密码，未继续锁屏操作。 |
-| 3. 坏样本跳过及恢复 | 未测 | 本批未建立坏样本；无法证明单文件SAF导入及隔离清理安全，因此未实施该项。 |
+| 3. 坏样本跳过及恢复 | 首次续行未测；后续子批见下节 | 本批首次续行未建立坏样本。用户解锁后完成的坏样本子批有限结果见下节，不据此外推持续播放、听感或完整清理。 |
 | 4. FD / 竞态 | 本批未测；保留既有有限结论 | 不做新的精确FD或竞态测试。旧审阅仅支持最后OPUS停止后单时点 `managedDescriptors=0`，且日志有OpenSLES告警；详见前述离线审阅。 |
 | 5. 删除本批测试歌单 | 通过 | 本批测试歌单 `517001`、`517002`、`517003` 已删除；操作证据见 `continued-*.png` 及 `local-evidence-inventory.json`。 |
 | 6. 测试对象及现场清理 | 未完成 | 测试歌曲记录、文件、SAF授权和两份本批UI XML仍残留。原有人工对象 `1`、`b`、`R5-16-PHONE-Ord2` 及标签 `b` 保留，未清理。未确认其他数据变化。 |
@@ -38,6 +38,22 @@
 **设备文件风险与停止边界：** 在首次UI树导出时执行了 `uiautomator dump /sdcard/window.xml`，写入前未检查该路径是否存在或备份原文件，之后又读取该文件保存为本地 `baseline.xml`。无法判断远端原内容是否被覆盖；该路径未再次检查、清理或恢复。此为执行程序失误和未决文件影响，不是产品缺陷。项目规则要求避免写入通用设备路径，后续不得删除、恢复或继续检查该远端文件；本轮已停止设备操作。主机全局ADB server仍运行；本批未启动新的日志采集器。测试歌曲/文件/SAF及两份UI XML的残留状态见上表，未清理。
 
 **证据索引与隐私：** 完整操作摘要和时间边界见 `artifacts/R5/android17/resume-20261107-190322/local-operation-record.md`；哈希清单见 `local-evidence-inventory.json`。状态证据包括 `devices.txt`、`package.txt`、`activity.txt`、`pid.txt`、`start.txt`、`baseline.xml/png`、`dump-status.txt`、`directories.xml`、`search.xml`、`test-directory-list.txt`、`keyguard-policy.txt`、`continued-background-media.txt`、`continued-playing-media.txt`、`continued-notification-paused.txt`、`continued-notification-resume.txt`、`continued-notification-next.txt`、`continued-notification-previous.txt`、`final-cold-start.txt`、`cold-pid.txt`、`final-pid.txt`、`final-media.txt` 及 `continued-01.png` 至 `continued-38.png`。部分本地截图含其他应用通知信息，仅作本地证据；不要在文档或对话中展示截图原图，也不要上传或外传。操作记录未保存逐命令exit/stderr；不得补称缺失状态。没有听感结果；R5其余保留项仍未完成，不能据此收口或进入R6。
+
+### 2026-11-07 坏样本子批（用户解锁后完成）
+
+首轮检查时手机处于安全锁屏状态；Agent未尝试解锁或输入密码。用户手动解锁后，专用Agent通过主机PowerShell ADB继续已授权坏样本子批。MCP只读状态仍报告 `state=user, gen7`，用户否认主动控制；该状态不能证明原因，不是本批阻塞或失败。Agent实际运行模型/强度无法验证。结论均限于已观察状态，不代判听感或声称完整R5验收。
+
+| # | 操作/断言 | 结果 | 证据与边界 |
+|---|---|---|---|
+| 1 | 坏项排到有效FLAC后自动跳过 | 有限通过 | 顺序模式下坏项为当前、R51701-FLAC为下一项；一次播放操作后观察到FLAC `PLAYING`。证据：`resume2-queue.png`、`resume2-sequential.png`、`resume2-skip.png`、`resume2-skip-media.txt`。仅限当次状态，不代表实际听感。 |
+| 2 | 坏项独占时的错误状态 | 有限观察 | 两次相隔约6秒的采样均见 `ERROR`、`0:00` 与相同 `updated` 时间。证据：`resume2-single-stop1.png`、`resume2-single-stop2.png`、`resume2-single-stop1.txt`、`resume2-single-stop2.txt`。只说明该观察窗口内状态相同，不能推出之后不再重试；不据此单独判定产品缺陷。 |
+| 3 | 选择有效FLAC恢复 | 状态恢复通过 | 选择FLAC后观察到 `PLAYING`、位置 `0:02`；未取得听感。证据：`resume2-recovered.png`、`resume2-recovered-media.txt`。 |
+| 4 | 精确删除坏文件并刷新目录 | 通过，数据边界有限 | 删除前确认普通非符号链接文件且SHA为 `f069643ffd61d6ca75234b16354d059b69b92d94f939ab31141bdd3e930a87e8`；精确删除命令退出0，之后 `test -e` 退出1。第四SAF根刷新后六个旧文件仍发现，坏行显示“文件失联”且记录保留；未写应用私有数据库。证据：`resume2-predelete.txt`、`resume2-delete.txt`、`resume2-deleted-check.txt`、`resume2-missing-search.png`。 |
+| 5 | 偏好恢复及最终冷启动/关闭 | 状态检查通过，听感未测 | 空搜索、标题升序、显示失联、随机模式及空队列恢复；冷启动显示1381/1381。冷启动PID为 `2547`（`resume2-final-cold-pid.txt`）；随后从最近任务移除App，最终PID文件为空，报告的 `pidof` 退出1。证据：`resume2-final-main.png`、`resume2-before-cold-pid.txt`、`resume2-final-cold.png`、`resume2-final-pid.txt`。不据此声称听感或音频路径静音。 |
+| 6 | 锁屏控制 | 未测 | 锁屏状态为 `secure=true, mTrusted=false`；未输入密码。设备之后由用户手动解锁，才继续测试。证据：首段 `keyguard.txt`、`power.txt`，续行 `unlocked-devices.txt`、`resume2-policy.txt`。 |
+| 7 | 子批清理及遗留对象 | 部分清理 | 唯一坏文件按类型与SHA精确删除；坏样本失联数据库行仍保留。既有三张测试歌单 `517001/517002/517003` 已删。此前六份测试音频及记录、测试SAF授权、两份旧UI XML仍在；人工对象 `1`、`b`、`R5-16-PHONE-Ord2` 与标签 `b` 保留。证据：`root-list.txt`、`old-audio-sha256.txt`、`resume2-final-main.png`、`resume2-missing-search.png`。 |
+
+本批未验证多项全失败时的自动停止，也未验证自动恢复；单坏文件状态观察及用户选择FLAC后的恢复不代表这些断言通过。坏样本子批详述及原文件索引见[本地结果记录](../../artifacts/R5/android17/bad-resume-20261107-193510/result.md)；该本地报告不纳入Git。之前 `resume-20261107-190322/continued-*` 截图中含其他应用通知信息，仅作本地证据，不展示或上传。此前误写入通用设备路径的 `/sdcard/window.xml` 是否覆盖仍无法判断；不查、不清、不恢复。主机ADB server仍运行；本批未启动日志采集器。用户要求暂停R5后续测试，未经用户续行指令不恢复。
 
 ### 2026-11-07 离线证据集中审阅
 
