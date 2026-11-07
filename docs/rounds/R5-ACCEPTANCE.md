@@ -1,6 +1,6 @@
 # R5 候选实际验收
 
-当前产品：自动验证通过。正式0.6.0+17/746af32已安装，手机两项修复人工复验通过；本次Codex集中批次在六格式完成后按用户要求暂停、Goal paused，尚未全部手机验收或清理。Windows+16的旧候选证据缺口不重开、不作为+17通过，也不再阻塞本轮获批范围。R5当前保留/忽略项见下方[收口取舍](#r5-收口取舍)；完整R5仍未验收。当前现场见[HANDOFF](../HANDOFF.md)。
+当前产品：自动验证通过。正式0.6.0+17/746af32已安装，手机两项修复人工复验通过；本次Codex集中批次在六格式完成后按用户要求暂停，尚未全部手机验收或清理。2026-11-07完成既有暂停批次的独立离线证据集中审阅：23项记录通过在限定边界内保留；诊断复制正文仍未证实；最小日志审阅只支持最后OPUS停止后managedDescriptors=0，日志还包含OpenSLES Configuration error。后台/通知/锁屏、单个新样本坏文件跳过/全失败停止/恢复、测试对象清理及原配置恢复、最终冷启正常关闭仍未做，听感未取得。此离线审阅不等于剩余手机保留项通过。本轮续行明确排除手机测试和设备/应用操作；原Goal记为paused，本侧工具状态null且未绑定、未恢复。Windows+16旧候选证据缺口不重开、不作为+17通过，也不再阻塞本轮获批范围。R5当前保留/忽略项见下方[收口取舍](#r5-收口取舍)；完整R5仍未验收。当前现场见[HANDOFF](../HANDOFF.md)。
 
 ## R5 收口取舍
 
@@ -13,9 +13,17 @@
 
 ## 手机 +17 Codex 集中批次暂停
 
+### 2026-11-07 离线证据集中审阅
+
+本轮审阅仅依赖已落盘的 `artifacts/R5/android17/final-20261106-215040/` 证据，可离线完成；未操作设备/应用，未运行测试、构建或质量检查。`assertions.jsonl`与`result.md`断言路径可解析，23项既有通过在各自限定断言范围内保留，诊断复制仍为未证实。审阅不改变暂停现场，也不将剩余手机保留项记为通过。
+
+对 `target-app-logcat.txt` 的最小FD/异常审阅只确认：最后OPUS停止状态及其后 `descriptorClosed` 事件显示 `managedDescriptors=0`（第5407–5408行）。这只支持该时点的应用管理描述符计数为0；不能推出全程无FD异常、无泄漏或连续切换/竞态通过。日志第888–889行包含 `libOpenSLES: Configuration error: unknown key` 与对应参数无效告警，故不作“无异常”结论。暂停现场文件仍记有快速切换/FD audit待办，原始暂停记录未改；本次只完成已批准范围内的最小日志审阅。
+
+保存队列去重的原始断言证据为 `cold-start-pids.json`、`ui/212-cold-empty-default.xml`、`ui/214-saved-queue-deduplicated-order.xml`、`ui/219-smart1-persist-desc.xml`、`ui/222-smart2-persisted-all.xml`；暂停编辑及播放编辑的媒体状态原始文件分别为 `156-paused-seek-media.txt`、`158-paused-mode-keeps-progress-media.txt`、`163-paused-edit-progress-media.txt`，以及 `191-playing-reorder-new-baseline-media.txt`、`192-reordered-while-playing-media.txt`、`194-reorder-actual-paused-progress-media.txt`、`195-noncurrent-removed-while-playing-media.txt`、`197-last-current-delete-plays-predecessor-media.txt`、`201-middle-current-delete-plays-successor-media.txt`、`203-stop-keeps-two-media.txt`、`205-replay-after-stop-media.txt`。完整断言映射仍以原始 `assertions.jsonl` 和 `result.md` 为准。
+
 2026-11-06用户明确要求改由Codex一次测完，并通过交互确认V2309A、正式+17/746af32、剩余功能/六格式/系统控制/独立故障/资源与清理范围；未重装或重跑隔离性能3。用户随后反馈原文件夹已允许3次：助手未先核对保存授权，把用户允许后返回误判为窗口异常而重复打开，已承认并纠正。核对原3目录后，才明确选中新R5-17-PHONE-FINAL授权并导入6个独立CC0样本，1374→1380首。不能把前面的被干预时序当应用缺陷。
 
-唯一详细结果与证据入口：`artifacts/R5/android17/final-20261106-215040/result.md`、`evidence-index.md`、`assertions.jsonl`；唯一暂停现场/残留/待办：`paused-progress.json`。记录23项脚本断言通过、1项诊断正文未证实，最终集中证据复核尚未完成。通过记录涵盖智能编辑/独立排序/跨类重名，FIFO优先Q/R/P再回原Q/R，三种自然结束、随机重复条目完整轮/跨轮/历史/重排，播放及暂停编辑/删当前后项前项删空、停止再播、真实进程重启/保存队列首次去重/来源修改及删除快照，FLAC/M4A/MP3/WAV/OGG-Vorbis/Opus六格式原生播放/拖进度/停止再播。状态和进度不代替实际听感，不声称取得私有库UUID逐行证据。
+唯一详细结果与断言证据入口：`artifacts/R5/android17/final-20261106-215040/result.md`、`assertions.jsonl`；唯一暂停现场/残留/待办：`paused-progress.json`。记录23项脚本断言通过、1项诊断正文未证实，2026-11-07离线集中审阅已完成。通过记录涵盖智能编辑/独立排序/跨类重名，FIFO优先Q/R/P再回原Q/R，三种自然结束、随机重复条目完整轮/跨轮/历史/重排，播放及暂停编辑/删当前后项前项删空、停止再播、真实进程重启/保存队列首次去重/来源修改及删除快照，FLAC/M4A/MP3/WAV/OGG-Vorbis/Opus六格式原生播放/拖进度/停止再播。状态和进度不代替实际听感，不声称取得私有库UUID逐行证据。日志的最小审阅只支持最后OPUS停止后`managedDescriptors=0`（`target-app-logcat.txt:5407-5408`）；另见OpenSLES Configuration error（`:888-889`），不能声称无异常/泄漏或竞态通过。后台/通知/锁屏、一个新样本故障与恢复、现场清理/配置恢复/最终冷启关闭仍未做。
 
 诊断复制有按钮成功反馈，但两个键盘粘贴注入未生效；改用界面粘贴菜单后得到非诊断内容，已取消未保存对话框并停止此分支，实际正文未证实。无关剪贴板正文只留原始失败证据，不作为诊断引用。工具异常及变更方案保留在result.md和对应failure原文，未确认新的产品缺陷；旧两项修复的用户通过反馈保持。
 
