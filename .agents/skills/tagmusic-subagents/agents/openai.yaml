@@ -3,4 +3,4 @@ interface:
   short_description: "仅用于 Tag Music 项目的独立开发、验收与设备批次协调"
   default_prompt: "使用 $tagmusic-subagents 协调本项目已授权工作，按风险分工并保留可复核证据。"
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true
