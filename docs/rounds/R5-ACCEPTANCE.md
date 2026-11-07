@@ -1,6 +1,6 @@
 # R5 候选实际验收
 
-当前产品：自动验证通过。正式0.6.0+17/746af32已安装，手机两项修复人工复验通过；既有Codex集中批次在六格式完成后暂停，尚未全部手机验收或清理。2026-11-07完成既有暂停批次的独立离线证据集中审阅：23项记录通过在限定边界内保留；诊断复制正文仍未证实；最小日志审阅只支持最后OPUS停止后managedDescriptors=0，日志还包含OpenSLES Configuration error。后台/通知/锁屏、单个新样本坏文件跳过/全失败停止/恢复、测试对象清理及原配置恢复、最终冷启正常关闭仍未做，听感未取得。2026-11-07续行已获明确授权，但前置只读核查发现现场运行态变化；主机侧 `adb devices` 成功读取设备列表，并自动启动了ADB server。随后指定Windows MCP PowerShell的建目录/ADB调用被USER_CONTROL门控，未返回命令结果。未关闭ADB server，未做手机输入或控制，也未开始手机测试。待控制权释放后先按交接重新只读核查，不自动开始测试。此次是工具门控，不是产品失败。Windows+16旧候选证据缺口不重开、不作为+17通过。R5当前保留/忽略项见下方[收口取舍](#r5-收口取舍)；完整R5仍未验收。当前现场见[HANDOFF](../HANDOFF.md)。
+当前产品：自动验证通过。正式0.6.0+17/746af32已安装，手机两项修复人工复验通过；既有+17集中批次的部分断言保留，R5仍未全部手机验收。2026-11-07用户明确续行授权后，专用手机Agent在V2309A / 10ADCL04J2002RM上完成部分系统媒体控制、歌单清理和冷启动观察，随后因执行程序失误及设备文件影响未决由主协调停止。不得将未测项记为产品失败，也不得声称完成全部手机验收、听感或清理。既有离线证据审阅有限结论不变。当前续行结果、证据索引、隐私提示及未决文件风险见[本批结果记录](../../artifacts/R5/android17/resume-20261107-190322/result.md)；下一步先评估未知文件影响，不继续操作或清理设备。Windows+16旧候选证据缺口不重开、不作为+17通过。R5当前保留/忽略项见下方[收口取舍](#r5-收口取舍)；完整R5仍未验收。当前状态见[HANDOFF](../HANDOFF.md)。
 
 ## R5 收口取舍
 
@@ -13,13 +13,31 @@
 
 ## 手机 +17 Codex 集中批次暂停
 
-### 2026-11-07 续行前置检查 / USER_CONTROL 阻塞
+### 2026-11-07 续行前置检查与早期控制门控
 
 用户已明确要求Codex继续+17手机测试，本轮无需再次确认测试授权。续行前只读检查的候选为正式包 `0.6.0+17`，目标设备为唯一设备 `V2309A / 10ADCL04J2002RM`。记录的前置状态与暂停时不同：预期应用前台，但检查时前台为vivo Launcher，`app.tagmusic.player` PID为空，且无目标media session。
 
-前置只读证据位于 `artifacts/R5/android17/resume-20261107-185348/`：`devices.txt`、`activity.txt`、`media.txt`、`package.txt`、`pid.txt`。主机侧 `adb devices` 已成功读取设备列表；因主机ADB server当时未运行，该命令自动启动了ADB server。之后尝试通过指定Windows MCP PowerShell创建唯一证据目录并运行ADB命令时，工具返回 `USER_CONTROL`，该次调用没有命令执行结果。未关闭全局ADB server；未向手机输入或发送控制命令。依工具控制边界停止，未改用其他通道。
+前置只读证据位于 `artifacts/R5/android17/resume-20261107-185348/`：`devices.txt`、`activity.txt`、`media.txt`、`package.txt`、`pid.txt`。主机侧 `adb devices` 已成功读取设备列表；因主机ADB server当时未运行，该命令自动启动了ADB server。随后一次指定Windows MCP PowerShell调用返回 `USER_CONTROL`，没有命令执行结果；当时未关闭全局ADB server。用户之后澄清该控制状态并非用户主动控制，专用手机Agent改用本地PowerShell ADB继续已授权工作。该MCP状态仅作过程旁注，不代表测试失败或当前阻塞。前置现场和早期门控不代表手机测试结果。
 
-本次未启动应用、未向手机输入、未安装或升级应用，也未改变数据或新增清理；没有手机测试结果、产品失败或新增清理事项。后台/通知/锁屏、单个新样本故障与恢复、测试对象清理、配置恢复、最终冷启及正常关闭仍未测。待用户释放Windows MCP控制后，下一步先重新只读核查设备和运行态；这一步不自动开始测试，后续设备操作须按当时交互授权边界执行。该阻塞属于工具控制门控，不是产品失败。
+本节仅记录续行初期前置状态；后续实际操作、断言和停止原因见下节[2026-11-07续行手机部分结果](#2026-11-07-续行手机部分结果与停止)。
+
+### 2026-11-07 续行手机部分结果与停止
+
+用户明确授权继续正式 `0.6.0+17` 手机测试。目标设备为 `V2309A / 10ADCL04J2002RM`，设备报告版本 `0.6.0+17`。专用Agent使用本地PowerShell ADB执行；任务配置请求为 `simple / gpt-6-luna / high`，实际运行配置和模型无法验证。MCP ControlStatus曾显示 `state=user, gen7, ~9.78s`，用户说明并非其主动控制；这仅作旁注，不是失败或当前阻塞。当前停止原因是执行程序失误及未知文件影响待评估。
+
+| 项目 | 结论 | 证据与边界 |
+|---|---|---|
+| 1. 后台通知与媒体会话控制 | 部分通过 | 媒体会话/标题仅有限核对；播放、暂停、继续、下一首至 R51702-M4A、上一首回 R51701-FLAC 通过。两次位置观测采用相同250ms基准，只能支持当时状态为 `PLAYING`，不能证明持续推进或听感。证据见本批报告索引中的 `continued-*-media.txt`。 |
+| 2. 锁屏跳过 | 未测 | `keyguard-policy.txt` 显示 `secure=true, mTrusted=false`；未输入密码，未继续锁屏操作。 |
+| 3. 坏样本跳过及恢复 | 未测 | 本批未建立坏样本；无法证明单文件SAF导入及隔离清理安全，因此未实施该项。 |
+| 4. FD / 竞态 | 本批未测；保留既有有限结论 | 不做新的精确FD或竞态测试。旧审阅仅支持最后OPUS停止后单时点 `managedDescriptors=0`，且日志有OpenSLES告警；详见前述离线审阅。 |
+| 5. 删除本批测试歌单 | 通过 | 本批测试歌单 `517001`、`517002`、`517003` 已删除；操作证据见 `continued-*.png` 及 `local-evidence-inventory.json`。 |
+| 6. 测试对象及现场清理 | 未完成 | 测试歌曲记录、文件、SAF授权和两份本批UI XML仍残留。原有人工对象 `1`、`b`、`R5-16-PHONE-Ord2` 及标签 `b` 保留，未清理。未确认其他数据变化。 |
+| 7. 偏好恢复、冷启动与退出观察 | 部分通过 | 已恢复空搜索、标题升序、显示失联、空队列/随机；冷启动PID由17022变为20180，列表显示1380/1380。随后从最近任务移除应用；最终PID文件为空，报告称 `pidof` 退出码1。Agent未保存逐命令退出码，不补记其他退出码；这不证明听感静音或正常音频退出。 |
+
+**设备文件风险与停止边界：** 在首次UI树导出时执行了 `uiautomator dump /sdcard/window.xml`，写入前未检查该路径是否存在或备份原文件，之后又读取该文件保存为本地 `baseline.xml`。无法判断远端原内容是否被覆盖；该路径未再次检查、清理或恢复。此为执行程序失误和未决文件影响，不是产品缺陷。项目规则要求避免写入通用设备路径，后续不得删除、恢复或继续检查该远端文件；本轮已停止设备操作。主机全局ADB server仍运行；本批未启动新的日志采集器。测试歌曲/文件/SAF及两份UI XML的残留状态见上表，未清理。
+
+**证据索引与隐私：** 完整操作摘要和时间边界见 `artifacts/R5/android17/resume-20261107-190322/local-operation-record.md`；哈希清单见 `local-evidence-inventory.json`。状态证据包括 `devices.txt`、`package.txt`、`activity.txt`、`pid.txt`、`start.txt`、`baseline.xml/png`、`dump-status.txt`、`directories.xml`、`search.xml`、`test-directory-list.txt`、`keyguard-policy.txt`、`continued-background-media.txt`、`continued-playing-media.txt`、`continued-notification-paused.txt`、`continued-notification-resume.txt`、`continued-notification-next.txt`、`continued-notification-previous.txt`、`final-cold-start.txt`、`cold-pid.txt`、`final-pid.txt`、`final-media.txt` 及 `continued-01.png` 至 `continued-38.png`。部分本地截图含其他应用通知信息，仅作本地证据；不要在文档或对话中展示截图原图，也不要上传或外传。操作记录未保存逐命令exit/stderr；不得补称缺失状态。没有听感结果；R5其余保留项仍未完成，不能据此收口或进入R6。
 
 ### 2026-11-07 离线证据集中审阅
 
