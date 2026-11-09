@@ -1,6 +1,6 @@
 # R5 候选实际验收
 
-当前产品：自动验证通过。候选 `0.6.0+17/746af32`，R5手机验收未完成，不进入R6。用户已授权继续R5；Goal工具仍报告paused且无resume入口，不声称工具active。最新手机批次已结束，播放/媒体状态、进度、上下首及左侧通知栏暂停/继续在限定边界内通过；锁屏暂停未证实、坏样本全失败/恢复及听感未测；本批三份物理素材已精确删除，但新增三条数据库记录仍保留，冷启21/21未恢复测试前18/18。详见[本批结果及证据](#2026-11-09-新批次素材播放通知及清理)，当前状态和下一步见[HANDOFF](../HANDOFF.md)。四个旧根的底层授权/数据库清理推迟到R5完成后单独评估。旧Windows+16证据缺口不重开、不作+17通过；旧通用设备路径 `/sdcard/window.xml` 不得检查、读取、写入、删除或恢复。后续设备操作仍需按批次授权，不能以Goal续行代替。
+当前产品：自动验证通过。候选 `0.6.0+17`；revision `746af32`沿用既有交接记录，本批未独立读取包内revision。R5手机验收未完成，不进入R6。用户已授权继续R5；Goal工具仍报告paused且无resume入口，不声称工具active。最新坏样本批次的有效WAV播放、坏1跳到WAV、两坏项在有限观察窗口内停止及重新选择WAV恢复均有状态证据；窗口内未见重试不证明更长时间行为。听感未评估。三份物理素材已精确删除，但新增三条数据库记录仍保留；冷启曲库总记录24，本批前21，未逐首核对原曲库。详见[最新批次结果及证据](#2026-11-09-坏样本跳过全失败停止恢复与清理)，当前状态和下一步见[HANDOFF](../HANDOFF.md)。四个旧根的底层授权/数据库清理推迟到R5完成后单独评估。旧Windows+16证据缺口不重开、不作+17通过；旧通用设备路径 `/sdcard/window.xml` 不得检查、读取、写入、删除或恢复。后续设备操作仍需按批次授权，不能以Goal续行代替。
 
 ## R5 收口取舍
 
@@ -156,6 +156,26 @@ App加入第5个测试根 `content://com.android.externalstorage.documents/tree/
 | 扫描、冷启与恢复 | 部分通过；数据未完全恢复 | `cleanup-scan-missing.png`显示扫描发现18首/元数据18首/失败目录0；`coldstart-missing-queue.png`、`coldstart-count.png`和`cleanup-queue-zero.png`记录冷启队列0、随机、空搜索及21/21；`coldstart-media.txt`为NONE，`coldstart-window.txt`为App前台且解锁。测试前18/18，删除素材后冷启仍21/21；新增三条记录保留为文件失联，R51701/R51703明确显示失联、坏样本行仍存在；未逐首核验原曲库，不称完整清理或恢复。 |
 
 本批已结束，无设备操作继续执行。新增待办为确认三条失联数据库记录的后续处置，须独立核对一致性及授权，不直接删DB行或清App数据。仍保留坏样本全失败/恢复及听感缺口；锁屏暂停本次未证实并不再重测。历史坏样本搜索回桌面本轮累计1次、同类历史至少2次；本批最初一般搜索另观察1次回桌面，原因未定，不将其归并为已确定同因。右侧控制中心误读1次已更正；本次锁屏复测仍未证实，与此前未证实历史并存，不清零或冒称修复。四个旧根和两份旧XML的历史处置边界未变，通用 `/sdcard/window.xml` 仍禁碰。
+
+### 2026-11-09 坏样本跳过、全失败停止、恢复与清理
+
+候选 `0.6.0+17`；revision `746af32`只沿用既有HANDOFF，本批未独立检查包内revision。设备为Vivo V2309A。手机操作由按Terra/high请求派发的phone_visual Agent完成，Agent已停止设备写入；实际运行模型和强度未独立验证。用户授权范围为两坏样本加一段短WAV、坏项跳过、两坏项全部失败后停止、失败后恢复、精确清理和冷启动。证据目录为[`r5-final-bad-20261109`](../../artifacts/R5/android17/r5-final-bad-20261109/)。
+
+测试素材目录 `/sdcard/Download/tagmusic/r5-final-bad-20261109/`，文件为 `R5FIN01-BAD.mp3`、`R5FIN02-BAD.mp3`、`R5FIN03-VALID.wav`。本批仅复核此前交接的根SAF树URI `content://com.android.externalstorage.documents/tree/primary%3ADownload%2Ftagmusic`；本批单文件`content://` URI和持久授权位没有直接观察，不能写成已验证。
+
+| 断言 | 结论 | 原始证据及边界 |
+|---|---|---|
+| 素材哈希 | 通过 | `host-sha256.txt`与`device-sha256.txt`中的三项SHA256互相一致。 |
+| 有效WAV播放 | 媒体状态为PLAYING | `wav-play.txt`显示PLAYING，metadata名为`R5FIN03-VALID.wav`；不代表听感已评估。 |
+| 单坏项跳过 | 通过（状态观察） | `skip-queue-before.png`显示坏1为当前项且有效WAV待播；`skip-queue-after.png`显示WAV播放中，`skip-media.txt`为PLAYING。 |
+| 两坏项全失败停止 | 观察窗口内停止，未见重试 | `allbad-stopped.png`显示“Failed to recognize file format”、当前坏2且已暂停；`allbad-media.txt`记录两次相同ERROR、position 0及updated状态；`allbad-time.txt`记录观察点。受约3秒/8秒采样形成的观察窗口限制，只能写窗口内停止/未见重试，不能推断更长时间不会重试。 |
+| 失败后恢复 | 通过（状态观察） | `recovery-before.png`、`recovery-after.png`及`recovery-media.txt`显示重新选择有效WAV后PLAYING；不代表听感正常。 |
+| 物理素材清理 | 通过（仅本批三项） | `cleanup-precheck.txt`只列出上述三项，主机/设备哈希一致后精确删除；`cleanup-result.txt`为`BATCH_ABSENT`。未改数据库。 |
+| 冷启扫描和最终状态 | 部分通过，数据库/原曲库恢复未证实 | `cleanup-scan.png`显示扫描发现18首、失败目录0；曲库总记录24，本批前21，新增三条记录仍在。未直接删除DB记录，也未逐首核对原曲库完整性。`cold-ui.png`记录队列0、随机模式、空搜索；`cold-media.txt`为NONE，`cold-window.txt`记录App前台且不在锁屏。原有旧失联记录未清理。 |
+
+证据流程偏差：预检曾将截图短暂写入指定批次目录以外的`artifacts/R5/android17/temp-r5-final-preflight.png`；查看后已删除，`Test-Path`复核为False。该文件不作为测试证据，未复制或展示图像；此项是证据流程偏差，不是测试失败或产品缺陷。
+
+本批Codex手机操作已结束。未复测通知或锁屏；旧批通知结果维持其原有限边界，锁屏暂停未证实且不重测。待办为三条新增失联记录的后续处置、用户听感判断及R5最终验收；不直接删除DB行或清应用数据。四个旧根及旧XML继续延后评估。
 
 ## +17 手机反馈修复候选
 
