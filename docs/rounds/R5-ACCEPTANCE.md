@@ -1,6 +1,6 @@
 # R5 候选实际验收
 
-当前产品：自动验证通过。候选 `0.6.0+17`；revision `746af32`沿用既有交接记录，本批未独立读取包内revision。R5手机验收未完成，不进入R6。用户已续行R5，Goal工具目前为active；无手机操作进行中。最新坏样本批次的有效WAV播放、坏1跳到WAV、两坏项在有限观察窗口内停止及重新选择WAV恢复均有状态证据；窗口内未见重试不证明更长时间行为。听感未评估。三份物理素材已精确删除，但新增三条数据库记录仍保留；冷启曲库总记录24，本批前21，未逐首核对原曲库。详见[最新批次结果及证据](#2026-11-09-坏样本跳过全失败停止恢复与清理)，当前状态和下一步见[HANDOFF](../HANDOFF.md)。下一步取得用户实际听感反馈并完成最终R5验收，同时处置三条新增失联记录；不直接删DB或清应用数据。任何新手机批次须单独授权。四个旧根的底层授权/数据库清理推迟到R5完成后单独评估。旧Windows+16证据缺口不重开、不作+17通过；旧通用设备路径 `/sdcard/window.xml` 不得检查、读取、写入、删除或恢复。
+当前产品：双端通过。候选 `0.6.0+17`；revision `746af32`沿用既有交接记录，本批未独立读取包内revision。用户已选择保留三条新增失联数据库记录并完成R5，故R5在当前缩减范围内验收完成，不启动R6。最新坏样本有效WAV状态和用户实际听感均通过；全失败停止仅限有限观察窗口。三份物理素材已精确删除；新增三条数据库记录仍保留。曲库总记录24、本批前21，未逐首核对原曲库。清理尝试因正式包不可调试而被`run-as`门控停止；未备份、读取或写数据库，未使用其他通道。详见[清理尝试及证据](#2026-11-09-新增失联记录清理尝试)。通知/锁屏不重测；四个旧根、两份旧XML及旧Windows+16证据缺口仍按原范围处理；旧通用设备路径 `/sdcard/window.xml` 不得检查、读取、写入、删除或恢复。
 
 ## R5 收口取舍
 
@@ -166,7 +166,8 @@ App加入第5个测试根 `content://com.android.externalstorage.documents/tree/
 | 断言 | 结论 | 原始证据及边界 |
 |---|---|---|
 | 素材哈希 | 通过 | `host-sha256.txt`与`device-sha256.txt`中的三项SHA256互相一致。 |
-| 有效WAV播放 | 媒体状态为PLAYING | `wav-play.txt`显示PLAYING，metadata名为`R5FIN03-VALID.wav`；不代表听感已评估。 |
+| 有效WAV播放 | 媒体状态为PLAYING | `wav-play.txt`显示PLAYING，metadata名为`R5FIN03-VALID.wav`。 |
+| 有效WAV听感 | 通过（用户实际反馈） | 用户反馈最新有效WAV测试听感通过；这是用户的实际听感结论，不由媒体状态或日志推断。 |
 | 单坏项跳过 | 通过（状态观察） | `skip-queue-before.png`显示坏1为当前项且有效WAV待播；`skip-queue-after.png`显示WAV播放中，`skip-media.txt`为PLAYING。 |
 | 两坏项全失败停止 | 观察窗口内停止，未见重试 | `allbad-stopped.png`显示“Failed to recognize file format”、当前坏2且已暂停；`allbad-media.txt`记录两次相同ERROR、position 0及updated状态；`allbad-time.txt`记录观察点。受约3秒/8秒采样形成的观察窗口限制，只能写窗口内停止/未见重试，不能推断更长时间不会重试。 |
 | 失败后恢复 | 通过（状态观察） | `recovery-before.png`、`recovery-after.png`及`recovery-media.txt`显示重新选择有效WAV后PLAYING；不代表听感正常。 |
@@ -175,7 +176,15 @@ App加入第5个测试根 `content://com.android.externalstorage.documents/tree/
 
 证据流程偏差：预检曾将截图短暂写入指定批次目录以外的`artifacts/R5/android17/temp-r5-final-preflight.png`；查看后已删除，`Test-Path`复核为False。该文件不作为测试证据，未复制或展示图像；此项是证据流程偏差，不是测试失败或产品缺陷。
 
-本批Codex手机操作已结束。未复测通知或锁屏；旧批通知结果维持其原有限边界，锁屏暂停未证实且不重测。待办为三条新增失联记录的后续处置、用户听感判断及R5最终验收；不直接删除DB行或清应用数据。四个旧根及旧XML继续延后评估。
+本批Codex手机操作已结束。未复测通知或锁屏；旧批通知结果维持其原有限边界，锁屏暂停未证实且不重测。用户反馈最新有效WAV测试听感通过。该批新增失联记录之后续清理尝试及用户最终选择见下节。
+
+### 2026-11-09 新增失联记录清理尝试
+
+用户授权专用Terra/high ADB Agent精确处理本批新增三条测试记录。设备为 `V2309A / 10ADCL04J2002RM`；`app.tagmusic.player`显示`versionName 0.6.0`、`versionCode 17`，包内revision未核实。尝试读取应用数据库目录前，`adb shell run-as app.tagmusic.player ls databases`返回`run-as: package not debuggable`、退出码1，Agent按安全门立即停止。此为正式包不可调试导致的权限/包状态限制，不是产品测试失败。用户随后选择“保留三条失联记录，完成R5（推荐）”，接受这三条数据库残留并完成R5。
+
+未备份、读取或写入数据库，未停止或启动App，也未尝试其他访问路径。新增三条失联记录仍保留，原曲库及其他状态不变。用户选择接受该残留后，R5在当前缩减范围内验收完成，不启动R6。通知/锁屏未重测；四个旧根及旧XML继续按既定安排延后处理。未经新授权不得尝试`adb backup`、提权或其他访问路径。
+
+证据目录：[`db-cleanup-20261109`](../../artifacts/R5/android17/r5-final-bad-20261109/db-cleanup-20261109/)。`devices.txt` SHA256 `7727091DC3E00EDEB28DCA24EE0ECC11DDAE0557855B5081501A4ED71E0BA03E`；`package.txt` SHA256 `06C5299B107C87AB25A273F7AB031D80560DBB8611A0F57768EA9C266A35E456`；`run-as.txt` SHA256 `F61B38E87B75D0CB8E5213899420A646A7DBEB430ACC824F50B59F55903AD7C7`。
 
 ## +17 手机反馈修复候选
 
