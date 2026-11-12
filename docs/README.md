@@ -13,6 +13,7 @@
 | 追溯 R4 流程优化依据 | [本窗口省 token 复盘](rounds/R4-TOKEN-REVIEW.md)，现行规则见 AGENTS |
 | 排查历史问题 | 交接指向的具体记录/证据；只有需要时才扩大范围 |
 | 用户要求交接 | 更新同一份 HANDOFF；不用另建聊天总结文件 |
+| 子 Agent 协作与减少主上下文读取 | [协作 Skill](../.agents/skills/tagmusic-subagents/SKILL.md)、[短交接协议](../.agents/skills/tagmusic-subagents/references/handoff.md)；主只读固定路由段，角色只读自身边界 |
 
 文档边界：用户当前指令优先；AGENTS 定协作流程，PLAN 定产品目标，HANDOFF 定当前状态，原始记录证明过去发生过什么。发现不一致先核实，不让历史状态覆盖当前结论。
 
