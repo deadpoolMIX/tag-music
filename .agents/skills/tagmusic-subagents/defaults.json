@@ -1,6 +1,6 @@
 {
   "primary": { "model": "gpt-6-luna", "reasoning_effort": "high" },
-  "planner": { "model": "gpt-6.1-sol", "reasoning_effort": "medium" },
+  "planner": { "model": "gpt-6.1-sol", "reasoning_effort": "high" },
   "simple": { "model": "gpt-6-luna", "reasoning_effort": "high" },
   "normal": { "model": "gpt-6.1-sol", "reasoning_effort": "medium" },
   "high_risk": { "model": "gpt-6.1-sol", "reasoning_effort": "high" },
