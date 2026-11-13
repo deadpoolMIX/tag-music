@@ -105,7 +105,10 @@ void main() {
               find.byType(CheckedPopupMenuItem<PlaybackMode>),
             )
             .toList();
-        expect(before.where((i) => i.checked).single.value, playback.queue.mode);
+        expect(
+          before.where((i) => i.checked).single.value,
+          playback.queue.mode,
+        );
         await tap(tester, find.byKey(ValueKey('playback-mode-${mode.name}')));
         expect(playback.queue.mode, mode);
         await tap(tester, find.byKey(const ValueKey('playback-mode')).last);

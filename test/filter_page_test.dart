@@ -210,7 +210,8 @@ void main() {
         expect(
           tester.takeException(),
           isNull,
-          reason: 'Initial filter layout must fit before interacting with tags.',
+          reason:
+              'Initial filter layout must fit before interacting with tags.',
         );
         final sort = find.byKey(const ValueKey('filter-sort'));
         expect(
