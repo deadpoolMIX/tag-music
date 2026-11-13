@@ -1,6 +1,6 @@
 interface:
-  display_name: "Tag Music 严格协调"
-  short_description: "仅用于 Tag Music 项目的独立开发、验收与设备批次协调"
-  default_prompt: "使用 $tagmusic-subagents 协调本项目已授权工作，按风险分工并保留可复核证据。"
+  display_name: "Tag Music 成果批次协作"
+  short_description: "Tag Music 功能组连续开发、集中必要检查与用户体验交付"
+  default_prompt: "使用 $tagmusic-subagents 协调本项目已授权工作，默认一个 developer 连续实现功能组，集中必要检查后交付用户体验；按具体风险增派角色，遵守设备授权和暂停边界。"
 policy:
   allow_implicit_invocation: true

@@ -13,7 +13,7 @@
 | 追溯 R4 流程优化依据 | [本窗口省 token 复盘](rounds/R4-TOKEN-REVIEW.md)，现行规则见 AGENTS |
 | 排查历史问题 | 交接指向的具体记录/证据；只有需要时才扩大范围 |
 | 用户要求交接 | 更新同一份 HANDOFF；不用另建聊天总结文件 |
-| 子 Agent 协作与减少主上下文读取 | [协作 Skill](../.agents/skills/tagmusic-subagents/SKILL.md)、[短交接协议](../.agents/skills/tagmusic-subagents/references/handoff.md)；主只读固定路由段，角色只读自身边界 |
+| 子 Agent 协作与减少主上下文读取 | [协作 Skill](../.agents/skills/tagmusic-subagents/SKILL.md)、[短交接协议](../.agents/skills/tagmusic-subagents/references/handoff.md)；默认一个 developer 连续实现，批次必要检查后交用户体验；按需增派角色 |
 
 文档边界：用户当前指令优先；AGENTS 定协作流程，PLAN 定产品目标，HANDOFF 定当前状态与下一步，开发日志唯一保存工作单元完成摘要，artifacts 原始证据证明过去发生过什么。发现不一致先核实，不让历史状态覆盖当前结论。
 
@@ -56,9 +56,9 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 
 ## 验证入口与维护
 
-- `& ./scripts/check.ps1 -Round R6`（PowerShell 7）：依赖恢复、格式、analyze、全套单元/widget及R6工具/报告审计测试；准备固定曲库/封面/LRC样本并输出既有曲库/标签/筛选/队列主机基准。R6应用变更的当前验证进度见[当轮计划](rounds/R6.md)；不含原生集成、双端构建、手机验收，不代表真实万首文件或设备Release性能。
+- `& ./scripts/check.ps1 -Round R6`（PowerShell 7）：依赖恢复、格式、analyze、全套单元/widget及R6工具/报告审计测试；准备固定曲库/封面/LRC样本并输出既有曲库/标签/筛选/队列主机基准。这是可选完整入口，按具体批次需要选用，不是体验候选前置条件。R6应用变更的当前计划与未测范围见[当轮计划](rounds/R6.md)；不含原生集成、双端构建、手机验收，不代表真实万首文件或设备Release性能。
 - 候选参数：`scripts/build.ps1 -Target all -BuildNumber <新构建号> -Round <当前阶段>`；`verify-apk.ps1` 显式传 `-Version/-BuildNumbers/-Round`；`verify-packages.py` 传 `--version/--build/--round`，当前音频基线另传 `--native-reference-round R1`。隔离性能包用同一审计入口另传`--android-archive <APK> --windows-archive <ZIP> --output <新审计.json>`；报告拒绝覆盖，SQLite剥离复核文件按构建号区分。须在下一次Android构建覆盖merged原生输入前审计本批包。示意值须取实际 pubspec/交接。
-- 手动 Flutter 先 `. ./scripts/env.ps1`，再 `& ./scripts/restore.ps1 -Round R6`。所有 Flutter 检查/测试/构建串行，避免共享注册文件互改。按模块表先做相关回归，候选/阶段收口完整验证，具体门禁见 [PLAN §4](PLAN.md#4-验证与质量门禁)。
+- 手动 Flutter 先 `. ./scripts/env.ps1`，再 `& ./scripts/restore.ps1 -Round R6`。所有 Flutter 检查/测试/构建串行，避免共享注册文件互改。按功能批次交付前集中必要检查，不默认全量回归或完整 check；具体范围见 [PLAN §4](PLAN.md#4-验证与质量门禁)。
 - check在R1～R6按阶段准备样本，SQLite包审计分支在R2～R6启用；R6的固定封面/LRC、性能采样契约及未测边界见[R6测量契约](rounds/R6.md#七固定样本与测量入口契约)。后续阶段Plan先核对覆盖，不能把skip当通过。脚本默认参数及Android播放/卡片脚本仍有R1路径/样本假设，使用前核对，显式传当前参数。
 - 固定日志名重跑前保留旧失败证据到同轮构建号/问题子目录，候选不复用构建号覆盖。`install-android.ps1` 还会启动应用与抓日志，须取得涵盖这些操作的本批交互确认。
 - 独立设备性能包（R3标签/R4三框）：`& ./scripts/build-filter-benchmark.ps1 -Target all -BenchmarkBuildNumber <新测试编号>`，双端Release模式；Android独立ID `app.tagmusic.player.benchmark`、临时合成库，Windows单列打包并内置JSON报告出口；脚本只构建审计，不安装运行。正式APK安装从artifacts取包，不能从最新build/app输出推定候选身份。R4使用`integration_test/filter_benchmark_test.dart`，报告实际规则重算/搜索排序，初次加载单列，不计真实文件扫描或UI渲染。Android完整分段日志用 `python scripts/audit-filter-benchmark.py <本批日志> --report <新报告.json> --audit <新审计.json>` 恢复并复核六场景；缺段/重复/截断拒绝，勿用摘要替代原始数据。
@@ -74,9 +74,9 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 | 本索引 | 架构/模块/长期接口，按上述任务路由读取 |
 | [PLAN](PLAN.md) | 产品边界、R0～R9 及跨阶段验证；阶段启动/相关规则时读 |
 | [HANDOFF](HANDOFF.md) | 唯一当前状态与下一步及必要证据入口，每次结束/中断前更新；不写已完成工作的过程记录 |
-| `rounds/Rxx.md` | 仅当前执行计划、必要产品/技术规格与当前缺口；不积累工作流水账、开发过程或详细验证叙事 |
-| `rounds/Rxx-ACCEPTANCE.md` | 正式验收结论与证据索引；手机清单5～8项，详细原始证据及执行/审查报告留 `artifacts/Rxx/` |
-| [开发日志](开发日志.md) | 工作单元完成摘要的唯一位置，每单元一行简述；北京时间倒序，最新在前、最老在后；不作恢复依据、不默认通读 |
+| `rounds/Rxx.md` | 仅当前批次计划、必要规格/缺口及已实现、正在实现、剩余；不积累工作流水账、开发过程或详细验证叙事 |
+| `rounds/Rxx-ACCEPTANCE.md` | 正式验收结论与证据索引；手机简短清单及实际通过/失败/未测，必要原始证据及按需执行/审查报告留 `artifacts/Rxx/` |
+| [开发日志](开发日志.md) | 工作单元完成摘要的唯一位置，每批一行简述；北京时间倒序，最新在前、最老在后；不作恢复依据、不默认通读 |
 | [TOOLCHAIN](TOOLCHAIN.md) / [THIRD_PARTY](THIRD_PARTY.md) | 环境/补丁及许可，相关任务读 |
 | [原始计划](archive/PLAN.original.md) | 原件保留，仅溯源时读 |
 
