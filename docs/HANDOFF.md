@@ -2,11 +2,10 @@
 
 更新：2026-11-13。
 
-- **当前任务：** 用户于 2026-11-13 澄清并未恢复 R6，且已暂停并删除 R6 Goal；主协调 `get_goal` 当前返回 null。产品状态仍为**开发中**，不得继续阶段工作或自动重建 Goal。此前完成的验证单元见 [R6 §2I](rounds/R6.md#2i续行后的格式修复与合并验证单元2026-11-13)。
-- **暂停现场：** 用户澄清到达时，host raw/partial 封装开发已开始；执行 Agent 随即中断。`scripts/r6-performance.py` 与 `scripts/test_r6_tools.py` 存在未提交、未测试、未审查的工作区差异；不将其视为完成实现。没有运行该单元工具测试或封装命令，没有创建封装产物。分支 `main`，HEAD `affbff9`；工作区同时保留用户原有 `AGENTS.md` 修改。
-- **下一步：** 等用户明确续行后，先重新核对 Goal 和这两个脚本的实际差异，再决定保留、修正或丢弃未验证改动；不得依据旧规划或目标上下文自行续行。顺序2后续需求及已完成项见 [R6 §2G～§2J](rounds/R6.md#2g-r6-order2-v1覆盖清单与尚未完成项)。
-- **验证与授权边界：** 既有格式/analyze、新增组22/22、回归103通过/1跳过和 host 原始采样属于 §2I 的前一工作区；当前脚本改动没有对应验证。完整 check、双端构建/包审计、应用运行及真实设备性能/体验均未验收。只有既有后台自动验证范围曾获授权；没有 GUI、手机或 ADB 批次授权，安装、启动及界面操作仍需另行交互确认。
-- **执行配置：** 本阶段按 [.agents Skill defaults](../.agents/skills/tagmusic-subagents/defaults.json) 路由。planner=`gpt-6.1-sol/high`；developer普通任务=`gpt-6.1-sol/medium`、高风险=`gpt-6.1-sol/high`；command_runner=`gpt-6-luna/high`；验收审查=`gpt-6.1-sol/medium`。实际运行配置按 Skill 规则以未验证处理。
-- **产品基线：** R5双端通过，候选 `0.6.0+17`、revision `746af32` 沿用既有记录；R5遗留边界与不重复事项见[R5验收与清理](rounds/R5-ACCEPTANCE.md#2026-11-09-新增失联记录清理尝试)。
-- **遗留边界：** 用户已接受保留三条新增失联数据库记录；物理测试音频已清理，四个旧根和两份旧XML延后。全失败停止只在既有约3秒/8秒窗口内有证据，不能扩大结论；单文件SAF URI/持久授权位未直接观察。详细记录和证据入口见[R5验收与清理](rounds/R5-ACCEPTANCE.md#2026-11-09-新增失联记录清理尝试)，不重复测试或清理。
-- **工作区与恢复：** 暂停发生时分支为 `main`、HEAD 为 `affbff9`；工作区另有用户原有 `AGENTS.md` 修改及上述两份未验证脚本差异。上一个完整验证单元检查点为 `4ad6c00`，此前文档检查点为 `4f800a7`、`affbff9`；不要覆盖或误认当前脚本改动已经提交。顺序2历史及暂停现场见 [R6 §2H～§2J](rounds/R6.md#2h暂停前最小工作单元收口2026-11-13)。此前协作规则修补记录见 [§九](rounds/R6.md#九协作规则修补2026-11-13) 和 [§十](rounds/R6.md#十协作Skill精简与新增审批2026-11-13)。
+- **当前任务：** 用户已明确继续R6；本轮host原始数据到统一raw/partial报告的实现、21项工具测试、封装/核验及独立审查已通过，仅关闭host统一封装缺口。产品状态仍为**开发中**，顺序2及阶段未验收。Goal工具仍为null，保留此前用户暂停并删除的事实；不阻止本轮明确续行，本次不重建Goal。详细结果、身份、失败累计与证据统一见[R6 §2K](rounds/R6.md#2khost-rawpartial-封装收口2026-11-13)。
+- **下一步：** 按[R6 §2G](rounds/R6.md#2gr6-order2-v1覆盖清单与尚未完成项)处理其余导航、首页排序/扫描迁接、旧规则编辑器UI、独立搜索、共享行布局/定位、minibar兼容路由等缺口，再做完整顺序2独立high_risk实现审查。当前仅host封装已闭合；真实应用locate、帧、资源及设备体验仍未测。
+- **工作区与检查点：** 分支main，源码检查点 `c1d7aee9b8e6aa9189c46f20e83bd2a1b9befc53`，仅含两份封装脚本；本文件、R6及开发日志的收口文档检查点为其后的当前HEAD（以 `git log -1 --format=%H` 读取），不与源码采样revision混同。收口后工作区仅保留用户原有AGENTS.md修改；artifacts不提交。恢复时先核实际HEAD与git status，勿将旧工作区描述当作新检查结果。
+- **证据与不可重复项：** [最终57项索引](../artifacts/R6/host-partial-20261113-plan-v2-execution/evidence-index.json)及[sidecar](../artifacts/R6/host-partial-20261113-plan-v2-execution/evidence-index.json.sha256)为本轮证据入口；14 raw＋14 report全部partial。闭合检查两次失败及closure-v2修正已在§2K闭合，不重采host数据、不重跑源码未变且已通过的01～08/closure-v2。§2I前一候选的格式/analyze、22项新增、103通过/1跳过回归结果仍只适用于其当时身份，不扩大为当前业务新验收。
+- **验证与授权边界：** 本轮未执行Flutter、完整check、双端构建/包审计、应用运行、GUI、手机或ADB操作；这些均未获得本轮新增授权。继续后台自动验证以已授权范围为限；安装、启动、前台界面与设备操作须按当批范围交互确认。工具不能判断真实流畅度和体验。
+- **请求配置：** planner=`gpt-6.1-sol/high`；developer实现及文档收口normal=`gpt-6.1-sol/medium`；01～08及closure-v2同一command_runner=`gpt-6-luna/high`；独立reviewer high_risk=`gpt-6.1-sol/high`。实际运行模型/思考强度均无可信元数据，未验证。
+- **产品基线与遗留边界：** R5双端通过，候选 `0.6.0+17`、revision `746af32`。用户接受保留三条新增失联记录；物理测试音频已清理，四个旧根和两份旧XML延后。全失败停止仅有既有约3秒/8秒窗口证据；单文件SAF URI/持久授权位未直接观察。见[R5验收与清理](rounds/R5-ACCEPTANCE.md#2026-11-09-新增失联记录清理尝试)，不重复测试或清理。
