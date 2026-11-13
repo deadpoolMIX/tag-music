@@ -197,6 +197,77 @@ void main() {
     },
   );
 
+  testWidgets(
+    'locate highlight expires after two virtual seconds without moving its target',
+    (tester) async {
+      final playback = library_page_test.SnapshotController()
+        ..current = null
+        ..selectedSongId = '10';
+      final rows = [for (var i = 0; i < 30; i++) r6Track('$i')];
+      final originalIds = rows.map((row) => row.song.id).toList();
+      final located = <String>[];
+      DateTime? locatedAt;
+      try {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SongList(
+                library: library,
+                playback: playback,
+                source: rows,
+                rows: rows,
+                onLocated: (id, _) {
+                  located.add(id);
+                  locatedAt = tester.binding.clock.now();
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('locate-current-song')));
+        await tester.pumpAndSettle();
+        final target = find.byKey(const ValueKey('10'));
+        expect(located, ['10']);
+        expect(tester.widget<SongRow>(target).highlighted, isTrue);
+        expect(find.byKey(const ValueKey('located-10')), findsOneWidget);
+        final rect = tester.getRect(target);
+        final viewport = tester.getRect(find.byType(ListView));
+        expect(rect.top, greaterThanOrEqualTo(viewport.top));
+        expect(rect.bottom, lessThanOrEqualTo(viewport.bottom));
+        final list = tester.widget<ListView>(find.byType(ListView));
+        final offset = list.controller!.offset;
+
+        // These are widget-clock lifecycle assertions, not device timings.
+        final elapsed = tester.binding.clock.now().difference(locatedAt!);
+        final untilJustBeforeExpiry =
+            const Duration(milliseconds: 1999) - elapsed;
+        expect(untilJustBeforeExpiry, greaterThan(Duration.zero));
+        await tester.pump(untilJustBeforeExpiry);
+        expect(tester.widget<SongRow>(target).highlighted, isTrue);
+        expect(find.byKey(const ValueKey('located-10')), findsOneWidget);
+        await tester.pump(const Duration(milliseconds: 1));
+        expect(tester.widget<SongRow>(target).highlighted, isFalse);
+        expect(find.byKey(const ValueKey('located-10')), findsNothing);
+        expect(tester.getRect(target), rect);
+        expect(list.controller!.offset, offset);
+        expect(located, ['10']);
+        expect(playback.currentSongId, '10');
+        expect(
+          tester
+              .widget<SongList>(find.byType(SongList))
+              .rows
+              .map((row) => row.song.id),
+          originalIds,
+        );
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.pumpWidget(const SizedBox());
+        playback.dispose();
+      }
+    },
+  );
+
   for (final scale in [1.0, 2.0]) {
     testWidgets(
       '10000 rows locate first, middle and final at text scale $scale; invalidated actions never highlight stale targets',
