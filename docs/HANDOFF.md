@@ -2,10 +2,9 @@
 
 更新：2026-11-13。
 
-- **当前任务：** 用户已明确继续R6；定位高亮到期及按钮禁用状态不变两项机器断言已补齐，定向9项测试及独立审查通过，仅关闭这两项缺口，见[R6 §2L](rounds/R6.md#2l定位生命周期定向补测收口2026-11-13)。产品状态仍为**开发中**，顺序2及阶段未验收。Goal工具仍为null，保留此前用户暂停并删除的事实，本次不重建。
-- **下一步：** 按[R6 §2G](rounds/R6.md#2gr6-order2-v1覆盖清单与尚未完成项)处理其余导航、首页排序/扫描迁接、旧规则编辑器UI、独立搜索、共享行布局矩阵、minibar兼容路由等缺口，再做完整顺序2独立high_risk实现审查；不能把本次两项补测扩大为P1全部通过。真实应用locate、帧、资源及设备体验仍未测。
-- **工作区与检查点：** 分支main，实测基线HEAD `da1a4d8485d2d67104f3b6a8c14a6632ec2e2f10` 加两测试文件未提交差异，准确SHA256及候选绑定见§2L；当前追加三份收口文档，待统一核验后建立本地检查点。用户原有AGENTS.md修改保留，artifacts不提交。恢复时先核实际HEAD、git status及相关提交，不将后续检查点当作实测时HEAD。
-- **证据与不可重复项：** 本批[执行索引](../artifacts/R6/navigation-v1/command-runner-20261113-173201405/index.json)须连同[独立审查v2](../artifacts/R6/navigation-v1/command-runner-20261113-173201405/lifecycle-identity-review-v2.md)读取：旧expected哈希错误原样保留，正确候选绑定已闭合；格式失败与哈希未拦截两项过程异常见§2L，不清零、不改旧证据、不重复有效检查。host封装与57项索引仍见[§2K](rounds/R6.md#2khost-rawpartial-封装收口2026-11-13)，不重采host、不重跑源码未变的01～08/closure-v2。§2I旧候选结果不扩大归属。
-- **验证与授权边界：** 本批仅执行两文件格式检查、analyze、定向测试及diff检查；未执行完整check、双端构建/包审计、应用运行、GUI、手机或ADB。设备、GUI、完整check、构建及双端实际运行未获本批授权；后续安装、启动、前台界面与设备操作须按当批范围交互确认。首页公开onLocated为空，本批不声称“零次回调”，也不以虚拟时钟推断设备性能或体验。
-- **请求配置：** planner=`gpt-6.1-sol/high`；developer实现及文档收口normal=`gpt-6.1-sol/medium`；command_runner=`gpt-6-luna/high`；独立reviewer high_risk=`gpt-6.1-sol/high`。实际运行模型/思考强度均无可信元数据，未验证。
+- **当前任务：** 用户已明确继续R6，产品状态仍为**开发中**；顺序2及阶段未验收。Goal工具仍为null，保留此前用户暂停并删除的事实，本次不重建。
+- **下一步：** 按[R6 §2G](rounds/R6.md#2gr6-order2-v1覆盖清单与尚未完成项)处理导航、首页排序/扫描迁接、旧规则编辑器UI、独立搜索、共享行布局矩阵、minibar兼容路由等当前缺口，再做完整顺序2独立high_risk实现审查。真实应用locate、帧、资源及设备体验仍未测。
+- **工作区与检查点：** 分支main；本轮minibar文案修正和文档规则/日志整理已独立审查，当前基于输入HEAD `d516da3`，待建立本地Git检查点。工作区保留用户原有AGENTS.md Goal恢复/手机规则差异，未纳入本轮修改；artifacts不提交。
+- **证据与不可重复项：** [定位生命周期执行索引](../artifacts/R6/navigation-v1/command-runner-20261113-173201405/index.json)须连同[独立审查v2](../artifacts/R6/navigation-v1/command-runner-20261113-173201405/lifecycle-identity-review-v2.md)读取候选绑定及限制；[host封装57项索引](../artifacts/R6/host-partial-20261113-plan-v2-execution/evidence-index.json)、[闭合结果](../artifacts/R6/host-partial-20261113-plan-v2-execution/closure-v2-result.txt)、[原始采样索引](../artifacts/R6/navigation-v1/command-runner-20261113-154346040/evidence-index.txt)及[样本工具索引](../artifacts/R6/gates-v1/command-runner-20261112-183525/evidence-index.md)保留原始输出及失败累计入口。旧expected哈希错误及历史失败证据不改、不清零；不重采host，不重跑源码未变且已有效的检查，不把旧候选结果扩大归给新版。
+- **验证与授权边界：** 当前有效机器覆盖仅以§2G及上述证据对应候选为限，不代表P1、顺序2或阶段通过。设备、GUI、完整check、构建及双端实际运行未获本批授权；后续安装、启动、前台界面与设备操作须按当批范围交互确认。首页公开onLocated为空，不声称“零次回调”，不以虚拟时钟推断设备性能或体验。
 - **产品基线与遗留边界：** R5双端通过，候选 `0.6.0+17`、revision `746af32`。用户接受保留三条新增失联记录；物理测试音频已清理，四个旧根和两份旧XML延后。全失败停止仅有既有约3秒/8秒窗口证据；单文件SAF URI/持久授权位未直接观察。见[R5验收与清理](rounds/R5-ACCEPTANCE.md#2026-11-09-新增失联记录清理尝试)，不重复测试或清理。

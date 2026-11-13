@@ -15,7 +15,7 @@
 | 用户要求交接 | 更新同一份 HANDOFF；不用另建聊天总结文件 |
 | 子 Agent 协作与减少主上下文读取 | [协作 Skill](../.agents/skills/tagmusic-subagents/SKILL.md)、[短交接协议](../.agents/skills/tagmusic-subagents/references/handoff.md)；主只读固定路由段，角色只读自身边界 |
 
-文档边界：用户当前指令优先；AGENTS 定协作流程，PLAN 定产品目标，HANDOFF 定当前状态，原始记录证明过去发生过什么。发现不一致先核实，不让历史状态覆盖当前结论。
+文档边界：用户当前指令优先；AGENTS 定协作流程，PLAN 定产品目标，HANDOFF 定当前状态与下一步，开发日志唯一保存工作单元完成摘要，artifacts 原始证据证明过去发生过什么。发现不一致先核实，不让历史状态覆盖当前结论。
 
 ## 架构与代码定位
 
@@ -23,9 +23,9 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 
 | 职责 | 代码入口 / 符号 | 相关验证 |
 |---|---|---|
-| 初始化、导航、设置 | [main.dart](../lib/main.dart)、[app.dart](../lib/app.dart)、[core/](../lib/core/)；R6七入口壳层与稳定页面状态仍在阶段实现中 | `app_test`、`settings_test`、集成 `smoke_test`；当前R6进度见[当轮记录](rounds/R6.md) |
+| 初始化、导航、设置 | [main.dart](../lib/main.dart)、[app.dart](../lib/app.dart)、[core/](../lib/core/)；R6七入口壳层与稳定页面状态仍在阶段实现中 | `app_test`、`settings_test`、集成 `smoke_test`；当前R6进度见[当轮计划](rounds/R6.md) |
 | 数据表、连接、迁移 | [database.dart](../lib/library/database.dart) / `LibraryDatabase`；`database.g.dart` 为生成文件 | `library_test`、`tag_test`、`playlist_test`、[schema v4 DDL](database-schema/v4.json) |
-| 扫描事务、增量/失联、搜索排序 | [library_controller.dart](../lib/library/library_controller.dart) / `LibraryController`；R6工作区新增独立全库搜索和修改时间排序，兼容要求见[R6 §2B/2C](rounds/R6.md#2b公共排序与持久兼容) | 单元/集成 `library_test`、`r6_library_sort_test`、`library_search_test`；R6状态见[当轮记录](rounds/R6.md) |
+| 扫描事务、增量/失联、搜索排序 | [library_controller.dart](../lib/library/library_controller.dart) / `LibraryController`；R6工作区新增独立全库搜索和修改时间排序，兼容要求见[R6 §2B/2C](rounds/R6.md#2b公共排序与持久兼容) | 单元/集成 `library_test`、`r6_library_sort_test`、`library_search_test`；R6状态见[当轮计划](rounds/R6.md) |
 | 曲库 UI、共享歌曲行、封面、输入连接 | [library_page.dart](../lib/library/library_page.dart)、[song_list.dart](../lib/library/song_list.dart)、[library_search_page.dart](../lib/library/library_search_page.dart)、[library_search.dart](../lib/library/library_search.dart)、[track_cover.dart](../lib/library/track_cover.dart)；R6顺序2仍未验收 | `test/library_page_test.dart`、`r6_song_list_test`、`library_search_test`；真机输入另需当批授权 |
 | 标签关系与管理、多选操作 | [tag_repository.dart](../lib/library/tag_repository.dart)、[tags_page.dart](../lib/library/tags_page.dart)；曲库controller共用DB及状态 | `tag_test`、`tags_page_test`、设备 `tag_benchmark_test` |
 | 三框组合筛选、当前规则保留 | [filter_rule.dart](../lib/library/filter_rule.dart)、[filter_repository.dart](../lib/library/filter_repository.dart)、[filter_page.dart](../lib/library/filter_page.dart)；LibraryController复用曲库/标签数据 | `filter_test`、`filter_page_test`、双端 `filter_benchmark_test` |
@@ -56,10 +56,10 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 
 ## 验证入口与维护
 
-- `& ./scripts/check.ps1 -Round R6`（PowerShell 7）：依赖恢复、格式、analyze、全套单元/widget及R6工具/报告审计测试；准备固定曲库/封面/LRC样本并输出既有曲库/标签/筛选/队列主机基准。R6应用变更的当前验证进度见[当轮记录](rounds/R6.md)；不含原生集成、双端构建、手机验收，不代表真实万首文件或设备Release性能。
+- `& ./scripts/check.ps1 -Round R6`（PowerShell 7）：依赖恢复、格式、analyze、全套单元/widget及R6工具/报告审计测试；准备固定曲库/封面/LRC样本并输出既有曲库/标签/筛选/队列主机基准。R6应用变更的当前验证进度见[当轮计划](rounds/R6.md)；不含原生集成、双端构建、手机验收，不代表真实万首文件或设备Release性能。
 - 候选参数：`scripts/build.ps1 -Target all -BuildNumber <新构建号> -Round <当前阶段>`；`verify-apk.ps1` 显式传 `-Version/-BuildNumbers/-Round`；`verify-packages.py` 传 `--version/--build/--round`，当前音频基线另传 `--native-reference-round R1`。隔离性能包用同一审计入口另传`--android-archive <APK> --windows-archive <ZIP> --output <新审计.json>`；报告拒绝覆盖，SQLite剥离复核文件按构建号区分。须在下一次Android构建覆盖merged原生输入前审计本批包。示意值须取实际 pubspec/交接。
 - 手动 Flutter 先 `. ./scripts/env.ps1`，再 `& ./scripts/restore.ps1 -Round R6`。所有 Flutter 检查/测试/构建串行，避免共享注册文件互改。按模块表先做相关回归，候选/阶段收口完整验证，具体门禁见 [PLAN §4](PLAN.md#4-验证与质量门禁)。
-- check在R1～R6按阶段准备样本，SQLite包审计分支在R2～R6启用；R6的固定封面/LRC、性能采样契约及未测边界见[R6顺序1](rounds/R6.md#七顺序1固定样本与测量入口2026-11-12)。后续阶段Plan先核对覆盖，不能把skip当通过。脚本默认参数及Android播放/卡片脚本仍有R1路径/样本假设，使用前核对，显式传当前参数。
+- check在R1～R6按阶段准备样本，SQLite包审计分支在R2～R6启用；R6的固定封面/LRC、性能采样契约及未测边界见[R6测量契约](rounds/R6.md#七固定样本与测量入口契约)。后续阶段Plan先核对覆盖，不能把skip当通过。脚本默认参数及Android播放/卡片脚本仍有R1路径/样本假设，使用前核对，显式传当前参数。
 - 固定日志名重跑前保留旧失败证据到同轮构建号/问题子目录，候选不复用构建号覆盖。`install-android.ps1` 还会启动应用与抓日志，须取得涵盖这些操作的本批交互确认。
 - 独立设备性能包（R3标签/R4三框）：`& ./scripts/build-filter-benchmark.ps1 -Target all -BenchmarkBuildNumber <新测试编号>`，双端Release模式；Android独立ID `app.tagmusic.player.benchmark`、临时合成库，Windows单列打包并内置JSON报告出口；脚本只构建审计，不安装运行。正式APK安装从artifacts取包，不能从最新build/app输出推定候选身份。R4使用`integration_test/filter_benchmark_test.dart`，报告实际规则重算/搜索排序，初次加载单列，不计真实文件扫描或UI渲染。Android完整分段日志用 `python scripts/audit-filter-benchmark.py <本批日志> --report <新报告.json> --audit <新审计.json>` 恢复并复核六场景；缺段/重复/截断拒绝，勿用摘要替代原始数据。
 - R5隔离性能入口：[build-queue-benchmark.ps1](../scripts/build-queue-benchmark.ps1)的`-Target all -BenchmarkBuildNumber <新编号>`只构建，复用独立Android ID并写入构建号/revision；Windows单列ZIP和报告路径，运行须当批授权。[queue_benchmark_test.dart](../integration_test/queue_benchmark_test.dart)共用[test/support/queue_benchmark.dart](../test/support/queue_benchmark.dart)，10000条目替换/批量加/删当前与非当前/反向重排/切入随机及跨轮构建各5次预热+20样本，逐次校验成员/独立ID/当前/FIFO；只计状态机操作，排除准备、校验、UI和播放FD。普通歌单11000输入去重为10000的保存/加载含事务等待、另计，不套队列阈值。
@@ -73,9 +73,10 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 | [AGENTS](../AGENTS.md) | 协作、阶段/Goal、验证责任、失败与交接规则 |
 | 本索引 | 架构/模块/长期接口，按上述任务路由读取 |
 | [PLAN](PLAN.md) | 产品边界、R0～R9 及跨阶段验证；阶段启动/相关规则时读 |
-| [HANDOFF](HANDOFF.md) | 唯一当前状态和入口，每次结束/中断前更新；详细验收结论引用验收记录 |
-| `rounds/Rxx.md` / `Rxx-ACCEPTANCE.md` | 当轮计划及技术记录 / 详细验收结论与证据索引；手机清单5～8项，历史按依赖读 |
-| [开发日志](开发日志.md) | 每次收口一句已完成摘要，不作恢复依据、不默认通读 |
+| [HANDOFF](HANDOFF.md) | 唯一当前状态与下一步及必要证据入口，每次结束/中断前更新；不写已完成工作的过程记录 |
+| `rounds/Rxx.md` | 仅当前执行计划、必要产品/技术规格与当前缺口；不积累工作流水账、开发过程或详细验证叙事 |
+| `rounds/Rxx-ACCEPTANCE.md` | 正式验收结论与证据索引；手机清单5～8项，详细原始证据及执行/审查报告留 `artifacts/Rxx/` |
+| [开发日志](开发日志.md) | 工作单元完成摘要的唯一位置，每单元一行简述；北京时间倒序，最新在前、最老在后；不作恢复依据、不默认通读 |
 | [TOOLCHAIN](TOOLCHAIN.md) / [THIRD_PARTY](THIRD_PARTY.md) | 环境/补丁及许可，相关任务读 |
 | [原始计划](archive/PLAN.original.md) | 原件保留，仅溯源时读 |
 

@@ -44,7 +44,7 @@ class PlaybackMinibar extends ConsumerWidget {
                       children: [
                         Text(
                           current == null
-                              ? '尚未播放'
+                              ? '未播放'
                               : playback?.metadata?.title ?? current.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
