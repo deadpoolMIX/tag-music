@@ -7,7 +7,7 @@
   "high_risk": {"model": "gpt-6.1-sol", "reasoning_effort": "medium"},
   "sol_high": {"model": "gpt-6.1-sol", "reasoning_effort": "high"},
   "command_runner": {"model": "gpt-6-luna", "reasoning_effort": "high"},
-  "acceptance": {"model": "gpt-6.1-sol", "reasoning_effort": "medium"},
+  "acceptance": {"model": "gpt-6.1-terra", "reasoning_effort": "high"},
   "phone_script": {"model": "gpt-6-luna", "reasoning_effort": "high"},
   "phone_visual": {"model": "gpt-6.1-terra", "reasoning_effort": "high"},
   "windows_gui": {"model": "gpt-6.1-terra", "reasoning_effort": "high"}

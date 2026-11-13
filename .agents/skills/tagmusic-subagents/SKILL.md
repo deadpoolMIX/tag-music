@@ -33,12 +33,12 @@ description: 用于 D:\.projects\Tag Musicplayer 的成果批次开发与按需�
 | 影响范围清楚，但局部状态/交互需更多推敲 | developer / complex（Terra/high） |
 | 依赖不清、复杂业务链，或AGENTS列明高风险实际变化 | developer / high_risk（Sol/medium）；需独立判断才加reviewer / high_risk |
 | 具体技术/依赖待决 | planner / planner（Sol/medium） |
-| 用户要求独立审查 | reviewer / acceptance（Sol/medium）；高风险或证据冲突用high_risk，同为medium |
+| 用户要求独立审查 | reviewer / acceptance（Terra/high）；高风险或证据冲突用high_risk（Sol/medium） |
 | 已有具体难点确需Sol提高思考投入 | developer、planner或reviewer / sol_high，仅按下述条件启用 |
 | 分担已有明确命令 | command_runner / command_runner；developer可自行执行，不强制交接 |
 | 手机脚本/视觉；电脑GUI | phone_tester / phone_script或phone_visual；windows_tester / windows_gui；具体限制见设备细则 |
 
-Sol默认medium，包括主协调、规划、复杂开发和按需审查；不能仅因“高风险”或一次失败自动升high。sol_high是例外档：主须指出具体未解决难点、现有证据及升档理由，再决定是否使用；不把medium/high当逐级必经流水线，不新增规划或审查角色。若任务起初已有明确复杂依赖/数据/并发风险，直接Sol/medium，不先让Luna或Terra试错；普通跨页面不自动升级。高风险必要定向检查与模型思考档位分别判断。
+Sol默认medium，包括主协调、规划、复杂开发和高风险审查；不能仅因“高风险”或一次失败自动升high。sol_high是例外档：主须指出具体未解决难点、现有证据及升档理由，再决定是否使用；不把medium/high当逐级必经流水线，不新增规划或审查角色。若任务起初已有明确复杂依赖/数据/并发风险，直接Sol/medium，不先让Luna或Terra试错；普通跨页面不自动升级。高风险必要定向检查与模型思考档位分别判断。
 
 ## 派发与资源约束
 
