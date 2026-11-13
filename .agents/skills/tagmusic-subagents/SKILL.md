@@ -22,17 +22,23 @@ description: 用于 D:\.projects\Tag Musicplayer 的成果批次开发与按需�
 
 ## 配置与路由
 
-[defaults.json](defaults.json)唯一保存请求配置，不是原生配置。主期望Luna/high由用户界面选择；无可信运行元数据时实际配置记“未验证”。指定配置/工具不可用须报告，不静默替换。新增岗位/Skill须用户授权。
+[defaults.json](defaults.json)唯一保存请求配置，不是原生配置。主期望Sol 6.1/medium由用户界面选择；此JSON不自动切换当前聊天实际模型；无可信运行元数据时实际配置记“未验证”。指定配置/工具不可用须报告，不静默替换。新增岗位/Skill须用户授权。
+
+主Agent按整批目标、业务依赖和具体风险决定路由，planner仅在确有拆分/技术待决时协助，不逐项审批。developer发现超出范围或模型能力不足时报告具体问题，由主调整；不按代码行数或页面数量判断难度，不把复杂业务交Luna反复试错。
 
 | 工作 | 角色/配置键 |
 |---|---|
-| 明确小UI/文案/文档 | developer / simple；流程文档主可维护 |
-| 页面组/功能链 | developer / normal |
-| AGENTS列明高风险的实际变化 | developer / high_risk；需独立判断才加reviewer / high_risk |
-| 具体技术/依赖待决 | planner / planner |
-| 用户要求独立审查 | reviewer / acceptance；高风险或证据冲突用high_risk |
+| 位置/做法/结果明确、无需业务判断的文案或机械小改 | developer / simple（Luna/high）；流程文档主可维护 |
+| 规格明确、复用已有结构的普通UI/相似页面组、局部修复 | developer / normal（Terra/medium），普通开发默认 |
+| 影响范围清楚，但局部状态/交互需更多推敲 | developer / complex（Terra/high） |
+| 依赖不清、复杂业务链，或AGENTS列明高风险实际变化 | developer / high_risk（Sol/medium）；需独立判断才加reviewer / high_risk |
+| 具体技术/依赖待决 | planner / planner（Sol/medium） |
+| 用户要求独立审查 | reviewer / acceptance（Sol/medium）；高风险或证据冲突用high_risk，同为medium |
+| 已有具体难点确需Sol提高思考投入 | developer、planner或reviewer / sol_high，仅按下述条件启用 |
 | 分担已有明确命令 | command_runner / command_runner；developer可自行执行，不强制交接 |
 | 手机脚本/视觉；电脑GUI | phone_tester / phone_script或phone_visual；windows_tester / windows_gui；具体限制见设备细则 |
+
+Sol默认medium，包括主协调、规划、复杂开发和按需审查；不能仅因“高风险”或一次失败自动升high。sol_high是例外档：主须指出具体未解决难点、现有证据及升档理由，再决定是否使用；不把medium/high当逐级必经流水线，不新增规划或审查角色。若任务起初已有明确复杂依赖/数据/并发风险，直接Sol/medium，不先让Luna或Terra试错；普通跨页面不自动升级。高风险必要定向检查与模型思考档位分别判断。
 
 ## 派发与资源约束
 
