@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-enum LibrarySort { title, artist, album, name }
+enum LibrarySort { title, artist, album, name, modified }
 
 /// Fixed three-box filter. An absent include box contributes no union operand.
 class FilterRule {

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'playback_controller.dart';
 import 'queue_page.dart';
+import 'playback_minibar.dart';
 import '../library/library_page.dart';
 import '../library/library_controller.dart';
 import '../library/filter_page.dart';
@@ -19,10 +20,12 @@ class PlaybackPage extends ConsumerWidget {
   const PlaybackPage({
     this.filtering = false,
     this.playlists = false,
+    this.controlsOnly = false,
     super.key,
   });
   final bool filtering;
   final bool playlists;
+  final bool controlsOnly;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,12 +34,27 @@ class PlaybackPage extends ConsumerWidget {
     if (controller == null) {
       return const Center(child: Text('让音乐有自己的归属'));
     }
+    if (library != null && !controlsOnly) {
+      return Column(
+        children: [
+          Expanded(
+            child: playlists
+                ? PlaylistsPage(library: library, playback: controller)
+                : filtering
+                ? FilterPage(library: library, playback: controller)
+                : LibraryPage(library: library, playback: controller),
+          ),
+          const PlaybackMinibar(),
+        ],
+      );
+    }
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
         final state = controller.player.state;
         final current = controller.current;
-        return Column(
+        final content = Column(
+          mainAxisSize: controlsOnly ? MainAxisSize.min : MainAxisSize.max,
           children: [
             if (controller.playbackNotice != null && controller.error == null)
               Padding(
@@ -58,7 +76,9 @@ class PlaybackPage extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-            if (library != null)
+            if (controlsOnly)
+              const SizedBox(height: 12)
+            else if (library != null)
               Expanded(
                 child: playlists
                     ? PlaylistsPage(library: library, playback: controller)
@@ -273,6 +293,7 @@ class PlaybackPage extends ConsumerWidget {
               ),
           ],
         );
+        return controlsOnly ? SingleChildScrollView(child: content) : content;
       },
     );
   }

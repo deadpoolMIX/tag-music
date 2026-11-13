@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../core/reorder_handle.dart';
 import '../playback/playback_controller.dart';
 import '../playback/queue_actions.dart';
 import 'database.dart';
@@ -8,15 +7,18 @@ import 'library_controller.dart';
 import 'playlist_actions.dart';
 import 'filter_rule.dart';
 import 'smart_playlist_editor.dart';
+import 'song_list.dart';
 
 class PlaylistsPage extends StatefulWidget {
   const PlaylistsPage({
     required this.library,
     required this.playback,
+    this.active = true,
     super.key,
   });
   final LibraryController library;
   final PlaybackController playback;
+  final bool active;
   @override
   State<PlaylistsPage> createState() => _PlaylistsPageState();
 }
@@ -24,9 +26,8 @@ class PlaylistsPage extends StatefulWidget {
 class _PlaylistsPageState extends State<PlaylistsPage> {
   String? openedId;
   String query = '';
-  bool selecting = false;
+  bool reorderingMode = false;
   bool busy = false;
-  final selected = <String>{};
 
   Future<void> _change(Future<void> Function() operation) async {
     if (busy) return;
@@ -120,60 +121,7 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                 ].any((value) => value.toLowerCase().contains(needle)),
           )
           .toList();
-      final reordering = !smart && needle.isEmpty && !selecting && !busy;
-      Widget row(int i) {
-        final track = rows[i];
-        return ListTile(
-          key: ValueKey('playlist-song-${track.song.id}'),
-          selected: widget.playback.currentSongId == track.song.id,
-          leading: selecting
-              ? Checkbox(
-                  value: selected.contains(track.song.id),
-                  onChanged: busy ? null : (_) => _toggle(track.song.id),
-                )
-              : Icon(track.available ? Icons.music_note : Icons.link_off),
-          title: Text(
-            track.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: Text(
-            track.available ? track.song.name : '文件失联 · 记录仍保留',
-            maxLines: 1,
-          ),
-          trailing: selecting
-              ? null
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    QueueAddButton(
-                      key: ValueKey('enqueue-playlist-${track.song.id}'),
-                      playback: widget.playback,
-                      songs: !busy && track.available
-                          ? [track.queueSong]
-                          : const [],
-                      compact: true,
-                    ),
-                    if (reordering)
-                      ReorderHandle(index: i, label: '拖动${track.title}排序'),
-                  ],
-                ),
-          onTap: busy
-              ? null
-              : selecting
-              ? () => _toggle(track.song.id)
-              : !track.available
-              ? null
-              : () {
-                  final snapshot = rows.where((t) => t.available).toList();
-                  widget.playback.playSongs(
-                    snapshot.map((t) => t.queueSong).toList(),
-                    snapshot.indexOf(track),
-                  );
-                },
-        );
-      }
-
+      final reordering = !smart && needle.isEmpty && reorderingMode && !busy;
       final detail = LayoutBuilder(
         builder: (context, constraints) => Column(
           children: [
@@ -242,7 +190,13 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                           labelText: '搜索歌单歌曲',
                           prefixIcon: Icon(Icons.search),
                         ),
-                        onChanged: (value) => setState(() => query = value),
+                        onChanged: (value) => setState(() {
+                          query = value;
+                          // Searching changes the displayed membership. End
+                          // reorder mode so later clearing the query preserves
+                          // any selection made in the search results.
+                          if (value.trim().isNotEmpty) reorderingMode = false;
+                        }),
                       ),
                       Wrap(
                         spacing: 8,
@@ -274,47 +228,14 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                             ),
                           if (!smart)
                             TextButton(
-                              key: const ValueKey('playlist-select'),
-                              onPressed: busy
+                              key: const ValueKey('playlist-reorder'),
+                              onPressed: busy || needle.isNotEmpty
                                   ? null
-                                  : () => setState(() {
-                                      selecting = !selecting;
-                                      selected.clear();
-                                    }),
-                              child: Text(selecting ? '退出多选' : '多选'),
+                                  : () => setState(
+                                      () => reorderingMode = !reorderingMode,
+                                    ),
+                              child: Text(reorderingMode ? '结束排序' : '调整顺序'),
                             ),
-                          if (selecting) ...[
-                            Text('已选 ${selected.length} 首'),
-                            QueueAddButton(
-                              key: const ValueKey('enqueue-playlist-selected'),
-                              playback: widget.playback,
-                              songs: busy
-                                  ? const []
-                                  : all
-                                        .where(
-                                          (t) =>
-                                              selected.contains(t.song.id) &&
-                                              t.available,
-                                        )
-                                        .map((t) => t.queueSong)
-                                        .toList(),
-                            ),
-                            TextButton(
-                              onPressed: busy || selected.isEmpty
-                                  ? null
-                                  : () {
-                                      final ids = Set<String>.of(selected);
-                                      _change(() async {
-                                        await library.removePlaylistSongs(
-                                          list.id,
-                                          ids,
-                                        );
-                                        if (mounted) setState(selected.clear);
-                                      });
-                                    },
-                              child: const Text('移除所选歌曲'),
-                            ),
-                          ],
                         ],
                       ),
                       Text(
@@ -339,57 +260,52 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
               ),
             ),
             Expanded(
-              child: rows.isEmpty
-                  ? Center(
-                      child: Text(
-                        ruleError != null
-                            ? '修复规则后显示结果'
-                            : all.isEmpty
-                            ? (smart ? '没有匹配的可用歌曲' : '空歌单，添加歌曲后即可播放')
-                            : '没有匹配的歌曲',
+              child: SongList(
+                scope: 'playlist',
+                emptyText: ruleError != null
+                    ? '修复规则后显示结果'
+                    : all.isEmpty
+                    ? (smart ? '没有匹配的可用歌曲' : '空歌单，添加歌曲后即可播放')
+                    : '没有匹配的歌曲',
+                key: ValueKey('playlist-songs-${list.id}'),
+                library: library,
+                playback: widget.playback,
+                source: all,
+                rows: rows,
+                enabled: !busy && ruleError == null,
+                reordering: reordering,
+                onRemove: smart
+                    ? null
+                    : (ids) => _change(
+                        () => library.removePlaylistSongs(list.id, ids),
                       ),
-                    )
-                  : reordering
-                  ? ReorderableListView.builder(
-                      buildDefaultDragHandles: false,
-                      key: ValueKey('playlist-order-${list.id}'),
-                      itemCount: rows.length,
-                      itemBuilder: (_, i) => row(i),
-                      onReorderItem: (oldIndex, newIndex) {
-                        final ids = all.map((t) => t.song.id).toList();
-                        ids.insert(newIndex, ids.removeAt(oldIndex));
-                        _change(() => library.reorderPlaylist(list.id, ids));
-                      },
-                    )
-                  : ListView.builder(
-                      itemCount: rows.length,
-                      itemBuilder: (_, i) => row(i),
-                    ),
+                onReorder: (oldIndex, newIndex) {
+                  final ids = all.map((t) => t.song.id).toList();
+                  ids.insert(newIndex, ids.removeAt(oldIndex));
+                  _change(() => library.reorderPlaylist(list.id, ids));
+                },
+              ),
             ),
           ],
         ),
       );
       return PopScope(
-        canPop: false,
+        canPop: !widget.active,
         onPopInvokedWithResult: (didPop, _) {
-          if (!didPop && !busy) _closePlaylist();
+          if (!didPop && !busy && widget.active) _closePlaylist();
         },
         child: detail,
       );
     },
   );
 
-  void _toggle(String id) => setState(() {
-    if (!selected.add(id)) selected.remove(id);
-  });
-
   void _closePlaylist() {
     FocusScope.of(context).unfocus();
     setState(() {
       openedId = null;
       query = '';
-      selected.clear();
-      selecting = false;
+
+      reorderingMode = false;
     });
   }
 
@@ -437,6 +353,7 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
           child: lists.isEmpty
               ? const Center(child: Text('保存喜欢的歌曲顺序，或创建空歌单'))
               : ListView.builder(
+                  key: const PageStorageKey('playlist-overview'),
                   itemCount: lists.length,
                   itemBuilder: (_, i) {
                     final list = lists[i];
@@ -456,8 +373,8 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                       onTap: () => setState(() {
                         openedId = list.id;
                         query = '';
-                        selected.clear();
-                        selecting = false;
+
+                        reorderingMode = false;
                       }),
                     );
                   },

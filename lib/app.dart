@@ -5,16 +5,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/diagnostics.dart';
 import 'core/settings.dart';
-import 'playback/playback_page.dart';
+import 'playback/playback_minibar.dart';
+import 'library/library_page.dart';
+import 'library/filter_page.dart';
+import 'library/playlists_page.dart';
 import 'playback/playback_controller.dart';
 import 'library/library_controller.dart';
 import 'library/tags_page.dart';
+
+final _appNavigator = GlobalKey<NavigatorState>();
 
 class TagMusicApp extends ConsumerWidget {
   const TagMusicApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => MaterialApp(
+    navigatorKey: _appNavigator,
+    builder: (context, child) => CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): () =>
+            _appNavigator.currentState?.maybePop(),
+      },
+      child: child!,
+    ),
     title: 'Tag Music',
     debugShowCheckedModeBanner: false,
     locale: const Locale('zh', 'CN'),
@@ -36,25 +49,36 @@ class TagMusicApp extends ConsumerWidget {
   );
 }
 
+enum AppDestination {
+  songs,
+  filter,
+  playlists,
+  albums,
+  artists,
+  tags,
+  settings,
+}
+
 const _destinations = [
-  (Icons.library_music_outlined, Icons.library_music, '曲库'),
-  (Icons.sell_outlined, Icons.sell, '标签'),
-  (Icons.filter_alt_outlined, Icons.filter_alt, '筛选'),
-  (Icons.queue_music_outlined, Icons.queue_music, '歌单'),
-  (Icons.settings_outlined, Icons.settings, '设置'),
+  (Icons.library_music_outlined, '歌曲'),
+  (Icons.filter_alt_outlined, '筛选'),
+  (Icons.queue_music_outlined, '歌单'),
+  (Icons.album_outlined, '专辑'),
+  (Icons.person_outline, '歌手'),
+  (Icons.sell_outlined, '标签'),
+  (Icons.settings_outlined, '设置'),
 ];
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
-
   @override
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends ConsumerState<AppShell>
     with WidgetsBindingObserver {
-  int _selected = 0;
-
+  AppDestination _selected = AppDestination.songs;
+  final _scaffold = GlobalKey<ScaffoldState>();
   @override
   void initState() {
     super.initState();
@@ -74,157 +98,215 @@ class _AppShellState extends ConsumerState<AppShell>
     super.dispose();
   }
 
+  Widget _navigation(bool compact, {bool drawer = false}) => SafeArea(
+    child: SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          children: [
+            for (final destination in AppDestination.values) ...[
+              if (destination == AppDestination.settings)
+                const Divider(height: 28),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Material(
+                  color: destination == _selected
+                      ? Theme.of(context).colorScheme.secondaryContainer
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Tooltip(
+                    message: _destinations[destination.index].$2,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () {
+                        setState(() => _selected = destination);
+                        if (drawer) Navigator.of(context).pop();
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _destinations[destination.index].$1,
+                              semanticLabel: compact
+                                  ? _destinations[destination.index].$2
+                                  : null,
+                            ),
+                            if (!compact) ...[
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Text(
+                                  _destinations[destination.index].$2,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    ),
+  );
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final wide = constraints.maxWidth >= 840;
+      final desktop = Theme.of(context).platform == TargetPlatform.windows;
+      final library = ref.watch(libraryProvider);
+      final playback = ref.watch(playbackProvider);
+      Widget unavailable() => const Center(child: Text('曲库尚未就绪'));
+      Widget branch(AppDestination destination) => KeyedSubtree(
+        key: ValueKey(destination),
+        child: switch (destination) {
+          AppDestination.songs =>
+            library == null || playback == null
+                ? unavailable()
+                : LibraryPage(
+                    library: library,
+                    playback: playback,
+                    menuButton: desktop
+                        ? null
+                        : IconButton(
+                            key: const ValueKey('open-navigation'),
+                            tooltip: '打开导航菜单',
+                            onPressed: () =>
+                                _scaffold.currentState?.openDrawer(),
+                            icon: const Icon(Icons.menu),
+                          ),
+                  ),
+          AppDestination.filter =>
+            library == null || playback == null
+                ? unavailable()
+                : FilterPage(library: library, playback: playback),
+          AppDestination.playlists =>
+            library == null || playback == null
+                ? unavailable()
+                : PlaylistsPage(
+                    library: library,
+                    playback: playback,
+                    active: _selected == AppDestination.playlists,
+                  ),
+          AppDestination.tags =>
+            library == null ? unavailable() : TagsPage(library: library),
+          AppDestination.settings => const SettingsPage(),
+          AppDestination.albums ||
+          AppDestination.artists => const Center(child: Text('分组浏览待接入')),
+        },
+      );
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Tag Music'),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: constraints.maxWidth / 2),
-                child: const Chip(
-                  label: Text(
-                    'R5 · 歌单与队列',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+        body: Column(
+          children: [
+            Expanded(
+              child: Scaffold(
+                key: _scaffold,
+                drawer: desktop
+                    ? null
+                    : Drawer(
+                        width: constraints.maxWidth * .52,
+                        child: _navigation(false, drawer: true),
+                      ),
+                drawerScrimColor: Colors.black26,
+                body: SafeArea(
+                  bottom: false,
+                  child: Row(
+                    children: [
+                      if (desktop)
+                        SizedBox(
+                          width: constraints.maxWidth >= 1000 ? 190 : 72,
+                          child: _navigation(constraints.maxWidth < 1000),
+                        ),
+                      if (desktop) const VerticalDivider(width: 1),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            if (!desktop &&
+                                (_selected != AppDestination.songs ||
+                                    library == null ||
+                                    playback == null))
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: IconButton(
+                                  key: const ValueKey('open-navigation'),
+                                  tooltip: '打开导航菜单',
+                                  onPressed: () =>
+                                      _scaffold.currentState?.openDrawer(),
+                                  icon: const Icon(Icons.menu),
+                                ),
+                              ),
+                            if (ref.watch(startupWarningProvider)
+                                case final warning?)
+                              MaterialBanner(
+                                content: Text(warning),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => setState(
+                                      () => _selected = AppDestination.settings,
+                                    ),
+                                    child: const Text('查看设置'),
+                                  ),
+                                ],
+                              ),
+                            if (playback != null)
+                              ListenableBuilder(
+                                listenable: playback,
+                                builder: (_, _) => Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (playback.error != null ||
+                                        playback.playbackNotice != null)
+                                      Text(
+                                        playback.error ??
+                                            playback.playbackNotice!,
+                                        key: const ValueKey('playback-error'),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    if (!playback.notificationsEnabled)
+                                      Text(
+                                        playback.notificationMessage ??
+                                            '允许播放通知后，可在通知栏和锁屏控制音乐。',
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    if (!playback.notificationsEnabled)
+                                      TextButton(
+                                        onPressed: playback
+                                            .requestNotificationPermission,
+                                        child: const Text('开启播放通知'),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            Expanded(
+                              child: IndexedStack(
+                                index: _selected.index,
+                                children: [
+                                  for (final destination
+                                      in AppDestination.values)
+                                    branch(destination),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
+            const PlaybackMinibar(),
           ],
         ),
-        body: Row(
-          children: [
-            if (wide) ...[
-              NavigationRail(
-                extended: constraints.maxWidth >= 1100,
-                selectedIndex: _selected,
-                labelType: constraints.maxWidth >= 1100
-                    ? NavigationRailLabelType.none
-                    : NavigationRailLabelType.all,
-                onDestinationSelected: (index) =>
-                    setState(() => _selected = index),
-                destinations: [
-                  for (final item in _destinations)
-                    NavigationRailDestination(
-                      icon: Icon(item.$1),
-                      selectedIcon: Icon(item.$2),
-                      label: Text(item.$3),
-                    ),
-                ],
-              ),
-              const VerticalDivider(width: 1),
-            ],
-            Expanded(
-              child: Column(
-                children: [
-                  if (ref.watch(startupWarningProvider) case final warning?)
-                    MaterialBanner(
-                      content: Text(warning),
-                      actions: [
-                        TextButton(
-                          onPressed: () => setState(() => _selected = 4),
-                          child: const Text('查看设置'),
-                        ),
-                      ],
-                    ),
-                  Expanded(
-                    child: _selected == 4
-                        ? const SettingsPage()
-                        : _selected == 0
-                        ? const PlaybackPage()
-                        : _selected == 1
-                        ? switch (ref.watch(libraryProvider)) {
-                            final library? => TagsPage(library: library),
-                            null => const Center(child: Text('曲库尚未就绪')),
-                          }
-                        : _selected == 2
-                        ? const PlaybackPage(filtering: true)
-                        : const PlaybackPage(playlists: true),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        bottomNavigationBar: wide
-            ? null
-            : NavigationBar(
-                selectedIndex: _selected,
-                onDestinationSelected: (index) =>
-                    setState(() => _selected = index),
-                destinations: [
-                  for (final item in _destinations)
-                    NavigationDestination(
-                      icon: Icon(item.$1),
-                      selectedIcon: Icon(item.$2),
-                      label: item.$3,
-                    ),
-                ],
-              ),
       );
     },
   );
-}
-
-class EmptyPage extends StatelessWidget {
-  const EmptyPage({required this.index, super.key});
-  final int index;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final titles = ['让音乐有自己的归属', '用标签连接每一种喜好', '留住每一次灵感'];
-    final descriptions = [
-      '这里将收纳你的本地音乐。\n目录导入与播放将在后续版本开放。',
-      '这里将管理音乐的多个标签。',
-      '这里将保存普通歌单和智能歌单。\n歌单与队列将在 R5 开放。',
-    ];
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(28),
-                decoration: BoxDecoration(
-                  color: scheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(32),
-                ),
-                child: Icon(
-                  _destinations[3].$1,
-                  size: 56,
-                  color: scheme.onSecondaryContainer,
-                ),
-              ),
-              const SizedBox(height: 28),
-              Text(
-                titles[index],
-                style: Theme.of(context).textTheme.headlineSmall,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                descriptions[index],
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge
-                    ?.copyWith(color: scheme.onSurfaceVariant, height: 1.7),
-              ),
-              const SizedBox(height: 32),
-              const Text('本地音乐 · 多标签 · 自由组合'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class SettingsPage extends ConsumerStatefulWidget {
@@ -294,6 +376,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 icon: const Icon(Icons.notifications_outlined),
                 label: const Text('播放通知设置'),
               ),
+            ],
+            if (ref.watch(libraryProvider) case final library?) ...[
+              const SizedBox(height: 24),
+              DirectorySettings(library: library),
             ],
             const SizedBox(height: 32),
             Text('关于', style: Theme.of(context).textTheme.titleMedium),

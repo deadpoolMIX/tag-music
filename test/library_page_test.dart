@@ -67,6 +67,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('open-library-search')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('library-search')));
       await tester.pump();
       expect(tester.testTextInput.hasAnyClients, isTrue);
@@ -75,7 +77,8 @@ void main() {
       // helper which can repair a missing connection before injecting text.
       tester.testTextInput.enterText('甲');
       await tester.pumpAndSettle();
-      expect(library.visible.length, 1);
+      expect(library.searchTracks('甲').length, 1);
+      expect(library.query, isEmpty);
       tester.view.viewInsets = const FakeViewPadding(bottom: 220);
       await tester.pumpAndSettle();
       expect(tester.testTextInput.hasAnyClients, isTrue);

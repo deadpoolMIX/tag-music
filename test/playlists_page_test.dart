@@ -73,11 +73,20 @@ void main() {
         await mount(tester, page());
         await tester.tap(find.byKey(ValueKey('playlist-$id')));
         await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('playlist-reorder')));
+        await tester.pumpAndSettle();
+        expect(
+          tester.getSize(find.byType(ReorderableDragStartListener).first),
+          const Size(48, 48),
+        );
         final start =
             tester.getCenter(find.byType(ReorderableDragStartListener).first) +
             offset;
         final gesture = await tester.startGesture(start);
         await tester.pump(const Duration(milliseconds: 800));
+        expect(find.textContaining('已选 '), findsNothing);
+        expect(playback.currentSongId, isNull);
+        expect(find.byType(ReorderableDragStartListener), findsNWidgets(2));
         await gesture.moveBy(const Offset(0, 20));
         await tester.pump();
         await gesture.moveTo(start + const Offset(0, 160));
@@ -85,10 +94,67 @@ void main() {
         await gesture.up();
         await tester.pumpAndSettle();
         expect(library.playlistSongIds[id], [ids['B'], ids['A']]);
+        expect(find.textContaining('已选 '), findsNothing);
+        expect(playback.currentSongId, isNull);
+        await tester.tap(find.byKey(const ValueKey('playlist-reorder')));
+        await tester.pumpAndSettle();
+        await tester.longPress(
+          find.byKey(ValueKey('playlist-song-${ids['B']}')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('已选 1 首'), findsOneWidget);
+        expect(playback.currentSongId, isNull);
         await tester.pumpWidget(const SizedBox());
       },
     );
   }
+
+  testWidgets(
+    'reordering isolates row selection and playback; searching restores selection without reentering reorder',
+    (tester) async {
+      final id = await library.createPlaylist('Exclusive modes', [
+        ids['A']!,
+        ids['B']!,
+      ]);
+      await mount(tester, page());
+      await tester.tap(find.byKey(ValueKey('playlist-$id')));
+      await tester.pumpAndSettle();
+      await tester.longPress(find.byKey(ValueKey('playlist-song-${ids['A']}')));
+      await tester.pumpAndSettle();
+      expect(find.text('已选 1 首'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('playlist-reorder')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('已选 '), findsNothing);
+      expect(find.byType(ReorderableDragStartListener), findsNWidgets(2));
+      await tester.longPress(find.byKey(ValueKey('playlist-song-${ids['B']}')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey('playlist-song-${ids['A']}')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('已选 '), findsNothing);
+      expect(playback.currentSongId, isNull);
+      await tester.tap(find.byTooltip('歌曲操作').first);
+      await tester.pumpAndSettle();
+      expect(find.text('多选歌曲'), findsNothing);
+      await tester.tapAt(const Offset(8, 8));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(ValueKey('playlist-search-$id')), 'A');
+      await tester.pumpAndSettle();
+      expect(find.byType(ReorderableDragStartListener), findsNothing);
+      expect(find.text('调整顺序'), findsOneWidget);
+      await tester.longPress(find.byKey(ValueKey('playlist-song-${ids['A']}')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(ValueKey('playlist-search-$id')), '');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey('playlist-song-${ids['B']}')));
+      await tester.pumpAndSettle();
+      expect(find.text('已选 2 首'), findsOneWidget);
+      expect(find.byType(ReorderableDragStartListener), findsNothing);
+      expect(playback.currentSongId, isNull);
+      expect(library.playlistSongIds[id], [ids['A'], ids['B']]);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 
   for (final smart in [false, true]) {
     testWidgets(
@@ -141,6 +207,8 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('playlist-picker-confirm')));
       await tester.pumpAndSettle();
       expect(library.playlistSongIds[id], [ids['A'], ids['C']]);
+      await tester.tap(find.byKey(const ValueKey('playlist-reorder')));
+      await tester.pumpAndSettle();
       expect(find.byType(ReorderableDragStartListener), findsNWidgets(2));
       final start = tester.getCenter(
         find.byType(ReorderableDragStartListener).first,
@@ -157,14 +225,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ReorderableListView), findsNothing);
       expect(find.text('搜索中不能重排歌曲'), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('playlist-select')));
+      await tester.longPress(find.byKey(ValueKey('playlist-song-${ids['A']}')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(ValueKey('playlist-song-${ids['A']}')));
       await tester.enterText(find.byKey(ValueKey('playlist-search-$id')), 'C');
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(ValueKey('playlist-song-${ids['C']}')));
       await tester.pumpAndSettle();
       expect(find.text('已选 2 首'), findsOneWidget);
+      await tester.ensureVisible(find.text('移除所选歌曲'));
       await tester.tap(find.text('移除所选歌曲'));
       await tester.pumpAndSettle();
       expect(library.playlistTracks(id), isEmpty);
@@ -233,19 +301,27 @@ void main() {
     (tester) async {
       library.filter(text: 'A');
       await mount(tester, LibraryPage(library: library, playback: playback));
-      await tester.tap(find.byKey(const ValueKey('save-library-playlist')));
+      await tester.longPress(find.byKey(ValueKey(ids['A']!)));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('保存歌单'));
+      await tester.tap(find.text('保存歌单'));
       await tester.pumpAndSettle();
       library.filter(text: 'B');
       await saveName(tester, 'Captured');
       final id = library.playlists.single.id;
       expect(library.playlistSongIds[id], [ids['A']]);
-      await tester.tap(find.byKey(const ValueKey('select-songs')));
+      await tester.ensureVisible(find.text('退出多选'));
+      await tester.tap(find.text('退出多选'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(ValueKey(ids['B']!)));
+      await tester.longPress(find.byKey(ValueKey(ids['B']!)));
+      await tester.pumpAndSettle();
       library.filter(text: 'C');
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(ValueKey(ids['C']!)));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('batch-add-playlist')),
+      );
       await tester.tap(find.byKey(const ValueKey('batch-add-playlist')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Captured'));

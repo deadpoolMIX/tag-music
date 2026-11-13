@@ -90,24 +90,47 @@ void main() {
       await tester.pumpAndSettle();
       expect(playback.queue.mode, PlaybackMode.shuffle);
       expect(player.opens, isEmpty);
+      final playPause = find.descendant(
+        of: find.byKey(const ValueKey('global-minibar')),
+        matching: find.byKey(const ValueKey('play-pause')),
+      );
+      expect(playPause, findsOneWidget);
+      expect(tester.widget<IconButton>(playPause).onPressed, isNull);
       await tap(tester, find.byKey(const ValueKey('open-playback-queue')));
       expect(find.text('队列为空，从曲库、筛选或歌单添加歌曲'), findsOneWidget);
-      expect(find.byKey(const ValueKey('play-pause')), findsNothing);
       for (final mode in PlaybackMode.values) {
+        await tap(tester, find.byKey(const ValueKey('playback-mode')).last);
+        final before = tester
+            .widgetList<CheckedPopupMenuItem<PlaybackMode>>(
+              find.byType(CheckedPopupMenuItem<PlaybackMode>),
+            )
+            .toList();
+        expect(before.where((i) => i.checked).single.value, playback.queue.mode);
+        await tap(tester, find.byKey(ValueKey('playback-mode-${mode.name}')));
+        expect(playback.queue.mode, mode);
         await tap(tester, find.byKey(const ValueKey('playback-mode')).last);
         final items = tester
             .widgetList<CheckedPopupMenuItem<PlaybackMode>>(
               find.byType(CheckedPopupMenuItem<PlaybackMode>),
             )
             .toList();
-        expect(items.where((i) => i.checked).single.value, playback.queue.mode);
-        await tap(tester, find.byKey(ValueKey('playback-mode-${mode.name}')));
-        expect(playback.queue.mode, mode);
+        expect(items, hasLength(PlaybackMode.values.length));
+        expect(items.where((i) => i.checked).single.value, mode);
+        for (final item in items) {
+          expect(item.checked, item.value == mode);
+        }
+        Navigator.of(
+          tester.element(find.byType(CheckedPopupMenuItem<PlaybackMode>).first),
+        ).pop();
+        await tester.pumpAndSettle();
       }
-      expect(player.opens, isEmpty);
-      expect(playback.playing, isFalse);
       await tap(tester, find.byTooltip('关闭队列'));
       expect(find.byKey(const ValueKey('open-playback-queue')), findsOneWidget);
+      await tap(tester, find.byKey(const ValueKey('open-playback-queue')));
+      expect(find.text('队列为空，从曲库、筛选或歌单添加歌曲'), findsOneWidget);
+      expect(playback.queue.entries, isEmpty);
+      expect(player.opens, isEmpty);
+      expect(playback.playing, isFalse);
     },
   );
 
@@ -228,18 +251,21 @@ void main() {
       await playback.playSongs([song('old')], 0);
       final original = playback.queue.current!.entryId;
       final stops = player.stops;
-      library.filter(reverse: true);
+      library.filter(order: LibrarySort.title, reverse: true);
       await mount(tester, LibraryPage(library: library, playback: playback));
-      await tap(tester, find.byKey(const ValueKey('select-songs')));
-      await tap(tester, find.byKey(ValueKey(tracks['A']!.song.id)));
+      await tester.longPress(find.byKey(ValueKey(tracks['A']!.song.id)));
+      await tester.pumpAndSettle();
       await tap(tester, find.byKey(ValueKey(tracks['C']!.song.id)));
       library.filter(text: 'B');
       await tester.pumpAndSettle();
       await tap(tester, find.byKey(const ValueKey('enqueue-library-selected')));
       expect(names().skip(1), [tracks['C']!.song.name, tracks['A']!.song.name]);
-      await tap(tester, find.byKey(const ValueKey('enqueue-library')));
+      await tap(
+        tester,
+        find.byKey(ValueKey('enqueue-library-${tracks['B']!.song.id}')),
+      );
       expect(names().last, tracks['B']!.song.name);
-      await tap(tester, find.byKey(const ValueKey('select-songs')));
+      await tap(tester, find.text('退出多选'));
       await tap(
         tester,
         find.byKey(ValueKey('enqueue-library-${tracks['B']!.song.id}')),
@@ -251,18 +277,6 @@ void main() {
       await mount(tester, FilterPage(library: library, playback: playback));
       await tap(tester, find.byKey(const ValueKey('enqueue-filter')));
       expect(names().last, tracks['A']!.song.name);
-      await tester.scrollUntilVisible(
-        find.byKey(ValueKey('enqueue-filter-${tracks['A']!.song.id}')),
-        200,
-        scrollable: find.descendant(
-          of: find.byKey(const PageStorageKey('filter-scroll')),
-          matching: find.byWidgetPredicate(
-            (widget) =>
-                widget is Scrollable &&
-                widget.axisDirection == AxisDirection.down,
-          ),
-        ),
-      );
       final beforeSingle = names().length;
       await tap(
         tester,
@@ -307,11 +321,10 @@ void main() {
         );
         expect(names().last, tracks['B']!.song.name);
         if (id == regular) {
-          await tap(tester, find.byKey(const ValueKey('playlist-select')));
-          await tap(
-            tester,
+          await tester.longPress(
             find.byKey(ValueKey('playlist-song-${tracks['B']!.song.id}')),
           );
+          await tester.pumpAndSettle();
           await tester.enterText(
             find.byKey(ValueKey('playlist-search-$id')),
             'A',

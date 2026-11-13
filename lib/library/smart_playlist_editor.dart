@@ -115,7 +115,10 @@ class _SmartEditorState extends State<_SmartEditor> {
                   children: [
                     DropdownButton<LibrarySort>(
                       key: const ValueKey('smart-sort'),
-                      value: preferences.sort,
+                      value: preferences.sort == LibrarySort.modified
+                          ? null
+                          : preferences.sort,
+                      hint: const Text('修改时间（已保存）'),
                       onChanged: saving ? null : (sort) => _change(sort: sort),
                       items: [
                         for (final entry in {

@@ -137,8 +137,8 @@ class LibraryController extends ChangeNotifier {
   Map<String, Set<String>> tagIdsBySong = {};
   Map<String, int> tagCounts = {};
   String query = '';
-  LibrarySort sort = LibrarySort.title;
-  bool descending = false;
+  LibrarySort sort = LibrarySort.modified;
+  bool descending = true;
   bool showMissing = true;
   bool scanning = false;
   bool choosing = false;
@@ -177,12 +177,62 @@ class LibraryController extends ChangeNotifier {
     return rows;
   }
 
+  /// A full-library snapshot, independent of all page and persisted filters.
+  /// Cache by the data snapshot, never by playback notifications.
+  List<LibraryTrack>? _searchSource;
+  final _searchResults = <(String, LibrarySort, bool), List<LibraryTrack>>{};
+
+  List<LibraryTrack> searchTracks(
+    String text, {
+    LibrarySort order = LibrarySort.modified,
+    bool descending = true,
+  }) {
+    final needle = text.trim().toLowerCase();
+    if (!identical(_searchSource, tracks)) {
+      _searchResults.clear();
+      _searchSource = tracks;
+    }
+    final key = (needle, order, descending);
+    if (_searchResults[key] case final cached?) return cached;
+    final rows = tracks
+        .where(
+          (t) =>
+              needle.isEmpty ||
+              [
+                t.title,
+                t.song.name,
+                t.song.artist ?? '',
+                t.song.album ?? '',
+              ].any((v) => v.toLowerCase().contains(needle)),
+        )
+        .toList();
+    _sortTracks(rows, order, descending);
+    if (_searchResults.length >= 8) {
+      _searchResults.remove(_searchResults.keys.first);
+    }
+    return _searchResults[key] = List.unmodifiable(rows);
+  }
+
   void _sortTracks(List<LibraryTrack> rows, LibrarySort sort, bool descending) {
+    if (sort == LibrarySort.modified) {
+      rows.sort((a, b) {
+        final left = a.song.modified;
+        final right = b.song.modified;
+        if (left == null && right != null) return 1;
+        if (right == null && left != null) return -1;
+        final time = left == null ? 0 : left.compareTo(right!);
+        if (time != 0) return descending ? -time : time;
+        final name = a.song.name.compareTo(b.song.name);
+        return name != 0 ? name : a.song.id.compareTo(b.song.id);
+      });
+      return;
+    }
     String value(LibraryTrack t) => switch (sort) {
       LibrarySort.title => t.title,
       LibrarySort.artist => t.song.artist ?? '',
       LibrarySort.album => t.song.album ?? '',
       LibrarySort.name => t.song.name,
+      LibrarySort.modified => throw StateError('handled above'),
     };
     rows.sort((a, b) {
       var result = value(a).toLowerCase().compareTo(value(b).toLowerCase());

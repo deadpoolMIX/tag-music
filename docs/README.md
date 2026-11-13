@@ -23,10 +23,10 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 
 | 职责 | 代码入口 / 符号 | 相关验证 |
 |---|---|---|
-| 初始化、导航、设置 | [main.dart](../lib/main.dart)、[app.dart](../lib/app.dart)、[core/](../lib/core/) | `app_test`、`settings_test`、集成 `smoke_test` |
+| 初始化、导航、设置 | [main.dart](../lib/main.dart)、[app.dart](../lib/app.dart)、[core/](../lib/core/)；R6七入口壳层与稳定页面状态仍在阶段实现中 | `app_test`、`settings_test`、集成 `smoke_test`；当前R6进度见[当轮记录](rounds/R6.md) |
 | 数据表、连接、迁移 | [database.dart](../lib/library/database.dart) / `LibraryDatabase`；`database.g.dart` 为生成文件 | `library_test`、`tag_test`、`playlist_test`、[schema v4 DDL](database-schema/v4.json) |
-| 扫描事务、增量/失联、搜索排序 | [library_controller.dart](../lib/library/library_controller.dart) / `LibraryController` | 单元/集成 `library_test` |
-| 曲库 UI、封面、输入连接 | [library_page.dart](../lib/library/library_page.dart)、[library_search.dart](../lib/library/library_search.dart) | `test/library_page_test.dart`、真机输入 |
+| 扫描事务、增量/失联、搜索排序 | [library_controller.dart](../lib/library/library_controller.dart) / `LibraryController`；R6工作区新增独立全库搜索和修改时间排序，兼容要求见[R6 §2B/2C](rounds/R6.md#2b公共排序与持久兼容) | 单元/集成 `library_test`、`r6_library_sort_test`、`library_search_test`；R6状态见[当轮记录](rounds/R6.md) |
+| 曲库 UI、共享歌曲行、封面、输入连接 | [library_page.dart](../lib/library/library_page.dart)、[song_list.dart](../lib/library/song_list.dart)、[library_search_page.dart](../lib/library/library_search_page.dart)、[library_search.dart](../lib/library/library_search.dart)、[track_cover.dart](../lib/library/track_cover.dart)；R6顺序2仍未验收 | `test/library_page_test.dart`、`r6_song_list_test`、`library_search_test`；真机输入另需当批授权 |
 | 标签关系与管理、多选操作 | [tag_repository.dart](../lib/library/tag_repository.dart)、[tags_page.dart](../lib/library/tags_page.dart)；曲库controller共用DB及状态 | `tag_test`、`tags_page_test`、设备 `tag_benchmark_test` |
 | 三框组合筛选、当前规则保留 | [filter_rule.dart](../lib/library/filter_rule.dart)、[filter_repository.dart](../lib/library/filter_repository.dart)、[filter_page.dart](../lib/library/filter_page.dart)；LibraryController复用曲库/标签数据 | `filter_test`、`filter_page_test`、双端 `filter_benchmark_test` |
 | 普通歌单存储、编辑、列表/队列保存 | [playlist_repository.dart](../lib/library/playlist_repository.dart)、[playlists_page.dart](../lib/library/playlists_page.dart)、[playlist_actions.dart](../lib/library/playlist_actions.dart)；LibraryController共用DB与曲库UUID | `playlist_test`、`playlists_page_test` |
@@ -56,9 +56,9 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 
 ## 验证入口与维护
 
-- `& ./scripts/check.ps1 -Round R5`（PowerShell 7）：依赖恢复、格式、analyze、全套单元/widget及7项Python报告审计测试；准备真实合成音频/封面样本，并输出曲库/标签/筛选/队列主机基准。不含原生集成、双端构建、手机验收，不代表真实万首文件或设备Release性能。
+- `& ./scripts/check.ps1 -Round R6`（PowerShell 7）：依赖恢复、格式、analyze、全套单元/widget及R6工具/报告审计测试；准备固定曲库/封面/LRC样本并输出既有曲库/标签/筛选/队列主机基准。R6应用变更的当前验证进度见[当轮记录](rounds/R6.md)；不含原生集成、双端构建、手机验收，不代表真实万首文件或设备Release性能。
 - 候选参数：`scripts/build.ps1 -Target all -BuildNumber <新构建号> -Round <当前阶段>`；`verify-apk.ps1` 显式传 `-Version/-BuildNumbers/-Round`；`verify-packages.py` 传 `--version/--build/--round`，当前音频基线另传 `--native-reference-round R1`。隔离性能包用同一审计入口另传`--android-archive <APK> --windows-archive <ZIP> --output <新审计.json>`；报告拒绝覆盖，SQLite剥离复核文件按构建号区分。须在下一次Android构建覆盖merged原生输入前审计本批包。示意值须取实际 pubspec/交接。
-- 手动 Flutter 先 `. ./scripts/env.ps1`，再 `& ./scripts/restore.ps1 -Round R5`。所有 Flutter 检查/测试/构建串行，避免共享注册文件互改。按模块表先做相关回归，候选/阶段收口完整验证，具体门禁见 [PLAN §4](PLAN.md#4-验证与质量门禁)。
+- 手动 Flutter 先 `. ./scripts/env.ps1`，再 `& ./scripts/restore.ps1 -Round R6`。所有 Flutter 检查/测试/构建串行，避免共享注册文件互改。按模块表先做相关回归，候选/阶段收口完整验证，具体门禁见 [PLAN §4](PLAN.md#4-验证与质量门禁)。
 - check在R1～R6按阶段准备样本，SQLite包审计分支在R2～R6启用；R6的固定封面/LRC、性能采样契约及未测边界见[R6顺序1](rounds/R6.md#七顺序1固定样本与测量入口2026-11-12)。后续阶段Plan先核对覆盖，不能把skip当通过。脚本默认参数及Android播放/卡片脚本仍有R1路径/样本假设，使用前核对，显式传当前参数。
 - 固定日志名重跑前保留旧失败证据到同轮构建号/问题子目录，候选不复用构建号覆盖。`install-android.ps1` 还会启动应用与抓日志，须取得涵盖这些操作的本批交互确认。
 - 独立设备性能包（R3标签/R4三框）：`& ./scripts/build-filter-benchmark.ps1 -Target all -BenchmarkBuildNumber <新测试编号>`，双端Release模式；Android独立ID `app.tagmusic.player.benchmark`、临时合成库，Windows单列打包并内置JSON报告出口；脚本只构建审计，不安装运行。正式APK安装从artifacts取包，不能从最新build/app输出推定候选身份。R4使用`integration_test/filter_benchmark_test.dart`，报告实际规则重算/搜索排序，初次加载单列，不计真实文件扫描或UI渲染。Android完整分段日志用 `python scripts/audit-filter-benchmark.py <本批日志> --report <新报告.json> --audit <新审计.json>` 恢复并复核六场景；缺段/重复/截断拒绝，勿用摘要替代原始数据。

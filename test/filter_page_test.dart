@@ -167,11 +167,6 @@ void main() {
       await tester.pumpAndSettle();
       final expected = library.filtered.map((t) => t.probe.location).toList();
       final target = find.byKey(ValueKey('filter-song-${songs['乙.mp3']}'));
-      await tester.scrollUntilVisible(
-        target,
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
       await tester.ensureVisible(target);
       await tester.pumpAndSettle();
       await tester.tap(target);
@@ -212,6 +207,16 @@ void main() {
       'filter controls and picker usable at ${configuration.$1} scale ${configuration.$2}',
       (tester) async {
         await open(tester, size: configuration.$1, scale: configuration.$2);
+        expect(
+          tester.takeException(),
+          isNull,
+          reason: 'Initial filter layout must fit before interacting with tags.',
+        );
+        final sort = find.byKey(const ValueKey('filter-sort'));
+        expect(
+          tester.getSize(sort).width,
+          lessThanOrEqualTo(configuration.$1.width - 32),
+        );
         await pick(tester, 2, ['A']);
         expect(library.filtered.length, 2);
         final clear = find.byKey(const ValueKey('filter-clear-2'));

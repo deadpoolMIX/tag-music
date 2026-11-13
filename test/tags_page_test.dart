@@ -89,19 +89,19 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('select-songs')));
-    await tester.pumpAndSettle();
     library.filter(text: '甲');
     await tester.pumpAndSettle();
     expect(library.visible.length, 1);
     expect(ids['甲'], isNotNull);
     expect(find.text('歌曲 甲.mp3'), findsWidgets);
-    await tester.tap(find.byKey(ValueKey<String>(ids['甲']!)));
+    await tester.longPress(find.byKey(ValueKey<String>(ids['甲']!)));
+    await tester.pumpAndSettle();
     library.filter(text: '乙');
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(ValueKey<String>(ids['乙']!)));
     await tester.pumpAndSettle();
     expect(find.text('已选 2 首'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('batch-tags')));
     await tester.tap(find.byKey(const ValueKey('batch-tags')));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('添加收藏'));
