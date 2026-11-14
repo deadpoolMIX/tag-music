@@ -26,6 +26,8 @@ class SongList extends StatefulWidget {
     this.scope = 'library',
     this.emptyText = '没有匹配的歌曲',
     this.onLocated,
+    this.resetScrollKey,
+    this.keyboardDismissBehavior = ScrollViewKeyboardDismissBehavior.manual,
     super.key,
   });
   final LibraryController library;
@@ -38,6 +40,10 @@ class SongList extends StatefulWidget {
   final Future<void> Function(Set<String>)? onRemove;
   final String scope;
   final String emptyText;
+
+  /// A query change can reset scrolling without discarding hidden selections.
+  final Object? resetScrollKey;
+  final ScrollViewKeyboardDismissBehavior keyboardDismissBehavior;
 
   /// Optional real-application observation; widget virtual time is not a device sample.
   final void Function(String songId, int elapsedMicroseconds)? onLocated;
@@ -78,9 +84,21 @@ class _SongListState extends State<SongList> {
     }
     final members = widget.source.map((t) => t.song.id).toSet();
     _selected.removeWhere((id) => !members.contains(id));
-    if (!identical(oldWidget.rows, widget.rows)) {
+    final rowsChanged = !identical(oldWidget.rows, widget.rows);
+    final resetScroll = oldWidget.resetScrollKey != widget.resetScrollKey;
+    if (rowsChanged) {
       _indexRows();
+    }
+    if (rowsChanged || resetScroll) {
       _invalidateLocate();
+    }
+    if (resetScroll) {
+      final token = _locateToken;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && token == _locateToken && _scroll.hasClients) {
+          _scroll.jumpTo(0);
+        }
+      });
     }
   }
 
@@ -300,6 +318,7 @@ class _SongListState extends State<SongList> {
                   ReorderableListView.builder(
                     key: PageStorageKey((widget.scope, widget.key)),
                     scrollController: _scroll,
+                    keyboardDismissBehavior: widget.keyboardDismissBehavior,
                     itemExtent: extent,
                     buildDefaultDragHandles: false,
                     itemCount: widget.rows.length,
@@ -310,6 +329,7 @@ class _SongListState extends State<SongList> {
                   ListView.builder(
                     key: PageStorageKey((widget.scope, widget.key)),
                     controller: _scroll,
+                    keyboardDismissBehavior: widget.keyboardDismissBehavior,
                     itemExtent: extent,
                     itemCount: widget.rows.length,
                     padding: const EdgeInsets.only(bottom: 64),

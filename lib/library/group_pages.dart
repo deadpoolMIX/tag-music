@@ -10,13 +10,17 @@ class GroupList extends StatelessWidget {
     required this.storageKey,
     required this.descending,
     required this.onSort,
-    required this.children,
+    required this.itemCount,
+    required this.itemBuilder,
+    required this.emptyText,
     super.key,
   });
   final String storageKey;
   final bool descending;
   final VoidCallback onSort;
-  final List<Widget> children;
+  final int itemCount;
+  final IndexedWidgetBuilder itemBuilder;
+  final String emptyText;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -30,7 +34,22 @@ class GroupList extends StatelessWidget {
         ),
       ),
       Expanded(
-        child: ListView(key: PageStorageKey(storageKey), children: children),
+        child: itemCount == 0
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(emptyText, textAlign: TextAlign.center),
+                ),
+              )
+            : ListTileTheme(
+                dense: true,
+                minVerticalPadding: 8,
+                child: ListView.builder(
+                  key: PageStorageKey(storageKey),
+                  itemCount: itemCount,
+                  itemBuilder: itemBuilder,
+                ),
+              ),
       ),
     ],
   );
@@ -152,25 +171,30 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
                   : 'artists-overview',
               descending: descending,
               onSort: () => setState(() => descending = !descending),
-              children: [
-                if (keys.isEmpty) const ListTile(title: Text('暂无歌曲')),
-                for (final key in keys)
-                  ListTile(
-                    leading: Icon(
-                      widget.albums
-                          ? Icons.album_outlined
-                          : Icons.person_outline,
-                    ),
-                    title: Text(key ?? unknown),
-                    subtitle: Text(
-                      '${groups[key]!.length} 首${key == null ? (widget.albums ? ' · 未提供专辑信息' : ' · 未提供歌手信息') : ''}',
-                    ),
-                    onTap: () => setState(() {
-                      selected = key;
-                      opened = true;
-                    }),
+              itemCount: keys.length,
+              emptyText: '暂无歌曲',
+              itemBuilder: (_, index) {
+                final key = keys[index];
+                return ListTile(
+                  leading: Icon(
+                    widget.albums ? Icons.album_outlined : Icons.person_outline,
                   ),
-              ],
+                  title: Text(
+                    key ?? unknown,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    '${groups[key]!.length} 首${key == null ? (widget.albums ? ' · 未提供专辑信息' : ' · 未提供歌手信息') : ''}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onTap: () => setState(() {
+                    selected = key;
+                    opened = true;
+                  }),
+                );
+              },
             ),
           ),
         ],

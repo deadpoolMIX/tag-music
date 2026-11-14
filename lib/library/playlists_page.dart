@@ -6,6 +6,7 @@ import 'database.dart';
 import 'library_controller.dart';
 import 'playlist_actions.dart';
 import 'filter_rule.dart';
+import 'group_pages.dart';
 import 'smart_playlist_editor.dart';
 import 'song_list.dart';
 
@@ -363,42 +364,37 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
             ],
           ),
         ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            onPressed: () => setState(() => descending = !descending),
-            icon: Icon(descending ? Icons.arrow_downward : Icons.arrow_upward),
-            label: Text(descending ? '名称降序' : '名称升序'),
-          ),
-        ),
         Expanded(
-          child: lists.isEmpty
-              ? const Center(child: Text('保存喜欢的歌曲顺序，或创建空歌单'))
-              : ListView.builder(
-                  key: const PageStorageKey('playlist-overview'),
-                  itemCount: lists.length,
-                  itemBuilder: (_, i) {
-                    final list = lists[i];
-                    return ListTile(
-                      key: ValueKey('playlist-${list.id}'),
-                      leading: Icon(
-                        list.kind == 'smart'
-                            ? Icons.auto_awesome
-                            : Icons.queue_music,
-                      ),
-                      title: Text(list.name),
-                      subtitle: Text(
-                        '${list.kind == 'smart' ? '智能歌单' : '普通歌单'} · ${_count(library, list)}',
-                      ),
-                      onTap: () => setState(() {
-                        openedId = list.id;
-                        query = '';
-
-                        reorderingMode = false;
-                      }),
-                    );
-                  },
+          child: GroupList(
+            storageKey: 'playlist-overview',
+            descending: descending,
+            onSort: () => setState(() => descending = !descending),
+            itemCount: lists.length,
+            emptyText: '保存喜欢的歌曲顺序，或创建空歌单',
+            itemBuilder: (_, i) {
+              final list = lists[i];
+              return ListTile(
+                key: ValueKey('playlist-${list.id}'),
+                leading: Icon(
+                  list.kind == 'smart' ? Icons.auto_awesome : Icons.queue_music,
                 ),
+                title: Text(
+                  list.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  '${list.kind == 'smart' ? '智能歌单' : '普通歌单'} · ${_count(library, list)}',
+                ),
+                onTap: () => setState(() {
+                  openedId = list.id;
+                  query = '';
+
+                  reorderingMode = false;
+                }),
+              );
+            },
+          ),
         ),
       ],
     );

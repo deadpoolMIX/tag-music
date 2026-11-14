@@ -253,38 +253,42 @@ class _TagsPageState extends State<TagsPage> {
               storageKey: 'tags-overview',
               descending: descending,
               onSort: () => setState(() => descending = !descending),
-              children: [
-                if (tags.isEmpty)
-                  const ListTile(title: Text('尚无标签。创建后可在曲库为歌曲添加标签。')),
-                for (final tag in tags)
-                  ListTile(
-                    key: ValueKey('tag-${tag.id}'),
-                    leading: const Icon(Icons.sell_outlined),
-                    title: Text(tag.name),
-                    subtitle: Text('${library.tracksForTag(tag.id).length} 首'),
-                    onTap: () => setState(() => openedId = tag.id),
-                    trailing: PopupMenuButton<String>(
-                      tooltip: '标签操作',
-                      onSelected: (action) {
-                        if (action == 'rename') {
-                          _editName(
-                            context,
-                            library,
-                            id: tag.id,
-                            initial: tag.name,
-                          );
-                        }
-                        if (action == 'delete') {
-                          _delete(context, tag.id, tag.name);
-                        }
-                      },
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(value: 'rename', child: Text('改名')),
-                        PopupMenuItem(value: 'delete', child: Text('删除')),
-                      ],
-                    ),
+              itemCount: tags.length,
+              emptyText: '尚无标签。创建后可在曲库为歌曲添加标签。',
+              itemBuilder: (_, index) {
+                final tag = tags[index];
+                return ListTile(
+                  key: ValueKey('tag-${tag.id}'),
+                  leading: const Icon(Icons.sell_outlined),
+                  title: Text(
+                    tag.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-              ],
+                  subtitle: Text('${library.tracksForTag(tag.id).length} 首'),
+                  onTap: () => setState(() => openedId = tag.id),
+                  trailing: PopupMenuButton<String>(
+                    tooltip: '标签操作',
+                    onSelected: (action) {
+                      if (action == 'rename') {
+                        _editName(
+                          context,
+                          library,
+                          id: tag.id,
+                          initial: tag.name,
+                        );
+                      }
+                      if (action == 'delete') {
+                        _delete(context, tag.id, tag.name);
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'rename', child: Text('改名')),
+                      PopupMenuItem(value: 'delete', child: Text('删除')),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         ],

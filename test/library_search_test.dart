@@ -120,14 +120,14 @@ void main() {
           'absent',
         );
         await tester.pumpAndSettle();
-        expect(find.text('没有匹配的歌曲'), findsOneWidget);
+        expect(find.textContaining('没有匹配的歌曲'), findsOneWidget);
         expect(find.byType(SongRow), findsNothing);
         expectPlaybackUnchanged();
         expectSourceUnchanged();
 
         await tester.tap(find.byTooltip('清空搜索'));
         await tester.pumpAndSettle();
-        expect(find.text('没有匹配的歌曲'), findsNothing);
+        expect(find.textContaining('没有匹配的歌曲'), findsNothing);
         expect(find.byType(SongRow), findsNWidgets(4));
         for (final id in ['a', 'b', 'c', 'd']) {
           expect(find.byKey(ValueKey(id)), findsOneWidget);

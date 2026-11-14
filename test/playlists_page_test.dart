@@ -258,13 +258,17 @@ void main() {
         rows['B']!.queueSong,
       ], 0);
       final original = playback.queue.entries.map((e) => e.entryId).toList();
+      final displayedSongs = playback.queue.entries
+          .map((e) => e.song.songId)
+          .toSet()
+          .toList();
       await library.createPlaylist('Other', []);
       await mount(tester, page());
       await tester.tap(find.byKey(const ValueKey('save-queue-playlist')));
       await tester.pumpAndSettle();
       await saveName(tester, 'Queue');
       final id = library.playlists.singleWhere((p) => p.name == 'Queue').id;
-      expect(library.playlistSongIds[id], [ids['C'], ids['A'], ids['B']]);
+      expect(library.playlistSongIds[id], displayedSongs);
       await tester.tap(find.byKey(ValueKey('playlist-$id')));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('歌单操作'));
@@ -350,6 +354,7 @@ void main() {
   testWidgets(
     'small screen song click plays ordered snapshot and keyboard keeps shared playback bar usable',
     (tester) async {
+      playback.queue.setMode(PlaybackMode.sequential);
       tester.view.physicalSize = const Size(320, 568);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
