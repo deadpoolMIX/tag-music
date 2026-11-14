@@ -158,12 +158,15 @@ void main() {
     'removing current preserves playing or paused, and final removal unloads',
     () async {
       await controller.playSongs([song('A'), song('B'), song('C')], 0);
+      final displayed = controller.queue.entries
+          .map((entry) => entry.song.songId)
+          .toList();
       await controller.removeFromQueue(controller.queue.current!.entryId);
-      expect(controller.currentSongId, 'B');
+      expect(controller.currentSongId, displayed[1]);
       expect(controller.playing, isTrue);
       await controller.pause();
       await controller.removeFromQueue(controller.queue.current!.entryId);
-      expect(controller.currentSongId, 'C');
+      expect(controller.currentSongId, displayed[2]);
       expect(controller.playing, isFalse);
       expect(documents.descriptors, hasLength(1));
       await controller.removeFromQueue(controller.queue.current!.entryId);

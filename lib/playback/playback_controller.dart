@@ -10,6 +10,7 @@ import 'package:media_kit/media_kit.dart';
 
 import 'documents.dart';
 import 'lyrics.dart';
+import 'sleep_countdown.dart';
 import 'playback_queue.dart';
 
 export 'playback_queue.dart'
@@ -27,7 +28,14 @@ class PlaybackController extends ChangeNotifier {
     this.player,
     this.documents, {
     PlaybackQueue? playbackQueue,
+    Duration Function()? sleepClock,
+    SleepSchedule? sleepSchedule,
   }) : queue = playbackQueue ?? PlaybackQueue() {
+    sleep = SleepCountdown(
+      clock: sleepClock ?? (() => _sleepWatch.elapsed),
+      schedule: sleepSchedule ?? scheduleSleepWakeup,
+      onWake: (token) => _scheduleSleepDeadline(token),
+    );
     lyrics.addListener(_publish);
     _subscriptions.addAll([
       player.stream.playing.listen((_) => _publish()),
@@ -67,6 +75,7 @@ class PlaybackController extends ChangeNotifier {
         unawaited(
           _serial(() async {
             if (_selection != failedSelection || !_playbackFailed) return;
+            if (await _sleepBlocksSwitch()) return;
             if (failedEntry != null) _failedEntries.add(failedEntry);
             playbackNotice = error;
             await _unload();
@@ -81,6 +90,68 @@ class PlaybackController extends ChangeNotifier {
         );
       }),
     ]);
+  }
+
+  final _sleepWatch = Stopwatch()..start();
+  late final SleepCountdown sleep;
+  int? _sleepDeadlineQueued;
+  bool get _countSleep =>
+      _playIntent &&
+      playing &&
+      !player.state.buffering &&
+      !player.state.completed &&
+      !changingTrack &&
+      player.state.playlist.medias.isNotEmpty;
+
+  void _observeSleep() {
+    sleep.update(counting: _countSleep, entryId: queue.current?.entryId);
+    if (sleep.waitingForEnd && (!playing || _playbackFailed || !_playIntent)) {
+      _scheduleSleepDeadline(sleep.generation);
+    }
+  }
+
+  void _scheduleSleepDeadline(int token) {
+    if (_closed || token != sleep.generation || _sleepDeadlineQueued == token) {
+      return;
+    }
+    _sleepDeadlineQueued = token;
+    unawaited(
+      _serial(() async {
+        if (_sleepDeadlineQueued == token) _sleepDeadlineQueued = null;
+        if (token != sleep.generation) return;
+        sleep.update(counting: _countSleep, entryId: queue.current?.entryId);
+        if (sleep.waitingForEnd &&
+            (!playing ||
+                _playbackFailed ||
+                !_playIntent ||
+                queue.current?.entryId != sleep.lockedEntryId)) {
+          await _finishSleep();
+        }
+      }),
+    );
+  }
+
+  Future<void> setSleepTimer(Duration duration) => _serial(() async {
+    sleep.start(duration);
+    _sleepDeadlineQueued = null;
+    _observeSleep();
+  });
+  Future<void> cancelSleepTimer() => _serial(() async {
+    sleep.cancel();
+    _sleepDeadlineQueued = null;
+  });
+  Future<void> _finishSleep() async {
+    sleep.cancel();
+    _sleepDeadlineQueued = null;
+    await _stopPlayback();
+    playbackNotice = '睡眠定时已结束';
+  }
+
+  Future<bool> _sleepBlocksSwitch() async {
+    _observeSleep();
+    if (!sleep.waitingForEnd) return false;
+    await _finishSleep();
+    return true;
   }
 
   final lyrics = LyricsTimeline();
@@ -152,7 +223,10 @@ class PlaybackController extends ChangeNotifier {
   );
 
   void _publish() {
-    if (!_closed) notifyListeners();
+    if (!_closed) {
+      _observeSleep();
+      notifyListeners();
+    }
   }
 
   // All transitions (including notification callbacks) share one serial lane.
@@ -161,6 +235,7 @@ class PlaybackController extends ChangeNotifier {
     final result = _pending.then((_) async {
       if (_closed) return;
       try {
+        _observeSleep();
         await action();
       } catch (e) {
         error = '操作失败：$e';
@@ -262,6 +337,7 @@ class PlaybackController extends ChangeNotifier {
   Future<void> _loadDirectory(String root) async {
     final loaded = await documents.list(root);
     await _serial(() async {
+      if (await _sleepBlocksSwitch()) return;
       _selection++;
       _playbackFailed = false;
       await _unload();
@@ -282,6 +358,7 @@ class PlaybackController extends ChangeNotifier {
   Future<void> playSongs(List<QueueSong> snapshot, int target) =>
       _serial(() async {
         if (target < 0 || target >= snapshot.length) return;
+        if (await _sleepBlocksSwitch()) return;
         _diagnosticQueue = false;
         queue.replace(snapshot, target);
         _syncTracks();
@@ -307,6 +384,7 @@ class PlaybackController extends ChangeNotifier {
   Future<void> removeFromQueue(String entryId) => _serial(() async {
     final wasCurrent = queue.current?.entryId == entryId;
     final wasPlaying = playing;
+    if (wasCurrent && await _sleepBlocksSwitch()) return;
     queue.remove(entryId);
     _syncTracks();
     if (!wasCurrent) return;
@@ -340,6 +418,7 @@ class PlaybackController extends ChangeNotifier {
 
   Future<void> _select(int target) async {
     if (target < 0 || target >= tracks.length) return;
+    if (await _sleepBlocksSwitch()) return;
     queue.select(queue.entries[target].entryId);
     await _openCurrent(play: true);
   }
@@ -412,6 +491,7 @@ class PlaybackController extends ChangeNotifier {
           playbackNotice = '已跳过不可播放歌曲：${entry.song.track.name}。$e';
           await _unload();
           await session?.setActive(false);
+          if (await _sleepBlocksSwitch()) return;
           if (queue.next(excluded: _failedEntries) == null) {
             _selection++; // Invalidate queued decoder cleanup for this attempt.
             _playbackFailed = true;
@@ -457,6 +537,13 @@ class PlaybackController extends ChangeNotifier {
 
   Future<void> _resume() async {
     if (current == null) return;
+    _observeSleep();
+    if (sleep.waitingForEnd) {
+      if (!playing || _playbackFailed || player.state.playlist.medias.isEmpty) {
+        await _finishSleep();
+      }
+      return;
+    }
     if (_playbackFailed || player.state.playlist.medias.isEmpty) {
       await _openCurrent(play: true);
     } else {
@@ -480,15 +567,18 @@ class PlaybackController extends ChangeNotifier {
       await _resume();
     }
   });
-  Future<void> stop() => _serial(() async {
+  Future<void> stop() => _serial(_stopPlayback);
+  Future<void> _stopPlayback() async {
     _selection++;
     _playbackFailed = false;
     error = null;
     _playIntent = false;
     await _unload();
     await session?.setActive(false);
-  });
+  }
+
   Future<void> _advance({bool natural = false}) async {
+    if (await _sleepBlocksSwitch()) return;
     if (queue.next(natural: natural) != null) {
       await _openCurrent(play: true);
     } else if (natural) {
@@ -500,6 +590,7 @@ class PlaybackController extends ChangeNotifier {
 
   Future<void> next() => _serial(() => _advance());
   Future<void> previous() => _serial(() async {
+    if (await _sleepBlocksSwitch()) return;
     if (queue.previous() != null) await _openCurrent(play: true);
   });
   Future<void> seek(Duration position) => _serial(() async {
@@ -513,6 +604,8 @@ class PlaybackController extends ChangeNotifier {
   Future<void> shutdown() async {
     await _pending;
     _closed = true;
+    sleep.dispose();
+    _sleepWatch.stop();
     lyrics.removeListener(_publish);
     lyrics.dispose();
     for (final subscription in _subscriptions) {

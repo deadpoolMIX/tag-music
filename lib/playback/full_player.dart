@@ -13,6 +13,7 @@ import 'playback_controller.dart';
 import 'playback_page.dart' show formatPosition;
 import 'queue_page.dart';
 import 'lyrics.dart';
+import 'sleep_timer_sheet.dart';
 
 Future<void> openFullPlayer(BuildContext context) =>
     Navigator.of(context)
@@ -331,11 +332,18 @@ class FullPlayer extends ConsumerWidget {
                                               playback: playback,
                                             ),
                                             IconButton(
-                                              tooltip: '睡眠定时暂不可用',
-                                              icon: const Icon(
-                                                Icons.bedtime_outlined,
+                                              tooltip: playback.sleep.active
+                                                  ? '睡眠定时已开启'
+                                                  : '睡眠定时',
+                                              icon: Icon(
+                                                playback.sleep.active
+                                                    ? Icons.bedtime
+                                                    : Icons.bedtime_outlined,
                                               ),
-                                              onPressed: null,
+                                              onPressed: () => showSleepTimer(
+                                                context,
+                                                playback,
+                                              ),
                                             ),
                                             IconButton(
                                               tooltip: '播放队列',
