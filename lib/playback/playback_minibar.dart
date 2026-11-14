@@ -24,57 +24,59 @@ class PlaybackMinibar extends ConsumerWidget {
           child: Row(
             children: [
               Expanded(
-                child: InkWell(
-                  onTap: playback == null
-                      ? null
-                      : () => openFullPlayer(context),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    child: Row(
-                      children: [
-                        if (current != null && playback != null) ...[
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: TrackCover(
-                              documents: playback.documents,
-                              track: current,
-                              size: 44,
+                child: Tooltip(
+                  message: '打开完整播放器',
+                  child: InkWell(
+                    onTap: playback == null
+                        ? null
+                        : () => openFullPlayer(context),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          if (current != null && playback != null) ...[
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: TrackCover(
+                                documents: playback.documents,
+                                track: current,
+                                size: 44,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                          ],
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  current == null
+                                      ? '未播放'
+                                      : playbackTitle(playback!),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                                Text(
+                                  current == null
+                                      ? '选择歌曲开始播放'
+                                      : playback!.changingTrack
+                                      ? '正在装载歌曲'
+                                      : playback.currentLyric ??
+                                            playbackArtist(playback),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 12),
                         ],
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                current == null
-                                    ? '未播放'
-                                    : playbackTitle(playback!),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                              Text(
-                                current == null
-                                    ? '选择歌曲开始播放'
-                                    : playback!.changingTrack
-                                    ? '正在装载歌曲'
-                                    : playback.currentLyric ??
-                                          playback.metadata?.artist ??
-                                          '未知歌手',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),

@@ -3,13 +3,19 @@ import 'package:flutter/semantics.dart';
 
 import 'playback_controller.dart';
 
+String? _nonBlank(String? value) {
+  final text = value?.trim();
+  return text == null || text.isEmpty ? null : text;
+}
+
 String playbackTitle(PlaybackController playback) =>
-    (!playback.changingTrack ? playback.metadata?.title : null) ??
-    playback.current?.name ??
+    (!playback.changingTrack ? _nonBlank(playback.metadata?.title) : null) ??
+    _nonBlank(playback.current?.name) ??
     '未播放';
 
-String playbackArtist(PlaybackController playback) =>
-    playback.changingTrack ? '正在读取歌曲信息' : playback.metadata?.artist ?? '未知歌手';
+String playbackArtist(PlaybackController playback) => playback.changingTrack
+    ? '正在读取歌曲信息'
+    : _nonBlank(playback.metadata?.artist) ?? '未知歌手';
 
 String playbackActivityLabel(PlaybackController playback) {
   if (playback.changingTrack) return '正在装载歌曲';

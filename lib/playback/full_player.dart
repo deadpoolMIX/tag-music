@@ -331,21 +331,75 @@ class _PlayerBody extends StatelessWidget {
   Widget _heading(BuildContext context) => Column(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Text(
-        playbackTitle(playback),
-        textAlign: TextAlign.center,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.headlineSmall,
+      Tooltip(
+        message: playbackTitle(playback),
+        child: Text(
+          playbackTitle(playback),
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
       ),
       const SizedBox(height: 6),
-      Text(
-        playbackArtist(playback),
-        textAlign: TextAlign.center,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
+      Tooltip(
+        message: playbackArtist(playback),
+        child: Text(
+          playbackArtist(playback),
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
     ],
+  );
+
+  Widget _empty(BuildContext context) => Center(
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.album_outlined, size: 72),
+            const SizedBox(height: 20),
+            Text(
+              '还没有播放歌曲',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 12),
+            const Text('从曲库选择歌曲后，会在这里显示封面和播放控制。', textAlign: TextAlign.center),
+            const SizedBox(height: 20),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (Navigator.canPop(context))
+                  FilledButton.tonalIcon(
+                    onPressed: () => Navigator.maybePop(context),
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('返回上一页'),
+                  ),
+                OutlinedButton.icon(
+                  onPressed: () =>
+                      showPlaybackQueue(context, playback, library),
+                  icon: const Icon(Icons.queue_music),
+                  label: const Text('查看播放队列'),
+                ),
+              ],
+            ),
+            if (playback.sleep.active) ...[
+              const SizedBox(height: 16),
+              SleepTimerStatus(playback: playback),
+            ],
+            PlaybackFeedback(playback: playback),
+          ],
+        ),
+      ),
+    ),
   );
 
   Widget _controls(BuildContext context) => Column(
@@ -392,6 +446,7 @@ class _PlayerBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
+      if (playback.current == null) return _empty(context);
       final horizontalPadding = constraints.maxWidth < 360 ? 16.0 : 32.0;
       final width = math.max(0.0, constraints.maxWidth - horizontalPadding * 2);
       final wide = !simple && width >= 760;
