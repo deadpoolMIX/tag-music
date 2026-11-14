@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/reorder_handle.dart';
 import '../playback/playback_controller.dart';
@@ -53,6 +54,7 @@ class SongList extends StatefulWidget {
 
 class _SongListState extends State<SongList> {
   final _scroll = ScrollController();
+  final _selectionFocus = FocusNode(debugLabel: 'song-list-selection');
   final _selected = <String>{};
   bool _selecting = false;
   String? _highlight;
@@ -112,12 +114,21 @@ class _SongListState extends State<SongList> {
   void dispose() {
     _timer?.cancel();
     _scroll.dispose();
+    _selectionFocus.dispose();
     super.dispose();
   }
 
-  void _toggle(String id) => setState(() {
-    _selecting = true;
-    if (!_selected.add(id)) _selected.remove(id);
+  void _toggle(String id) {
+    setState(() {
+      _selecting = true;
+      if (!_selected.add(id)) _selected.remove(id);
+    });
+    _selectionFocus.requestFocus();
+  }
+
+  void _exitSelection() => setState(() {
+    _selected.clear();
+    _selecting = false;
   });
 
   List<LibraryTrack> _snapshot() => List.unmodifiable(
@@ -173,89 +184,152 @@ class _SongListState extends State<SongList> {
     });
   }
 
-  Widget _toolbar() => Material(
-    color: Theme.of(context).colorScheme.surfaceContainer,
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text('已选 ${_selected.length} 首'),
+  Widget _toolbar(double maxHeight) {
+    final visibleIds = widget.rows.map((t) => t.song.id).toSet();
+    final visibleSelected = _selected.where(visibleIds.contains).length;
+    final hiddenSelected = _selected.length - visibleSelected;
+    final unavailable = _snapshot().where((t) => !t.available).length;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: SingleChildScrollView(
+        child: Material(
+          color: Theme.of(context).colorScheme.surfaceContainer,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Semantics(
+                        liveRegion: true,
+                        child: Text('已选 ${_selected.length} 首'),
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _exitSelection,
+                    icon: const Icon(Icons.close),
+                    label: const Text('退出多选'),
+                  ),
+                ],
+              ),
+              if (hiddenSelected > 0 || unavailable > 0)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                  child: Text(
+                    [
+                      if (hiddenSelected > 0)
+                        '当前结果已选 $visibleSelected 首，另有 $hiddenSelected 首在当前结果外。',
+                      if (unavailable > 0) '已选中 $unavailable 首失联歌曲，加入队列时会跳过。',
+                    ].join(' '),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    Tooltip(
+                      message: '全选当前结果，保留其他结果中的选择',
+                      child: TextButton(
+                        onPressed:
+                            !widget.enabled ||
+                                visibleSelected == visibleIds.length
+                            ? null
+                            : () =>
+                                  setState(() => _selected.addAll(visibleIds)),
+                        child: const Text('全选'),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: !widget.enabled || visibleSelected == 0
+                          ? null
+                          : () =>
+                                setState(() => _selected.removeAll(visibleIds)),
+                      child: const Text('取消当前结果选择'),
+                    ),
+                    TextButton(
+                      onPressed: _selected.isEmpty
+                          ? null
+                          : () => setState(_selected.clear),
+                      child: const Text('清空选择'),
+                    ),
+                    TextButton(
+                      key: const ValueKey('batch-tags'),
+                      onPressed: !widget.enabled || _selected.isEmpty
+                          ? null
+                          : () {
+                              final snapshot = _snapshot();
+                              showTagActions(
+                                context,
+                                widget.library,
+                                snapshot.map((t) => t.song.id).toSet(),
+                              );
+                            },
+                      child: const Text('批量编辑标签'),
+                    ),
+                    TextButton(
+                      key: ValueKey('enqueue-${widget.scope}-selected'),
+                      onPressed:
+                          !widget.enabled ||
+                              !_snapshot().any((t) => t.available)
+                          ? null
+                          : () {
+                              final snapshot = _snapshot()
+                                  .where((t) => t.available)
+                                  .map((t) => t.queueSong)
+                                  .toList();
+                              widget.playback.addToQueue(snapshot);
+                            },
+                      child: const Text('加入队列'),
+                    ),
+                    TextButton(
+                      key: const ValueKey('batch-add-playlist'),
+                      onPressed: !widget.enabled || _selected.isEmpty
+                          ? null
+                          : () {
+                              final ids = _snapshot()
+                                  .map((t) => t.song.id)
+                                  .toList();
+                              addToPlaylist(context, widget.library, ids);
+                            },
+                      child: const Text('添加到歌单'),
+                    ),
+                    TextButton(
+                      onPressed: !widget.enabled || _selected.isEmpty
+                          ? null
+                          : () {
+                              final ids = _snapshot()
+                                  .map((t) => t.song.id)
+                                  .toList();
+                              savePlaylist(context, widget.library, ids);
+                            },
+                      child: const Text('保存歌单'),
+                    ),
+                    if (widget.onRemove != null)
+                      TextButton(
+                        onPressed: !widget.enabled || _selected.isEmpty
+                            ? null
+                            : () {
+                                final ids = _snapshot()
+                                    .map((t) => t.song.id)
+                                    .toSet();
+                                widget.onRemove!(ids);
+                              },
+                        child: const Text('移除所选歌曲'),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => setState(
-              () => _selected.addAll(widget.rows.map((t) => t.song.id)),
-            ),
-            child: const Text('全选'),
-          ),
-          TextButton(
-            key: const ValueKey('batch-tags'),
-            onPressed: !widget.enabled || _selected.isEmpty
-                ? null
-                : () {
-                    final snapshot = _snapshot();
-                    showTagActions(
-                      context,
-                      widget.library,
-                      snapshot.map((t) => t.song.id).toSet(),
-                    );
-                  },
-            child: const Text('批量编辑标签'),
-          ),
-          TextButton(
-            key: ValueKey('enqueue-${widget.scope}-selected'),
-            onPressed: !widget.enabled || !_snapshot().any((t) => t.available)
-                ? null
-                : () {
-                    final snapshot = _snapshot()
-                        .where((t) => t.available)
-                        .map((t) => t.queueSong)
-                        .toList();
-                    widget.playback.addToQueue(snapshot);
-                  },
-            child: const Text('加入队列'),
-          ),
-          TextButton(
-            key: const ValueKey('batch-add-playlist'),
-            onPressed: !widget.enabled || _selected.isEmpty
-                ? null
-                : () {
-                    final ids = _snapshot().map((t) => t.song.id).toList();
-                    addToPlaylist(context, widget.library, ids);
-                  },
-            child: const Text('添加到歌单'),
-          ),
-          TextButton(
-            onPressed: !widget.enabled || _selected.isEmpty
-                ? null
-                : () {
-                    final ids = _snapshot().map((t) => t.song.id).toList();
-                    savePlaylist(context, widget.library, ids);
-                  },
-            child: const Text('保存歌单'),
-          ),
-          if (widget.onRemove != null)
-            TextButton(
-              onPressed: !widget.enabled || _selected.isEmpty
-                  ? null
-                  : () {
-                      final ids = _snapshot().map((t) => t.song.id).toSet();
-                      widget.onRemove!(ids);
-                    },
-              child: const Text('移除所选歌曲'),
-            ),
-          TextButton(
-            onPressed: () => setState(() {
-              _selected.clear();
-              _selecting = false;
-            }),
-            child: const Text('退出多选'),
-          ),
-        ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -304,56 +378,70 @@ class _SongListState extends State<SongList> {
         );
       }
 
-      return Column(
-        children: [
-          if (_selecting) _toolbar(),
-          Expanded(
-            child: Stack(
+      return CallbackShortcuts(
+        bindings: {
+          if (_selecting)
+            const SingleActivator(LogicalKeyboardKey.escape): _exitSelection,
+        },
+        child: Focus(
+          focusNode: _selectionFocus,
+          skipTraversal: true,
+          child: LayoutBuilder(
+            builder: (context, constraints) => Column(
               children: [
-                if (widget.rows.isEmpty)
-                  Center(child: Text(widget.emptyText))
-                else if (widget.reordering &&
-                    !_selecting &&
-                    widget.onReorder != null)
-                  ReorderableListView.builder(
-                    key: PageStorageKey((widget.scope, widget.key)),
-                    scrollController: _scroll,
-                    keyboardDismissBehavior: widget.keyboardDismissBehavior,
-                    itemExtent: extent,
-                    buildDefaultDragHandles: false,
-                    itemCount: widget.rows.length,
-                    itemBuilder: row,
-                    onReorderItem: widget.onReorder!,
-                  )
-                else
-                  ListView.builder(
-                    key: PageStorageKey((widget.scope, widget.key)),
-                    controller: _scroll,
-                    keyboardDismissBehavior: widget.keyboardDismissBehavior,
-                    itemExtent: extent,
-                    itemCount: widget.rows.length,
-                    padding: const EdgeInsets.only(bottom: 64),
-                    itemBuilder: row,
-                  ),
-                Positioned(
-                  right: 12,
-                  bottom: 12,
-                  child: Opacity(
-                    opacity: .85,
-                    child: IconButton.filledTonal(
-                      key: const ValueKey('locate-current-song'),
-                      tooltip: '定位当前歌曲',
-                      onPressed: canLocate
-                          ? () => _locate(current, extent)
-                          : null,
-                      icon: const Icon(Icons.my_location),
-                    ),
+                if (_selecting) _toolbar(constraints.maxHeight * .45),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      if (widget.rows.isEmpty)
+                        Center(child: Text(widget.emptyText))
+                      else if (widget.reordering &&
+                          !_selecting &&
+                          widget.onReorder != null)
+                        ReorderableListView.builder(
+                          key: PageStorageKey((widget.scope, widget.key)),
+                          scrollController: _scroll,
+                          keyboardDismissBehavior:
+                              widget.keyboardDismissBehavior,
+                          itemExtent: extent,
+                          buildDefaultDragHandles: false,
+                          itemCount: widget.rows.length,
+                          itemBuilder: row,
+                          onReorderItem: widget.onReorder!,
+                        )
+                      else
+                        ListView.builder(
+                          key: PageStorageKey((widget.scope, widget.key)),
+                          controller: _scroll,
+                          keyboardDismissBehavior:
+                              widget.keyboardDismissBehavior,
+                          itemExtent: extent,
+                          itemCount: widget.rows.length,
+                          padding: const EdgeInsets.only(bottom: 64),
+                          itemBuilder: row,
+                        ),
+                      Positioned(
+                        right: 12,
+                        bottom: 12,
+                        child: Opacity(
+                          opacity: .85,
+                          child: IconButton.filledTonal(
+                            key: const ValueKey('locate-current-song'),
+                            tooltip: '定位当前歌曲',
+                            onPressed: canLocate
+                                ? () => _locate(current, extent)
+                                : null,
+                            icon: const Icon(Icons.my_location),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       );
     },
   );
@@ -410,10 +498,12 @@ class SongRow extends StatelessWidget {
                     width: 44,
                     height: 44,
                     child: selecting
-                        ? Icon(
-                            selected
-                                ? Icons.check_box
-                                : Icons.check_box_outline_blank,
+                        ? Checkbox(
+                            value: selected,
+                            onChanged: enabled ? (_) => onSelect() : null,
+                            semanticLabel: '选择${track.title}',
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
                           )
                         : ClipRRect(
                             borderRadius: BorderRadius.circular(6),

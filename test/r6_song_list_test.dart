@@ -1,8 +1,7 @@
-import 'dart:typed_data';
-
 import 'package:drift/native.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tag_music/library/database.dart';
 import 'package:tag_music/library/library_controller.dart';
@@ -113,7 +112,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(playback.selectedSongId, isNull);
       expect(find.text('已选 1 首'), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('a')));
+      expect(
+        tester.widget<Checkbox>(find.byType(Checkbox).first).value,
+        isTrue,
+      );
+      await tester.tap(find.byType(Checkbox).first);
       await tester.pumpAndSettle();
       expect(find.text('已选 0 首'), findsOneWidget);
       expect(
@@ -199,10 +202,20 @@ void main() {
         await tester.pumpAndSettle();
         update(() => rows = [source[1]]);
         await tester.pumpAndSettle();
+        expect(find.textContaining('另有 1 首在当前结果外'), findsOneWidget);
         await tester.tap(find.text('全选'));
         await tester.pumpAndSettle();
         update(() => rows = [source[0]]);
         await tester.pumpAndSettle();
+        await tester.tap(find.text('全选'));
+        await tester.pumpAndSettle();
+        expect(find.text('已选 3 首'), findsOneWidget);
+        expect(find.textContaining('另有 2 首在当前结果外'), findsOneWidget);
+        expect(find.textContaining('已选中 1 首失联歌曲'), findsOneWidget);
+        await tester.tap(find.text('取消当前结果选择'));
+        await tester.pumpAndSettle();
+        expect(find.text('已选 2 首'), findsOneWidget);
+        expect(find.textContaining('失联歌曲'), findsNothing);
         await tester.tap(find.text('全选'));
         await tester.pumpAndSettle();
         expect(find.text('已选 3 首'), findsOneWidget);
@@ -234,6 +247,14 @@ void main() {
         await playback.next();
         expect(playback.currentSongId, 'b');
         await playback.next();
+        expect(playback.currentSongId, 'a');
+        await tester.ensureVisible(find.text('清空选择'));
+        await tester.tap(find.text('清空选择'));
+        await tester.pumpAndSettle();
+        expect(find.text('已选 0 首'), findsOneWidget);
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+        expect(find.text('退出多选'), findsNothing);
         expect(playback.currentSongId, 'a');
         expect(tester.takeException(), isNull);
       } finally {
