@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'library_controller.dart';
+import '../playback/playback_controller.dart';
+import 'group_pages.dart';
+import 'song_list.dart';
 
 Future<void> _run(BuildContext context, Future<void> Function() action) async {
   try {
@@ -118,9 +121,24 @@ Future<void> showTagActions(
   ),
 );
 
-class TagsPage extends StatelessWidget {
-  const TagsPage({required this.library, super.key});
+class TagsPage extends StatefulWidget {
+  const TagsPage({
+    required this.library,
+    this.playback,
+    this.active = true,
+    super.key,
+  });
   final LibraryController library;
+  final PlaybackController? playback;
+  final bool active;
+  @override
+  State<TagsPage> createState() => _TagsPageState();
+}
+
+class _TagsPageState extends State<TagsPage> {
+  LibraryController get library => widget.library;
+  String? openedId;
+  bool descending = false;
 
   Future<void> _delete(BuildContext context, String id, String name) async {
     final count = library.countForTag(id);
@@ -161,61 +179,116 @@ class TagsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: library,
-    builder: (context, _) => ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton.icon(
-            key: const ValueKey('create-tag'),
-            onPressed: () => _editName(context, library),
-            icon: const Icon(Icons.add),
-            label: const Text('创建标签'),
-          ),
-        ),
-        if (library.tags.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(24),
-            child: Text('尚无标签。创建后可在曲库为歌曲添加标签。'),
-          ),
-        for (final tag in library.tags)
-          ExpansionTile(
-            key: ValueKey('tag-${tag.id}'),
-            title: Text(tag.name),
-            subtitle: Text('${library.countForTag(tag.id)} 首歌曲'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  tooltip: '修改${tag.name}',
-                  onPressed: () => _editName(
-                    context,
-                    library,
-                    id: tag.id,
-                    initial: tag.name,
-                  ),
-                  icon: const Icon(Icons.edit_outlined),
-                ),
-                IconButton(
-                  tooltip: '删除${tag.name}',
-                  onPressed: () => _delete(context, tag.id, tag.name),
-                  icon: const Icon(Icons.delete_outline),
-                ),
-              ],
-            ),
+    builder: (context, _) {
+      final tag = library.tags.where((t) => t.id == openedId).firstOrNull;
+      if (tag != null) {
+        final rows = library.tracksForTag(tag.id);
+        return PopScope(
+          canPop: !widget.active,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop && widget.active) setState(() => openedId = null);
+          },
+          child: Column(
             children: [
-              for (final track in library.tracksForTag(tag.id))
-                ListTile(
-                  title: Text(track.title),
-                  subtitle: Text(
-                    track.available ? track.song.name : '文件失联 · 标签保留',
+              Row(
+                children: [
+                  IconButton(
+                    tooltip: '返回标签',
+                    onPressed: () => setState(() => openedId = null),
+                    icon: const Icon(Icons.arrow_back),
                   ),
-                ),
-              if (library.countForTag(tag.id) == 0)
-                const ListTile(title: Text('尚无关联歌曲')),
+                  Expanded(
+                    child: Text(
+                      tag.name,
+                      style: Theme.of(context).textTheme.titleLarge,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text('${rows.length} 首'),
+                  ),
+                ],
+              ),
+              Expanded(
+                child: widget.playback == null
+                    ? const Center(child: Text('播放器尚未就绪'))
+                    : SongList(
+                        key: ValueKey('tag-songs-${tag.id}'),
+                        library: library,
+                        playback: widget.playback!,
+                        source: rows,
+                        rows: rows,
+                        scope: 'tag',
+                        emptyText: '尚无关联歌曲',
+                      ),
+              ),
             ],
           ),
-      ],
-    ),
+        );
+      }
+      final tags = [...library.tags]
+        ..sort((a, b) {
+          final c = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+          final stable = c != 0 ? c : a.name.compareTo(b.name);
+          return descending ? -stable : stable;
+        });
+      return Column(
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: FilledButton.icon(
+                key: const ValueKey('create-tag'),
+                onPressed: () => _editName(context, library),
+                icon: const Icon(Icons.add),
+                label: const Text('创建标签'),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GroupList(
+              storageKey: 'tags-overview',
+              descending: descending,
+              onSort: () => setState(() => descending = !descending),
+              children: [
+                if (tags.isEmpty)
+                  const ListTile(title: Text('尚无标签。创建后可在曲库为歌曲添加标签。')),
+                for (final tag in tags)
+                  ListTile(
+                    key: ValueKey('tag-${tag.id}'),
+                    leading: const Icon(Icons.sell_outlined),
+                    title: Text(tag.name),
+                    subtitle: Text('${library.tracksForTag(tag.id).length} 首'),
+                    onTap: () => setState(() => openedId = tag.id),
+                    trailing: PopupMenuButton<String>(
+                      tooltip: '标签操作',
+                      onSelected: (action) {
+                        if (action == 'rename') {
+                          _editName(
+                            context,
+                            library,
+                            id: tag.id,
+                            initial: tag.name,
+                          );
+                        }
+                        if (action == 'delete') {
+                          _delete(context, tag.id, tag.name);
+                        }
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'rename', child: Text('改名')),
+                        PopupMenuItem(value: 'delete', child: Text('删除')),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      );
+    },
   );
 }

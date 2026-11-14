@@ -31,19 +31,25 @@ void main() {
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     expect(find.text('Rock'), findsOneWidget);
-    await tester.tap(find.byTooltip('修改Rock'));
+    await tester.tap(find.byTooltip('标签操作'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('改名'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField), 'Jazz');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     expect(find.text('Jazz'), findsOneWidget);
-    await tester.tap(find.byTooltip('删除Jazz'));
+    await tester.tap(find.byTooltip('标签操作'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('删除'));
     await tester.pumpAndSettle();
     expect(find.textContaining('0 首歌曲'), findsWidgets);
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
     expect(library.tags.length, 1);
-    await tester.tap(find.byTooltip('删除Jazz'));
+    await tester.tap(find.byTooltip('标签操作'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('删除'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('删除').last);
     await tester.pumpAndSettle();
@@ -113,11 +119,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: TagsPage(library: library)),
+        home: Scaffold(
+          body: TagsPage(library: library, playback: playback),
+        ),
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('2 首歌曲'), findsOneWidget);
+    expect(find.text('2 首'), findsOneWidget);
     await tester.tap(find.text('收藏'));
     await tester.pumpAndSettle();
     expect(find.text('歌曲 甲.mp3'), findsOneWidget);

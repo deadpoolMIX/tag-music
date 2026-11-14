@@ -12,6 +12,7 @@ import 'library/playlists_page.dart';
 import 'playback/playback_controller.dart';
 import 'library/library_controller.dart';
 import 'library/tags_page.dart';
+import 'library/group_pages.dart';
 
 final _appNavigator = GlobalKey<NavigatorState>();
 
@@ -193,10 +194,23 @@ class _AppShellState extends ConsumerState<AppShell>
                     active: _selected == AppDestination.playlists,
                   ),
           AppDestination.tags =>
-            library == null ? unavailable() : TagsPage(library: library),
+            library == null || playback == null
+                ? unavailable()
+                : TagsPage(
+                    library: library,
+                    playback: playback,
+                    active: _selected == AppDestination.tags,
+                  ),
           AppDestination.settings => const SettingsPage(),
-          AppDestination.albums ||
-          AppDestination.artists => const Center(child: Text('分组浏览待接入')),
+          AppDestination.albums || AppDestination.artists =>
+            library == null || playback == null
+                ? unavailable()
+                : MetadataGroupsPage(
+                    library: library,
+                    playback: playback,
+                    albums: destination == AppDestination.albums,
+                    active: _selected == destination,
+                  ),
         },
       );
       return Scaffold(

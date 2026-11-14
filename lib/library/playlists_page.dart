@@ -28,6 +28,7 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
   String query = '';
   bool reorderingMode = false;
   bool busy = false;
+  bool descending = false;
 
   Future<void> _change(Future<void> Function() operation) async {
     if (busy) return;
@@ -309,8 +310,21 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
     });
   }
 
+  String _count(LibraryController library, Playlist list) {
+    try {
+      return '${library.playlistTracks(list.id).length} 首';
+    } catch (_) {
+      return '规则不可读取';
+    }
+  }
+
   Widget _overview(LibraryController library) {
-    final lists = library.playlists;
+    final lists = [...library.playlists]
+      ..sort((a, b) {
+        final c = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+        final stable = c != 0 ? c : a.name.compareTo(b.name);
+        return descending ? -stable : stable;
+      });
     return Column(
       children: [
         Padding(
@@ -349,6 +363,14 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
             ],
           ),
         ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () => setState(() => descending = !descending),
+            icon: Icon(descending ? Icons.arrow_downward : Icons.arrow_upward),
+            label: Text(descending ? '名称降序' : '名称升序'),
+          ),
+        ),
         Expanded(
           child: lists.isEmpty
               ? const Center(child: Text('保存喜欢的歌曲顺序，或创建空歌单'))
@@ -366,9 +388,7 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                       ),
                       title: Text(list.name),
                       subtitle: Text(
-                        list.kind == 'smart'
-                            ? '智能歌单 · 按规则动态更新'
-                            : '普通歌单 · ${library.playlistSongIds[list.id]?.length ?? 0} 首',
+                        '${list.kind == 'smart' ? '智能歌单' : '普通歌单'} · ${_count(library, list)}',
                       ),
                       onTap: () => setState(() {
                         openedId = list.id;
