@@ -35,6 +35,52 @@ void main() {
   });
   tearDown(() => library.shutdown());
 
+  testWidgets('detail scroll positions restore per group within this run', (
+    tester,
+  ) async {
+    final playback = library_page_test.SnapshotController()..current = null;
+    addTearDown(playback.dispose);
+    final rows = List.generate(100, (i) => r6Track('$i'));
+    final bucket = PageStorageBucket();
+    Future<void> show(String? group) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: PageStorage(
+              bucket: bucket,
+              child: group == null
+                  ? const SizedBox()
+                  : SongList(
+                      key: ValueKey(group),
+                      scope: 'album',
+                      library: library,
+                      playback: playback,
+                      source: rows,
+                      rows: rows,
+                    ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    double offset() =>
+        tester.widget<ListView>(find.byType(ListView)).controller!.offset;
+    await show('A');
+    await tester.drag(find.byType(ListView), const Offset(0, -900));
+    await tester.pumpAndSettle();
+    final saved = offset();
+    expect(saved, greaterThan(0));
+    await show(null);
+    await show('B');
+    expect(offset(), 0);
+    await show(null);
+    await show('A');
+    expect(offset(), closeTo(saved, 1));
+    await show(null);
+  });
+
   testWidgets(
     'shared row layout, long press, secondary tap, menu and empty selection actions',
     (tester) async {

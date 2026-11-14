@@ -298,6 +298,7 @@ class _SongListState extends State<SongList> {
                     !_selecting &&
                     widget.onReorder != null)
                   ReorderableListView.builder(
+                    key: PageStorageKey((widget.scope, widget.key)),
                     scrollController: _scroll,
                     itemExtent: extent,
                     buildDefaultDragHandles: false,
@@ -307,6 +308,7 @@ class _SongListState extends State<SongList> {
                   )
                 else
                   ListView.builder(
+                    key: PageStorageKey((widget.scope, widget.key)),
                     controller: _scroll,
                     itemExtent: extent,
                     itemCount: widget.rows.length,

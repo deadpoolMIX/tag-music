@@ -593,13 +593,18 @@ class PlaybackController extends ChangeNotifier {
     if (await _sleepBlocksSwitch()) return;
     if (queue.previous() != null) await _openCurrent(play: true);
   });
-  Future<void> seek(Duration position) => _serial(() async {
-    final milliseconds = position.inMilliseconds.clamp(
-      0,
-      player.state.duration.inMilliseconds,
-    );
-    await player.seek(Duration(milliseconds: milliseconds));
-  });
+  Future<void> seek(Duration position, {String? expectedEntryId}) =>
+      _serial(() async {
+        if (expectedEntryId != null &&
+            queue.current?.entryId != expectedEntryId) {
+          return;
+        }
+        final milliseconds = position.inMilliseconds.clamp(
+          0,
+          player.state.duration.inMilliseconds,
+        );
+        await player.seek(Duration(milliseconds: milliseconds));
+      });
 
   Future<void> shutdown() async {
     await _pending;

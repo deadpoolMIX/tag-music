@@ -28,6 +28,7 @@ class QueuePlayer extends TransitionPlayer {
   QueueStreams get stream => _stream;
   final _stream = QueueStreams();
   final opens = <String>[];
+  final seeks = <Duration>[];
   final rejected = <String>{};
   bool rejectAll = false;
   bool emitErrorOnOpen = false;
@@ -47,6 +48,7 @@ class QueuePlayer extends TransitionPlayer {
 
   @override
   Future<void> seek(Duration position) async {
+    seeks.add(position);
     state = state.copyWith(position: position);
   }
 
@@ -99,6 +101,32 @@ void main() {
 
   // A serialized no-op waits for already-delivered engine callbacks.
   Future<void> drain() => controller.setMode(controller.queue.mode);
+
+  test(
+    'a seek queued behind a track switch cannot target the new entry',
+    () async {
+      await controller.setMode(PlaybackMode.sequential);
+      await controller.playSongs([song('A'), song('B')], 0);
+      final previousEntry = controller.queue.current!.entryId;
+      final change = controller.next();
+      final seek = controller.seek(
+        const Duration(seconds: 8),
+        expectedEntryId: previousEntry,
+      );
+      await Future.wait([change, seek]);
+      expect(controller.currentSongId, 'B');
+      expect(player.seeks, isEmpty);
+      expect(player.state.position, Duration.zero);
+      player.state = player.state.copyWith(
+        duration: const Duration(minutes: 1),
+      );
+      await controller.seek(
+        const Duration(seconds: 8),
+        expectedEntryId: controller.queue.current!.entryId,
+      );
+      expect(player.state.position, const Duration(seconds: 8));
+    },
+  );
 
   test(
     'startup/add are silent; UUID resolver supplies current SAF location',

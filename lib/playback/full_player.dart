@@ -78,6 +78,8 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
                           snapshot.data!,
                           fit: BoxFit.cover,
                           gaplessPlayback: false,
+                          errorBuilder: (_, error, stack) =>
+                              const SizedBox.shrink(),
                         ),
                       ),
                     ),
@@ -95,37 +97,84 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
   }
 }
 
-class PlayerSeek extends StatelessWidget {
+class PlayerSeek extends StatefulWidget {
   const PlayerSeek({required this.playback, this.onSeek, super.key});
   final PlaybackController playback;
   final VoidCallback? onSeek;
   @override
+  State<PlayerSeek> createState() => _PlayerSeekState();
+}
+
+class _PlayerSeekState extends State<PlayerSeek> {
+  double? _preview;
+  String? _entryId;
+
+  @override
+  void didUpdateWidget(PlayerSeek oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.playback != widget.playback ||
+        widget.playback.queue.current?.entryId != _entryId ||
+        widget.playback.player.state.duration <= Duration.zero) {
+      _preview = null;
+      _entryId = null;
+    }
+  }
+
+  void _commit(double value) {
+    final playback = widget.playback;
+    final entryId = _entryId;
+    setState(() {
+      _preview = null;
+      _entryId = null;
+    });
+    // A natural track change during a held drag must not seek the new track.
+    if (entryId == null || playback.queue.current?.entryId != entryId) return;
+    widget.onSeek?.call();
+    unawaited(
+      playback.seek(
+        Duration(milliseconds: value.round()),
+        expectedEntryId: entryId,
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final playback = widget.playback;
     final state = playback.player.state;
     final max = state.duration.inMilliseconds.toDouble().clamp(
       1.0,
       double.infinity,
     );
+    final position = Duration(
+      milliseconds: (_preview ?? state.position.inMilliseconds.toDouble())
+          .clamp(0, max)
+          .round(),
+    );
+    final enabled = playback.current != null && state.duration > Duration.zero;
     return Row(
       children: [
-        Text(formatPosition(state.position)),
+        Text(formatPosition(position)),
         Expanded(
           child: KeyedSubtree(
-            key: ValueKey(state.duration > Duration.zero),
+            key: ValueKey(enabled),
             child: Slider(
               key: const ValueKey('playback-seek'),
               semanticFormatterCallback: (value) =>
                   formatPosition(Duration(milliseconds: value.round())),
-              value: state.position.inMilliseconds.toDouble().clamp(0, max),
+              label: formatPosition(position),
+              value: position.inMilliseconds.toDouble().clamp(0, max),
               max: max,
-              onChanged: state.duration > Duration.zero
-                  ? (value) {
-                      onSeek?.call();
-                      unawaited(
-                        playback.seek(Duration(milliseconds: value.round())),
-                      );
-                    }
+              onChangeStart: enabled
+                  ? (value) => setState(() {
+                      _entryId = playback.queue.current?.entryId;
+                      _preview = value;
+                    })
                   : null,
+              onChanged: enabled
+                  ? (value) => setState(() => _preview = value)
+                  : null,
+              onChangeEnd: enabled ? _commit : null,
             ),
           ),
         ),
@@ -360,6 +409,8 @@ class FullPlayer extends ConsumerWidget {
                                             more(),
                                           ],
                                         ),
+                                        if (playback.sleep.active)
+                                          SleepTimerStatus(playback: playback),
                                         if (playback.error != null ||
                                             playback.playbackNotice != null)
                                           Padding(
@@ -405,6 +456,7 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
   final _scroll = ScrollController();
   Timer? _hide;
   bool _controls = true, _follow = true;
+  int _pointers = 0, _followGeneration = 0;
   int _last = -2;
   Lyrics? _lyrics;
   List<double> _offsets = [], _heights = [];
@@ -432,6 +484,7 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
 
   void _arm() {
     _hide?.cancel();
+    if (_pointers > 0) return;
     _hide = Timer(const Duration(seconds: 5), () {
       if (!mounted ||
           (MediaQuery.accessibleNavigationOf(context) ||
@@ -451,6 +504,15 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
     setState(() {
       _follow = true;
       _last = -2;
+      _followGeneration++;
+    });
+    _reveal();
+  }
+
+  void _pauseFollow() {
+    setState(() {
+      _follow = false;
+      _followGeneration++;
     });
     _reveal();
   }
@@ -465,6 +527,7 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
     _width = width;
     _scale = scale;
     _last = -2;
+    _followGeneration++;
     if (changedTrack) _follow = true;
     _offsets = [];
     _heights = [];
@@ -508,9 +571,20 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
         child: Scaffold(
           body: PlayerBackground(
             playback: playback,
-            child: GestureDetector(
+            child: Listener(
               behavior: HitTestBehavior.opaque,
-              onTap: _reveal,
+              onPointerDown: (_) {
+                _pointers++;
+                _reveal();
+              },
+              onPointerUp: (_) {
+                _pointers = math.max(0, _pointers - 1);
+                _arm();
+              },
+              onPointerCancel: (_) {
+                _pointers = math.max(0, _pointers - 1);
+                _arm();
+              },
               child: SafeArea(
                 child: Stack(
                   children: [
@@ -529,8 +603,12 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
                           if (_follow && active != _last) {
                             _last = active;
                             final target = active < 0 ? 0.0 : _offsets[active];
+                            final generation = ++_followGeneration;
                             WidgetsBinding.instance.addPostFrameCallback((_) {
-                              if (!mounted || !_follow || !_scroll.hasClients) {
+                              if (!mounted ||
+                                  !_follow ||
+                                  generation != _followGeneration ||
+                                  !_scroll.hasClients) {
                                 return;
                               }
                               unawaited(
@@ -572,15 +650,13 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
                             child: NotificationListener<ScrollStartNotification>(
                               onNotification: (notice) {
                                 if (notice.dragDetails != null) {
-                                  setState(() => _follow = false);
-                                  _reveal();
+                                  _pauseFollow();
                                 }
                                 return false;
                               },
                               child: Listener(
                                 onPointerSignal: (_) {
-                                  setState(() => _follow = false);
-                                  _reveal();
+                                  _pauseFollow();
                                 },
                                 child: ListView.builder(
                                   controller: _scroll,
@@ -620,6 +696,10 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
                                                   milliseconds:
                                                       line.milliseconds,
                                                 ),
+                                                expectedEntryId: playback
+                                                    .queue
+                                                    .current
+                                                    ?.entryId,
                                               ),
                                             );
                                           },

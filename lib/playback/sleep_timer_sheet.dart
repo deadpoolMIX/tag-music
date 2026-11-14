@@ -13,6 +13,25 @@ String sleepTimeLabel(Duration value) {
   return '${hours > 0 ? '$hours小时' : ''}$minutes分${seconds.toString().padLeft(2, '0')}秒';
 }
 
+/// Uses the controller's playback clock; this view never starts another timer.
+class SleepTimerStatus extends StatelessWidget {
+  const SleepTimerStatus({required this.playback, super.key});
+  final PlaybackController playback;
+
+  @override
+  Widget build(BuildContext context) => TextButton.icon(
+    key: const ValueKey('sleep-timer-status'),
+    onPressed: () => showSleepTimer(context, playback),
+    icon: const Icon(Icons.bedtime_outlined, size: 18),
+    label: Text(
+      playback.sleep.waitingForEnd
+          ? '本曲结束后停止'
+          : '还可播放 ${sleepTimeLabel(playback.sleep.remaining)}',
+      textAlign: TextAlign.center,
+    ),
+  );
+}
+
 Future<void> showSleepTimer(
   BuildContext context,
   PlaybackController playback,
