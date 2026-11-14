@@ -14,13 +14,14 @@ String sleepTimeLabel(Duration value) {
 
 /// Uses the controller's playback clock; this view never starts another timer.
 class SleepTimerStatus extends StatelessWidget {
-  const SleepTimerStatus({required this.playback, super.key});
+  const SleepTimerStatus({required this.playback, this.onManage, super.key});
   final PlaybackController playback;
+  final VoidCallback? onManage;
 
   @override
   Widget build(BuildContext context) => TextButton.icon(
     key: const ValueKey('sleep-timer-status'),
-    onPressed: () => showSleepTimer(context, playback),
+    onPressed: onManage ?? () => showSleepTimer(context, playback),
     icon: const Icon(Icons.bedtime_outlined, size: 18),
     label: Text(
       playback.sleep.waitingForEnd

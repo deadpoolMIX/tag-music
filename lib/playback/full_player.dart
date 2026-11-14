@@ -7,11 +7,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../library/library_controller.dart';
-import '../library/song_information.dart';
 import '../library/track_cover.dart';
 import 'playback_controller.dart';
 import 'playback_page.dart' show formatPosition;
 import 'queue_page.dart';
+import 'player_actions.dart';
 import 'lyrics.dart';
 import 'sleep_timer_sheet.dart';
 
@@ -220,67 +220,18 @@ class FullPlayer extends ConsumerWidget {
       listenable: playback,
       builder: (context, _) {
         final simple = playback.simpleLayout;
-        void menu(String value) {
-          switch (value) {
-            case 'layout':
-              playback.toggleLayout();
-            case 'stop':
-              unawaited(playback.stop());
-            case 'sleep':
-              unawaited(showSleepTimer(context, playback));
-            case 'queue':
-              unawaited(showPlaybackQueue(context, playback, library));
-            case 'mode':
-              unawaited(showPlaybackModeChooser(context, playback));
-            case 'lyrics':
-              unawaited(
-                Navigator.push<void>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ImmersiveLyrics(playback: playback),
-                  ),
-                ),
-              );
-            case 'info':
-              final tracks = library?.tracks.where(
-                (t) => t.song.id == playback.currentSongId,
-              );
-              if (tracks?.isNotEmpty == true) {
-                unawaited(showSongInformation(context, tracks!.first));
-              }
-          }
-        }
-
-        List<PopupMenuEntry<String>> menuItems() => [
-          PopupMenuItem(
-            value: 'layout',
-            child: Text(simple ? '切换标准布局' : '切换简洁布局'),
+        final actions = PlayerActions(
+          playback: playback,
+          library: library,
+          toggleLayout: playback.toggleLayout,
+          openLyrics: () => Navigator.push<void>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ImmersiveLyrics(playback: playback),
+            ),
           ),
-          PopupMenuItem(
-            value: 'lyrics',
-            enabled: playback.current != null,
-            child: const Text('沉浸歌词'),
-          ),
-          const PopupMenuItem(value: 'queue', child: Text('播放队列')),
-          PopupMenuItem(
-            value: 'mode',
-            child: Text('播放模式 · ${playbackModeNames[playback.queue.mode]}'),
-          ),
-          const PopupMenuDivider(),
-          const PopupMenuItem(value: 'stop', child: Text('停止播放')),
-          PopupMenuItem(
-            value: 'sleep',
-            child: Text(playback.sleep.active ? '管理睡眠定时' : '睡眠定时'),
-          ),
-          if (library?.tracks.any((t) => t.song.id == playback.currentSongId) ==
-              true)
-            const PopupMenuItem(value: 'info', child: Text('歌曲信息')),
-        ];
-        Widget more() => PopupMenuButton<String>(
-          tooltip: '更多播放操作',
-          onSelected: menu,
-          itemBuilder: (_) => menuItems(),
         );
+        Widget more() => PlayerActionsButton(actions: actions);
         return CallbackShortcuts(
           bindings: {
             const SingleActivator(LogicalKeyboardKey.escape): () =>
@@ -296,19 +247,9 @@ class FullPlayer extends ConsumerWidget {
                 actions: [more()],
               ),
               body: GestureDetector(
-                onSecondaryTapUp: (details) async {
-                  final choice = await showMenu<String>(
-                    context: context,
-                    position: RelativeRect.fromLTRB(
-                      details.globalPosition.dx,
-                      details.globalPosition.dy,
-                      0,
-                      0,
-                    ),
-                    items: menuItems(),
-                  );
-                  if (choice != null && context.mounted) menu(choice);
-                },
+                onSecondaryTapUp: (details) => unawaited(
+                  actions.show(context, globalPosition: details.globalPosition),
+                ),
                 child: PlayerBackground(
                   playback: playback,
                   child: SafeArea(
@@ -434,15 +375,7 @@ class _PlayerBody extends StatelessWidget {
           ],
         ),
         if (playback.sleep.active) SleepTimerStatus(playback: playback),
-        if (playback.error != null || playback.playbackNotice != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              playback.error ?? playback.playbackNotice!,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
+        PlaybackFeedback(playback: playback),
       ],
     ],
   );
@@ -513,14 +446,14 @@ class _PlayerBody extends StatelessWidget {
   );
 }
 
-class ImmersiveLyrics extends StatefulWidget {
+class ImmersiveLyrics extends ConsumerStatefulWidget {
   const ImmersiveLyrics({required this.playback, super.key});
   final PlaybackController playback;
   @override
-  State<ImmersiveLyrics> createState() => _ImmersiveLyricsState();
+  ConsumerState<ImmersiveLyrics> createState() => _ImmersiveLyricsState();
 }
 
-class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
+class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
   final _scroll = ScrollController();
   final _pageFocus = FocusNode(debugLabel: 'lyrics-page');
   final _lyricsFocus = FocusNode(debugLabel: 'lyrics-lines');
@@ -528,7 +461,7 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
   final _controlsFocus = FocusNode(debugLabel: 'lyrics-controls');
   Timer? _hide;
   bool _controls = true, _follow = true, _keyboardInput = false;
-  int _pointers = 0, _followGeneration = 0;
+  int _pointers = 0, _followGeneration = 0, _modalInteractions = 0;
   int _last = -2;
   Lyrics? _lyrics;
   List<double> _offsets = [], _heights = [];
@@ -601,8 +534,21 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
   }
 
   bool get _holdingControls =>
+      _modalInteractions > 0 ||
       _pointers > 0 ||
       (_keyboardInput && (_headerFocus.hasFocus || _controlsFocus.hasFocus));
+
+  Future<void> _interact(Future<void> Function() action) async {
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+    _modalInteractions++;
+    _reveal();
+    try {
+      await action();
+    } finally {
+      _modalInteractions--;
+      if (mounted) _reveal();
+    }
+  }
 
   void _controlFocusChanged(bool focused) {
     if (focused) {
@@ -874,7 +820,18 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
                   PlayerSeek(playback: widget.playback, onSeek: _goCurrent),
                   PlaybackControls(playback: widget.playback),
                   if (widget.playback.sleep.active)
-                    SleepTimerStatus(playback: widget.playback),
+                    SleepTimerStatus(
+                      playback: widget.playback,
+                      onManage: () => _interact(
+                        () => showSleepTimer(context, widget.playback),
+                      ),
+                    ),
+                  PlaybackFeedback(
+                    playback: widget.playback,
+                    onOpen: () => _interact(
+                      () => showPlaybackFeedback(context, widget.playback),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -886,6 +843,10 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
 
   @override
   Widget build(BuildContext context) {
+    final actions = PlayerActions(
+      playback: widget.playback,
+      library: ref.watch(libraryProvider),
+    );
     final showControls =
         _controls ||
         MediaQuery.accessibleNavigationOf(context) ||
@@ -899,57 +860,72 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
         focusNode: _pageFocus,
         autofocus: true,
         child: Scaffold(
-          body: PlayerBackground(
-            playback: widget.playback,
-            child: Listener(
-              behavior: HitTestBehavior.opaque,
-              onPointerDown: (_) {
-                _keyboardInput = false;
-                _pointers++;
-                _reveal();
-              },
-              onPointerUp: (_) {
-                setState(() => _pointers = math.max(0, _pointers - 1));
-                _arm();
-              },
-              onPointerCancel: (_) {
-                setState(() => _pointers = math.max(0, _pointers - 1));
-                _arm();
-              },
-              child: SafeArea(
-                child: LayoutBuilder(
-                  builder: (context, constraints) => Column(
-                    children: [
-                      if (showControls || !_follow)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          child: Focus(
-                            focusNode: _headerFocus,
-                            skipTraversal: true,
-                            onFocusChange: _controlFocusChanged,
-                            child: Row(
-                              children: [
-                                if (showControls) const BackButton(),
-                                const Spacer(),
-                                if (!_follow)
-                                  Flexible(
-                                    child: FilledButton.tonalIcon(
-                                      onPressed: _goCurrent,
-                                      icon: const Icon(Icons.my_location),
-                                      label: const Text('回到当前句'),
+          body: GestureDetector(
+            onSecondaryTapUp: (details) => unawaited(
+              _interact(
+                () => actions.show(
+                  context,
+                  globalPosition: details.globalPosition,
+                ),
+              ),
+            ),
+            child: PlayerBackground(
+              playback: widget.playback,
+              child: Listener(
+                behavior: HitTestBehavior.opaque,
+                onPointerDown: (_) {
+                  _keyboardInput = false;
+                  _pointers++;
+                  _reveal();
+                },
+                onPointerUp: (_) {
+                  setState(() => _pointers = math.max(0, _pointers - 1));
+                  _arm();
+                },
+                onPointerCancel: (_) {
+                  setState(() => _pointers = math.max(0, _pointers - 1));
+                  _arm();
+                },
+                child: SafeArea(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => Column(
+                      children: [
+                        if (showControls || !_follow)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            child: Focus(
+                              focusNode: _headerFocus,
+                              skipTraversal: true,
+                              onFocusChange: _controlFocusChanged,
+                              child: Row(
+                                children: [
+                                  if (showControls) const BackButton(),
+                                  const Spacer(),
+                                  if (!_follow)
+                                    Flexible(
+                                      child: FilledButton.tonalIcon(
+                                        onPressed: _goCurrent,
+                                        icon: const Icon(Icons.my_location),
+                                        label: const Text('回到当前句'),
+                                      ),
                                     ),
-                                  ),
-                              ],
+                                  if (showControls)
+                                    PlayerActionsButton(
+                                      actions: actions,
+                                      interact: _interact,
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      Expanded(child: LayoutBuilder(builder: _lines)),
-                      if (showControls)
-                        _controlPanel(context, constraints.maxHeight * .45),
-                    ],
+                        Expanded(child: LayoutBuilder(builder: _lines)),
+                        if (showControls)
+                          _controlPanel(context, constraints.maxHeight * .45),
+                      ],
+                    ),
                   ),
                 ),
               ),
