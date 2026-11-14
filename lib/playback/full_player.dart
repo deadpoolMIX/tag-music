@@ -473,6 +473,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
   int _pointers = 0, _followGeneration = 0, _modalInteractions = 0;
   int _last = -2;
   Lyrics? _lyrics;
+  Lyrics? _observedLyrics;
   List<double> _offsets = [], _heights = [];
   double _width = 0, _viewportHeight = 0;
   TextScaler? _textScaler;
@@ -493,6 +494,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
   @override
   void initState() {
     super.initState();
+    _observedLyrics = widget.playback.lyrics.value;
     widget.playback.addListener(_changed);
     FocusManager.instance.addEarlyKeyEventHandler(_keyEvent);
     _arm();
@@ -525,7 +527,15 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
   }
 
   void _changed() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final lyrics = widget.playback.lyrics.value;
+    final changedLyrics = !identical(_observedLyrics, lyrics);
+    _observedLyrics = lyrics;
+    setState(() {
+      if (changedLyrics) _controls = true;
+    });
+    // Reset only when the result changes, not on every playback position tick.
+    if (changedLyrics) _arm();
   }
 
   void _arm() {
@@ -543,6 +553,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
   }
 
   bool get _holdingControls =>
+      widget.playback.lyrics.value.lines.isEmpty ||
       _modalInteractions > 0 ||
       _pointers > 0 ||
       (_keyboardInput && (_headerFocus.hasFocus || _controlsFocus.hasFocus));
@@ -691,12 +702,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
       });
     }
     if (lyrics.lines.isEmpty) {
-      return Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Text(lyrics.message ?? '暂无歌词', textAlign: TextAlign.center),
-        ),
-      );
+      return _lyricsStatus(lyrics);
     }
     return ShaderMask(
       blendMode: BlendMode.dstIn,
@@ -809,6 +815,121 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
     );
   }
 
+  Widget _lyricsStatus(Lyrics lyrics) {
+    final playback = widget.playback;
+    final hasSong = playback.current != null;
+    final loading = hasSong && lyrics.status == LyricsStatus.loading;
+    final title = !hasSong
+        ? '尚未选择歌曲'
+        : switch (lyrics.status) {
+            LyricsStatus.loading => '正在读取歌词',
+            LyricsStatus.unreadable => '歌词暂时无法显示',
+            LyricsStatus.untimed => '歌词没有可用时间戳',
+            _ => '这首歌暂无同步歌词',
+          };
+    final name = playback.current?.name;
+    final dot = name?.lastIndexOf('.') ?? -1;
+    final companion = name == null
+        ? null
+        : '${dot > 0 ? name.substring(0, dot) : name}.lrc';
+    final explanation = !hasSong
+        ? '可从播放队列选择歌曲，或返回曲库开始播放。'
+        : switch (lyrics.status) {
+            LyricsStatus.loading => '歌词读取完成后会自动显示，不影响继续播放。',
+            LyricsStatus.unreadable =>
+              '支持 UTF-8 或带 BOM 的 UTF-16 歌词；文件过大或内容损坏时无法显示。',
+            LyricsStatus.untimed => '同步歌词需要带时间戳，例如 [00:12.30]歌词内容。',
+            _ => '只读取音频同目录、同文件主名的 LRC 文件。',
+          };
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (loading && !MediaQuery.disableAnimationsOf(context))
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(),
+                )
+              else
+                Icon(
+                  loading ? Icons.hourglass_empty : Icons.lyrics_outlined,
+                  size: 36,
+                ),
+              const SizedBox(height: 16),
+              Semantics(
+                liveRegion: true,
+                header: true,
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              if (hasSong) ...[
+                const SizedBox(height: 8),
+                Text(
+                  playbackTitle(playback),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              const SizedBox(height: 12),
+              Text(explanation, textAlign: TextAlign.center),
+              if (hasSong && !loading && companion != null) ...[
+                const SizedBox(height: 12),
+                SelectableText(
+                  '对应歌词文件：$companion',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              const SizedBox(height: 12),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                children: [
+                  TextButton.icon(
+                    onPressed: () => Navigator.maybePop(context),
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('返回播放器'),
+                  ),
+                  if (lyrics.status == LyricsStatus.unreadable &&
+                      lyrics.message != null)
+                    TextButton.icon(
+                      onPressed: () => _interact(
+                        () => showDialog<void>(
+                          context: context,
+                          builder: (dialog) => AlertDialog(
+                            title: const Text('歌词读取详情'),
+                            content: SingleChildScrollView(
+                              child: SelectableText(lyrics.message!),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(dialog),
+                                child: const Text('关闭'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      icon: const Icon(Icons.info_outline),
+                      label: const Text('查看读取详情'),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _controlPanel(BuildContext context, double maxHeight) => Align(
     alignment: Alignment.bottomCenter,
     child: Focus(
@@ -860,6 +981,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
     );
     final showControls =
         _controls ||
+        widget.playback.lyrics.value.lines.isEmpty ||
         MediaQuery.accessibleNavigationOf(context) ||
         WidgetsBinding.instance.semanticsEnabled;
     return CallbackShortcuts(

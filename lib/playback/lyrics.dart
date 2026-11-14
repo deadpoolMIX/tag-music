@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 
 const maxLyricsBytes = 1024 * 1024;
 
+enum LyricsStatus { ready, loading, missing, untimed, unreadable }
+
 class LyricLine {
   const LyricLine(this.milliseconds, this.texts);
   final int milliseconds;
@@ -12,10 +14,15 @@ class LyricLine {
 }
 
 class Lyrics {
-  const Lyrics(this.lines, {this.message});
+  const Lyrics(this.lines, {this.message, this.status = LyricsStatus.ready});
   final List<LyricLine> lines;
   final String? message;
-  static const empty = Lyrics([], message: '未找到同目录同名 LRC 歌词');
+  final LyricsStatus status;
+  static const empty = Lyrics(
+    [],
+    message: '未找到同目录同名 LRC 歌词',
+    status: LyricsStatus.missing,
+  );
   int indexAt(Duration position) {
     var low = 0, high = lines.length;
     while (low < high) {
@@ -108,10 +115,14 @@ Lyrics parseLyrics(Uint8List bytes) {
     );
   }
   final times = shifted.keys.toList()..sort();
-  return Lyrics([
-    for (final time in times)
-      LyricLine(time, List.unmodifiable(shifted[time]!)),
-  ], message: times.isEmpty ? '歌词没有可用时间戳' : null);
+  return Lyrics(
+    [
+      for (final time in times)
+        LyricLine(time, List.unmodifiable(shifted[time]!)),
+    ],
+    message: times.isEmpty ? '歌词没有可用时间戳' : null,
+    status: times.isEmpty ? LyricsStatus.untimed : LyricsStatus.ready,
+  );
 }
 
 /// A shared timeline owns selection identity independently of delayed I/O.
@@ -127,14 +138,18 @@ class LyricsTimeline extends ChangeNotifier {
 
   Future<void> load(Future<Uint8List?> Function() read) async {
     final generation = ++_generation;
-    value = const Lyrics([], message: '正在读取歌词');
+    value = const Lyrics([], message: '正在读取歌词', status: LyricsStatus.loading);
     if (!_disposed) notifyListeners();
     Lyrics next;
     try {
       final bytes = await read();
       next = bytes == null ? Lyrics.empty : parseLyrics(bytes);
     } catch (error) {
-      next = Lyrics([], message: '歌词不可读：$error');
+      next = Lyrics(
+        [],
+        message: '歌词不可读：$error',
+        status: LyricsStatus.unreadable,
+      );
     }
     if (_disposed || generation != _generation) return;
     value = next;
