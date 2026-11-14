@@ -13,6 +13,34 @@ const playbackModeNames = {
   PlaybackMode.shuffle: '随机播放',
 };
 
+/// A full-size choice surface for places without a dedicated mode button.
+Future<void> showPlaybackModeChooser(
+  BuildContext context,
+  PlaybackController playback,
+) async {
+  final mode = await showDialog<PlaybackMode>(
+    context: context,
+    builder: (dialogContext) => SimpleDialog(
+      title: const Text('播放模式'),
+      children: [
+        for (final mode in PlaybackMode.values)
+          ListenableBuilder(
+            listenable: playback,
+            builder: (_, _) => ListTile(
+              title: Text(playbackModeNames[mode]!),
+              selected: mode == playback.queue.mode,
+              trailing: mode == playback.queue.mode
+                  ? const Icon(Icons.check)
+                  : null,
+              onTap: () => Navigator.pop(dialogContext, mode),
+            ),
+          ),
+      ],
+    ),
+  );
+  if (mode != null) await playback.setMode(mode);
+}
+
 class PlaybackControls extends StatelessWidget {
   const PlaybackControls({
     required this.playback,

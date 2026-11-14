@@ -228,6 +228,19 @@ class FullPlayer extends ConsumerWidget {
               unawaited(playback.stop());
             case 'sleep':
               unawaited(showSleepTimer(context, playback));
+            case 'queue':
+              unawaited(showPlaybackQueue(context, playback, library));
+            case 'mode':
+              unawaited(showPlaybackModeChooser(context, playback));
+            case 'lyrics':
+              unawaited(
+                Navigator.push<void>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ImmersiveLyrics(playback: playback),
+                  ),
+                ),
+              );
             case 'info':
               final tracks = library?.tracks.where(
                 (t) => t.song.id == playback.currentSongId,
@@ -238,25 +251,35 @@ class FullPlayer extends ConsumerWidget {
           }
         }
 
+        List<PopupMenuEntry<String>> menuItems() => [
+          PopupMenuItem(
+            value: 'layout',
+            child: Text(simple ? '切换标准布局' : '切换简洁布局'),
+          ),
+          PopupMenuItem(
+            value: 'lyrics',
+            enabled: playback.current != null,
+            child: const Text('沉浸歌词'),
+          ),
+          const PopupMenuItem(value: 'queue', child: Text('播放队列')),
+          PopupMenuItem(
+            value: 'mode',
+            child: Text('播放模式 · ${playbackModeNames[playback.queue.mode]}'),
+          ),
+          const PopupMenuDivider(),
+          const PopupMenuItem(value: 'stop', child: Text('停止播放')),
+          PopupMenuItem(
+            value: 'sleep',
+            child: Text(playback.sleep.active ? '管理睡眠定时' : '睡眠定时'),
+          ),
+          if (library?.tracks.any((t) => t.song.id == playback.currentSongId) ==
+              true)
+            const PopupMenuItem(value: 'info', child: Text('歌曲信息')),
+        ];
         Widget more() => PopupMenuButton<String>(
           tooltip: '更多播放操作',
           onSelected: menu,
-          itemBuilder: (_) => [
-            PopupMenuItem(
-              value: 'layout',
-              child: Text(simple ? '切换标准布局' : '切换简洁布局'),
-            ),
-            const PopupMenuItem(value: 'stop', child: Text('停止播放')),
-            PopupMenuItem(
-              value: 'sleep',
-              child: Text(playback.sleep.active ? '管理睡眠定时' : '睡眠定时'),
-            ),
-            if (library?.tracks.any(
-                  (t) => t.song.id == playback.currentSongId,
-                ) ==
-                true)
-              const PopupMenuItem(value: 'info', child: Text('歌曲信息')),
-          ],
+          itemBuilder: (_) => menuItems(),
         );
         return CallbackShortcuts(
           bindings: {
@@ -282,14 +305,9 @@ class FullPlayer extends ConsumerWidget {
                       0,
                       0,
                     ),
-                    items: [
-                      PopupMenuItem(
-                        value: 'layout',
-                        child: Text(simple ? '切换标准布局' : '切换简洁布局'),
-                      ),
-                    ],
+                    items: menuItems(),
                   );
-                  if (choice != null) menu(choice);
+                  if (choice != null && context.mounted) menu(choice);
                 },
                 child: PlayerBackground(
                   playback: playback,
@@ -785,6 +803,9 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
                   button: true,
                   enabled: entryId != null,
                   onTap: entryId == null ? null : seekLine,
+                  // Reading another line with a screen reader is browsing, just
+                  // like dragging the list. Do not pull focus back on each tick.
+                  onDidGainAccessibilityFocus: _pauseFollow,
                   label:
                       '${line.texts.join('，')}，${formatPosition(Duration(milliseconds: line.milliseconds))}',
                   child: ExcludeSemantics(
