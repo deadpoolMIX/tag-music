@@ -58,6 +58,7 @@ class _SleepTimerPanel extends StatefulWidget {
 class _SleepTimerPanelState extends State<_SleepTimerPanel> {
   bool _submitting = false, _choosing = false;
   String? _error;
+  Duration _customDraft = const Duration(minutes: 15);
   bool get _busy => _submitting || _choosing;
 
   Future<void> _apply(Duration? duration) async {
@@ -96,7 +97,10 @@ class _SleepTimerPanelState extends State<_SleepTimerPanel> {
     try {
       duration = await showDialog<Duration>(
         context: context,
-        builder: (_) => const _SleepDialDialog(),
+        builder: (_) => _SleepDialDialog(
+          initial: _customDraft,
+          onDraftChanged: (value) => _customDraft = value,
+        ),
       );
     } finally {
       if (mounted) setState(() => _choosing = false);
@@ -190,32 +194,82 @@ class _SleepTimerPanelState extends State<_SleepTimerPanel> {
 }
 
 class _SleepDialDialog extends StatefulWidget {
-  const _SleepDialDialog();
+  const _SleepDialDialog({required this.initial, required this.onDraftChanged});
+  final Duration initial;
+  final ValueChanged<Duration> onDraftChanged;
   @override
   State<_SleepDialDialog> createState() => _SleepDialDialogState();
 }
 
 class _SleepDialDialogState extends State<_SleepDialDialog> {
   final _dialFocus = FocusNode(debugLabel: 'sleep-time-dial');
-  int _hours = 0, _minutes = 15;
+  late final TextEditingController _hoursInput, _minutesInput;
+  late int _hours, _minutes;
   bool _hourDial = false, _showFocus = false;
   int get _count => _hourDial ? 13 : 60;
   int get _value => _hourDial ? _hours : _minutes;
   String get _unit => _hourDial ? '小时' : '分钟';
 
   @override
+  void initState() {
+    super.initState();
+    _hours = widget.initial.inHours;
+    _minutes = widget.initial.inMinutes % 60;
+    _hoursInput = TextEditingController(text: '$_hours');
+    _minutesInput = TextEditingController(text: '$_minutes');
+  }
+
+  String? _inputError(bool hours) {
+    final value = int.tryParse((hours ? _hoursInput : _minutesInput).text);
+    if (value == null) return '请输入${hours ? '小时' : '分钟'}';
+    if (value < 0 || value > (hours ? 12 : 59)) {
+      return hours ? '小时应为0～12' : '分钟应为0～59';
+    }
+    return null;
+  }
+
+  bool get _valid => _inputError(true) == null && _inputError(false) == null;
+  Duration get _duration => Duration(hours: _hours, minutes: _minutes);
+
+  void _edited(bool hours, String text) {
+    setState(() {
+      final value = int.tryParse(text) ?? 0;
+      if (hours) {
+        _hours = value.clamp(0, 12);
+        _hourDial = true;
+      } else {
+        _minutes = value.clamp(0, 59);
+        _hourDial = false;
+      }
+    });
+    if (_valid) widget.onDraftChanged(_duration);
+  }
+
+  void _submit() {
+    if (_valid && _duration > Duration.zero) Navigator.pop(context, _duration);
+  }
+
+  @override
   void dispose() {
     _dialFocus.dispose();
+    _hoursInput.dispose();
+    _minutesInput.dispose();
     super.dispose();
   }
 
-  void _set(int value) => setState(() {
-    if (_hourDial) {
-      _hours = value.clamp(0, 12);
-    } else {
-      _minutes = value.clamp(0, 59);
-    }
-  });
+  void _set(int value) {
+    setState(() {
+      if (_hourDial) {
+        _hours = value.clamp(0, 12);
+        _hoursInput.text = '$_hours';
+      } else {
+        _minutes = value.clamp(0, 59);
+        _minutesInput.text = '$_minutes';
+      }
+    });
+    if (_valid) widget.onDraftChanged(_duration);
+  }
+
   void _point(Offset point, double side) {
     final delta = point - Offset(side / 2, side / 2);
     if (delta.distance < side * .12) return;
@@ -234,11 +288,44 @@ class _SleepDialDialogState extends State<_SleepDialDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '$_hours 小时 $_minutes 分钟',
+              _valid ? '$_hours 小时 $_minutes 分钟' : '请填写有效的小时与分钟',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final hours in [true, false]) ...[
+                  if (!hours) const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      key: ValueKey(
+                        hours ? 'sleep-hours-input' : 'sleep-minutes-input',
+                      ),
+                      controller: hours ? _hoursInput : _minutesInput,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(2),
+                      ],
+                      textInputAction: hours
+                          ? TextInputAction.next
+                          : TextInputAction.done,
+                      onChanged: (value) => _edited(hours, value),
+                      onSubmitted: hours ? null : (_) => _submit(),
+                      decoration: InputDecoration(
+                        labelText: hours ? '小时' : '分钟',
+                        helperText: hours ? '0～12' : '0～59',
+                        errorText: _inputError(hours),
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 12),
             Wrap(
               alignment: WrapAlignment.center,
               spacing: 8,
@@ -353,7 +440,12 @@ class _SleepDialDialogState extends State<_SleepDialDialog> {
               ],
             ),
             const SizedBox(height: 8),
-            const Text('切换小时与分钟会保留选择，最长12小时59分钟。', textAlign: TextAlign.center),
+            Text(
+              _valid && _duration == Duration.zero
+                  ? '时长必须大于0。请填写时间或转动圆盘。'
+                  : '可直接输入或转动圆盘。切换单位保留选择，最长12小时59分钟。',
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
@@ -364,12 +456,7 @@ class _SleepDialDialogState extends State<_SleepDialDialog> {
         child: const Text('返回'),
       ),
       FilledButton(
-        onPressed: _hours == 0 && _minutes == 0
-            ? null
-            : () => Navigator.pop(
-                context,
-                Duration(hours: _hours, minutes: _minutes),
-              ),
+        onPressed: !_valid || _duration == Duration.zero ? null : _submit,
         child: const Text('开始计时'),
       ),
     ],
