@@ -6,6 +6,7 @@ import 'playback_controller.dart';
 import 'full_player.dart';
 import '../library/track_cover.dart';
 import 'queue_page.dart';
+import 'playback_status.dart';
 
 class PlaybackMinibar extends ConsumerWidget {
   const PlaybackMinibar({super.key});
@@ -53,7 +54,7 @@ class PlaybackMinibar extends ConsumerWidget {
                               Text(
                                 current == null
                                     ? '未播放'
-                                    : playback?.metadata?.title ?? current.name,
+                                    : playbackTitle(playback!),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(fontSize: 16),
@@ -61,8 +62,10 @@ class PlaybackMinibar extends ConsumerWidget {
                               Text(
                                 current == null
                                     ? '选择歌曲开始播放'
-                                    : playback?.currentLyric ??
-                                          playback?.metadata?.artist ??
+                                    : playback!.changingTrack
+                                    ? '正在装载歌曲'
+                                    : playback.currentLyric ??
+                                          playback.metadata?.artist ??
                                           '未知歌手',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -76,16 +79,19 @@ class PlaybackMinibar extends ConsumerWidget {
                   ),
                 ),
               ),
-              IconButton(
-                key: const ValueKey('play-pause'),
-                tooltip: playback?.playing == true ? '暂停' : '播放',
-                onPressed: current == null || playback == null || playback.busy
-                    ? null
-                    : playback.togglePlayPause,
-                icon: Icon(
-                  playback?.playing == true ? Icons.pause : Icons.play_arrow,
+              if (playback != null)
+                PlaybackToggleButton(
+                  playback: playback,
+                  filled: false,
+                  enabled: !playback.busy,
+                )
+              else
+                const IconButton(
+                  key: ValueKey('play-pause'),
+                  tooltip: '播放',
+                  onPressed: null,
+                  icon: Icon(Icons.play_arrow),
                 ),
-              ),
               IconButton(
                 key: const ValueKey('open-playback-queue'),
                 tooltip: '播放队列',

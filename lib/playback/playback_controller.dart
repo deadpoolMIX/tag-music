@@ -209,6 +209,14 @@ class PlaybackController extends ChangeNotifier {
   ProbeTrack? _resolvedTrack;
   String? _resolvedEntryId;
   bool get playing => !_playbackFailed && player.state.playing;
+  bool get playbackFailed => _playbackFailed;
+  bool get canSeek =>
+      current != null &&
+      !changingTrack &&
+      !_playbackFailed &&
+      player.state.playlist.medias.isNotEmpty &&
+      player.state.duration > Duration.zero;
+  bool get sleepCounting => sleep.active && !sleep.waitingForEnd && _countSleep;
   bool get canNext => queue.canNext;
   bool get canPrevious => queue.canPrevious;
   String? get currentSongId =>

@@ -12,6 +12,7 @@ import 'playback_controller.dart';
 import 'playback_page.dart' show formatPosition;
 import 'queue_page.dart';
 import 'player_actions.dart';
+import 'playback_status.dart';
 import 'lyrics.dart';
 import 'sleep_timer_sheet.dart';
 
@@ -114,7 +115,7 @@ class _PlayerSeekState extends State<PlayerSeek> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.playback != widget.playback ||
         widget.playback.queue.current?.entryId != _entryId ||
-        widget.playback.player.state.duration <= Duration.zero) {
+        !widget.playback.canSeek) {
       _preview = null;
       _entryId = null;
     }
@@ -128,7 +129,11 @@ class _PlayerSeekState extends State<PlayerSeek> {
       _entryId = null;
     });
     // A natural track change during a held drag must not seek the new track.
-    if (entryId == null || playback.queue.current?.entryId != entryId) return;
+    if (entryId == null ||
+        !playback.canSeek ||
+        playback.queue.current?.entryId != entryId) {
+      return;
+    }
     widget.onSeek?.call();
     unawaited(
       playback.seek(
@@ -142,30 +147,31 @@ class _PlayerSeekState extends State<PlayerSeek> {
   Widget build(BuildContext context) {
     final playback = widget.playback;
     final state = playback.player.state;
-    final max = state.duration.inMilliseconds.toDouble().clamp(
-      1.0,
-      double.infinity,
-    );
+    final enabled = playback.canSeek;
+    final max = enabled ? state.duration.inMilliseconds.toDouble() : 1.0;
     final position = Duration(
-      milliseconds: (_preview ?? state.position.inMilliseconds.toDouble())
-          .clamp(0, max)
-          .round(),
+      milliseconds:
+          (enabled ? _preview ?? state.position.inMilliseconds.toDouble() : 0.0)
+              .clamp(0, max)
+              .round(),
     );
-    final enabled = playback.current != null && state.duration > Duration.zero;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         KeyedSubtree(
           key: ValueKey(enabled),
           child: Semantics(
-            label: '播放进度',
+            label: enabled ? '播放进度' : '播放进度暂不可用',
             child: Slider(
               key: const ValueKey('playback-seek'),
               semanticFormatterCallback: (value) =>
-                  formatPosition(Duration(milliseconds: value.round())),
+                  '${formatPosition(Duration(milliseconds: value.round()))}，总长 ${formatPosition(state.duration)}',
               label: formatPosition(position),
               value: position.inMilliseconds.toDouble().clamp(0, max),
               max: max,
+              secondaryTrackValue: enabled
+                  ? state.buffer.inMilliseconds.toDouble().clamp(0.0, max)
+                  : null,
               onChangeStart: enabled
                   ? (value) => setState(() {
                       _entryId = playback.queue.current?.entryId;
@@ -185,7 +191,7 @@ class _PlayerSeekState extends State<PlayerSeek> {
             children: [
               Expanded(
                 child: Text(
-                  formatPosition(position),
+                  enabled ? formatPosition(position) : '--:--',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -193,7 +199,7 @@ class _PlayerSeekState extends State<PlayerSeek> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  formatPosition(state.duration),
+                  enabled ? formatPosition(state.duration) : '--:--',
                   textAlign: TextAlign.end,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -326,7 +332,7 @@ class _PlayerBody extends StatelessWidget {
     mainAxisSize: MainAxisSize.min,
     children: [
       Text(
-        playback.metadata?.title ?? playback.current?.name ?? '未播放',
+        playbackTitle(playback),
         textAlign: TextAlign.center,
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
@@ -334,7 +340,7 @@ class _PlayerBody extends StatelessWidget {
       ),
       const SizedBox(height: 6),
       Text(
-        playback.metadata?.artist ?? '未知歌手',
+        playbackArtist(playback),
         textAlign: TextAlign.center,
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
@@ -345,7 +351,10 @@ class _PlayerBody extends StatelessWidget {
   Widget _controls(BuildContext context) => Column(
     mainAxisSize: MainAxisSize.min,
     children: [
-      if (!simple) PlayerSeek(playback: playback),
+      if (!simple) ...[
+        PlaybackActivity(playback: playback),
+        PlayerSeek(playback: playback),
+      ],
       PlaybackControls(
         playback: playback,
         onToggleLayout: playback.toggleLayout,
@@ -642,6 +651,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
     final playback = widget.playback;
     final lyrics = playback.lyrics.value;
     final entryId = playback.queue.current?.entryId;
+    final seekEnabled = entryId != null && playback.canSeek;
     final active = lyrics.indexAt(playback.player.state.position);
     final padding = math.max(24.0, (constraints.maxWidth - 720) / 2);
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
@@ -725,7 +735,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
               itemBuilder: (context, index) {
                 final line = lyrics.lines[index];
                 void seekLine() {
-                  if (entryId == null) return;
+                  if (!seekEnabled || !playback.canSeek) return;
                   _goCurrent();
                   unawaited(
                     playback.seek(
@@ -747,8 +757,8 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
                 return Semantics(
                   selected: index == active,
                   button: true,
-                  enabled: entryId != null,
-                  onTap: entryId == null ? null : seekLine,
+                  enabled: seekEnabled,
+                  onTap: seekEnabled ? seekLine : null,
                   // Reading another line with a screen reader is browsing, just
                   // like dragging the list. Do not pull focus back on each tick.
                   onDidGainAccessibilityFocus: _pauseFollow,
@@ -756,7 +766,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
                       '${line.texts.join('，')}，${formatPosition(Duration(milliseconds: line.milliseconds))}',
                   child: ExcludeSemantics(
                     child: InkWell(
-                      onTap: entryId == null ? null : seekLine,
+                      onTap: seekEnabled ? seekLine : null,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         child: AnimatedOpacity(
@@ -817,6 +827,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  PlaybackActivity(playback: widget.playback),
                   PlayerSeek(playback: widget.playback, onSeek: _goCurrent),
                   PlaybackControls(playback: widget.playback),
                   if (widget.playback.sleep.active)

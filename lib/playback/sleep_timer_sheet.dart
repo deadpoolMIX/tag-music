@@ -6,11 +6,22 @@ import 'package:flutter/services.dart';
 import 'playback_controller.dart';
 
 String sleepTimeLabel(Duration value) {
-  final hours = value.inHours;
-  final minutes = value.inMinutes % 60;
-  final seconds = value.inSeconds % 60;
+  // Round up so a positive remainder never looks like an expired timer.
+  final totalSeconds = math.max(
+    0,
+    (value.inMicroseconds + Duration.microsecondsPerSecond - 1) ~/
+        Duration.microsecondsPerSecond,
+  );
+  final hours = totalSeconds ~/ 3600;
+  final minutes = totalSeconds ~/ 60 % 60;
+  final seconds = totalSeconds % 60;
   return '${hours > 0 ? '$hours小时' : ''}$minutes分${seconds.toString().padLeft(2, '0')}秒';
 }
+
+String sleepTimerProgressLabel(PlaybackController playback) =>
+    playback.sleep.waitingForEnd
+    ? '本曲结束后停止'
+    : '${playback.sleepCounting ? '计时中' : '计时已暂停'} · 还可播放 ${sleepTimeLabel(playback.sleep.remaining)}';
 
 /// Uses the controller's playback clock; this view never starts another timer.
 class SleepTimerStatus extends StatelessWidget {
@@ -23,12 +34,7 @@ class SleepTimerStatus extends StatelessWidget {
     key: const ValueKey('sleep-timer-status'),
     onPressed: onManage ?? () => showSleepTimer(context, playback),
     icon: const Icon(Icons.bedtime_outlined, size: 18),
-    label: Text(
-      playback.sleep.waitingForEnd
-          ? '本曲结束后停止'
-          : '还可播放 ${sleepTimeLabel(playback.sleep.remaining)}',
-      textAlign: TextAlign.center,
-    ),
+    label: Text(sleepTimerProgressLabel(playback), textAlign: TextAlign.center),
   );
 }
 
@@ -118,12 +124,16 @@ class _SleepTimerPanelState extends State<_SleepTimerPanel> {
                   sleep.waitingForEnd
                       ? '已到时间，将在当前歌曲结束后停止。切换歌曲会停止播放；取消定时后可继续切换。'
                       : sleep.active
-                      ? '剩余实际播放时间：${sleepTimeLabel(sleep.remaining)}'
+                      ? sleepTimerProgressLabel(widget.playback)
                       : '按实际播放时间计时，暂停或缓冲时不计。到时间后播完当前歌曲再停止。',
                 ),
                 if (sleep.active && !sleep.waitingForEnd) ...[
                   const SizedBox(height: 8),
-                  const Text('选择新时长会重新开始计时；暂停和缓冲时不计时。'),
+                  Text(
+                    widget.playback.sleepCounting
+                        ? '正在按实际播放时间累计。选择新时长会重新开始计时；暂停和缓冲时不计时。'
+                        : '当前未累计，恢复实际播放后继续。选择新时长会重新开始计时；暂停和缓冲时不计时。',
+                  ),
                 ],
                 const SizedBox(height: 20),
                 Wrap(

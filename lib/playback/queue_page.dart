@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 
 import '../core/reorder_handle.dart';
 import '../library/library_controller.dart';
 import '../library/playlist_actions.dart';
 import 'playback_controller.dart';
+import 'playback_status.dart';
 
 const playbackModeNames = {
   PlaybackMode.sequential: '顺序播放',
@@ -59,25 +59,7 @@ class PlaybackControls extends StatelessWidget {
         onPressed: playback.canPrevious ? playback.previous : null,
         icon: const Icon(Icons.skip_previous),
       ),
-      Semantics(
-        customSemanticsActions: onToggleLayout == null
-            ? null
-            : {
-                const CustomSemanticsAction(label: '切换标准或简洁布局'):
-                    onToggleLayout!,
-              },
-        child: GestureDetector(
-          onLongPress: onToggleLayout,
-          child: IconButton.filled(
-            key: const ValueKey('play-pause'),
-            tooltip: playback.playing ? '暂停' : '播放',
-            onPressed: playback.current == null
-                ? null
-                : playback.togglePlayPause,
-            icon: Icon(playback.playing ? Icons.pause : Icons.play_arrow),
-          ),
-        ),
-      ),
+      PlaybackToggleButton(playback: playback, onToggleLayout: onToggleLayout),
       IconButton(
         tooltip: '下一首',
         onPressed: playback.canNext ? playback.next : null,
@@ -268,7 +250,7 @@ class _QueuePageState extends State<QueuePage> {
                           subtitle: Text(
                             [
                               if (current)
-                                playback.playing ? '正在播放' : '当前 · 已暂停',
+                                '当前 · ${playbackActivityLabel(playback)}',
                               if (priority[entry.entryId] case final rank?)
                                 '优先待播 $rank',
                             ].join(' · '),
