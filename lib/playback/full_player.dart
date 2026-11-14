@@ -226,6 +226,8 @@ class FullPlayer extends ConsumerWidget {
               playback.toggleLayout();
             case 'stop':
               unawaited(playback.stop());
+            case 'sleep':
+              unawaited(showSleepTimer(context, playback));
             case 'info':
               final tracks = library?.tracks.where(
                 (t) => t.song.id == playback.currentSongId,
@@ -245,6 +247,10 @@ class FullPlayer extends ConsumerWidget {
               child: Text(simple ? '切换标准布局' : '切换简洁布局'),
             ),
             const PopupMenuItem(value: 'stop', child: Text('停止播放')),
+            PopupMenuItem(
+              value: 'sleep',
+              child: Text(playback.sleep.active ? '管理睡眠定时' : '睡眠定时'),
+            ),
             if (library?.tracks.any(
                   (t) => t.song.id == playback.currentSongId,
                 ) ==
@@ -498,8 +504,12 @@ class ImmersiveLyrics extends StatefulWidget {
 
 class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
   final _scroll = ScrollController();
+  final _pageFocus = FocusNode(debugLabel: 'lyrics-page');
+  final _lyricsFocus = FocusNode(debugLabel: 'lyrics-lines');
+  final _headerFocus = FocusNode(debugLabel: 'lyrics-header');
+  final _controlsFocus = FocusNode(debugLabel: 'lyrics-controls');
   Timer? _hide;
-  bool _controls = true, _follow = true;
+  bool _controls = true, _follow = true, _keyboardInput = false;
   int _pointers = 0, _followGeneration = 0;
   int _last = -2;
   Lyrics? _lyrics;
@@ -519,7 +529,34 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
   void initState() {
     super.initState();
     widget.playback.addListener(_changed);
+    FocusManager.instance.addEarlyKeyEventHandler(_keyEvent);
     _arm();
+  }
+
+  // Observe before child shortcuts consume slider or scrolling keys. Never
+  // consume the event, and leave keys on other routes entirely untouched.
+  KeyEventResult _keyEvent(KeyEvent event) {
+    if (!mounted ||
+        !_pageFocus.hasFocus ||
+        ModalRoute.of(context)?.isCurrent != true ||
+        (event is! KeyDownEvent && event is! KeyRepeatEvent)) {
+      return KeyEventResult.ignored;
+    }
+    _keyboardInput = true;
+    if ((_lyricsFocus.hasFocus || _pageFocus.hasPrimaryFocus) &&
+        const [
+          LogicalKeyboardKey.arrowUp,
+          LogicalKeyboardKey.arrowDown,
+          LogicalKeyboardKey.pageUp,
+          LogicalKeyboardKey.pageDown,
+          LogicalKeyboardKey.home,
+          LogicalKeyboardKey.end,
+        ].contains(event.logicalKey)) {
+      _pauseFollow();
+    } else {
+      _reveal();
+    }
+    return KeyEventResult.ignored;
   }
 
   void _changed() {
@@ -528,15 +565,28 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
 
   void _arm() {
     _hide?.cancel();
-    if (_pointers > 0) return;
+    if (_holdingControls) return;
     _hide = Timer(const Duration(seconds: 5), () {
       if (!mounted ||
+          _holdingControls ||
           (MediaQuery.accessibleNavigationOf(context) ||
               WidgetsBinding.instance.semanticsEnabled)) {
         return;
       }
       setState(() => _controls = false);
     });
+  }
+
+  bool get _holdingControls =>
+      _pointers > 0 ||
+      (_keyboardInput && (_headerFocus.hasFocus || _controlsFocus.hasFocus));
+
+  void _controlFocusChanged(bool focused) {
+    if (focused) {
+      _reveal();
+    } else {
+      _arm();
+    }
   }
 
   void _reveal() {
@@ -559,6 +609,11 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
       _followGeneration++;
     });
     _reveal();
+  }
+
+  void _browseWithPointer() {
+    _keyboardInput = false;
+    _pauseFollow();
   }
 
   void _metrics(Lyrics lyrics, double width, TextScaler scaler) {
@@ -664,78 +719,83 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
           if (notice.dragDetails != null) _pauseFollow();
           return false;
         },
-        child: Listener(
-          onPointerSignal: (_) => _pauseFollow(),
-          child: ListView.builder(
-            controller: _scroll,
-            padding: EdgeInsets.fromLTRB(
-              padding,
-              constraints.maxHeight * .30,
-              padding,
-              constraints.maxHeight * .65,
-            ),
-            itemCount: lyrics.lines.length,
-            itemExtentBuilder: (index, _) => _heights[index],
-            itemBuilder: (context, index) {
-              final line = lyrics.lines[index];
-              final distance = (index - active).abs();
-              final alpha = active < 0
-                  ? .65
-                  : switch (distance) {
-                      0 => 1.0,
-                      1 => .65,
-                      2 => .45,
-                      _ => .30,
-                    };
-              return Semantics(
-                selected: index == active,
-                button: true,
-                label:
-                    '${line.texts.join('，')}，${formatPosition(Duration(milliseconds: line.milliseconds))}',
-                child: ExcludeSemantics(
-                  child: InkWell(
-                    onTap: () {
-                      _goCurrent();
-                      if (entryId == null) return;
-                      unawaited(
-                        playback.seek(
-                          Duration(milliseconds: line.milliseconds),
-                          expectedEntryId: entryId,
-                        ),
-                      );
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      child: AnimatedOpacity(
-                        duration: reducedMotion
-                            ? Duration.zero
-                            : const Duration(milliseconds: 250),
-                        opacity: alpha,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            for (var i = 0; i < line.texts.length; i++)
-                              Padding(
-                                padding: EdgeInsets.only(top: i == 0 ? 0 : 6),
-                                child: Text(
-                                  line.texts[i],
-                                  style: (i == 0 ? _original : _translation)
-                                      .copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface,
-                                      ),
+        child: Focus(
+          focusNode: _lyricsFocus,
+          skipTraversal: true,
+          child: Listener(
+            onPointerSignal: (_) => _browseWithPointer(),
+            onPointerPanZoomStart: (_) => _browseWithPointer(),
+            child: ListView.builder(
+              controller: _scroll,
+              padding: EdgeInsets.fromLTRB(
+                padding,
+                constraints.maxHeight * .30,
+                padding,
+                constraints.maxHeight * .65,
+              ),
+              itemCount: lyrics.lines.length,
+              itemExtentBuilder: (index, _) => _heights[index],
+              itemBuilder: (context, index) {
+                final line = lyrics.lines[index];
+                final distance = (index - active).abs();
+                final alpha = active < 0
+                    ? .65
+                    : switch (distance) {
+                        0 => 1.0,
+                        1 => .65,
+                        2 => .45,
+                        _ => .30,
+                      };
+                return Semantics(
+                  selected: index == active,
+                  button: true,
+                  label:
+                      '${line.texts.join('，')}，${formatPosition(Duration(milliseconds: line.milliseconds))}',
+                  child: ExcludeSemantics(
+                    child: InkWell(
+                      onTap: () {
+                        _goCurrent();
+                        if (entryId == null) return;
+                        unawaited(
+                          playback.seek(
+                            Duration(milliseconds: line.milliseconds),
+                            expectedEntryId: entryId,
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: AnimatedOpacity(
+                          duration: reducedMotion
+                              ? Duration.zero
+                              : const Duration(milliseconds: 250),
+                          opacity: alpha,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (var i = 0; i < line.texts.length; i++)
+                                Padding(
+                                  padding: EdgeInsets.only(top: i == 0 ? 0 : 6),
+                                  child: Text(
+                                    line.texts[i],
+                                    style: (i == 0 ? _original : _translation)
+                                        .copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface,
+                                        ),
+                                  ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -744,21 +804,28 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
 
   Widget _controlPanel(BuildContext context, double maxHeight) => Align(
     alignment: Alignment.bottomCenter,
-    child: ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: 720, maxHeight: maxHeight),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-        child: Material(
-          color: Theme.of(context).colorScheme.surface.withValues(alpha: .92),
-          borderRadius: BorderRadius.circular(24),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                PlayerSeek(playback: widget.playback, onSeek: _goCurrent),
-                PlaybackControls(playback: widget.playback),
-              ],
+    child: Focus(
+      focusNode: _controlsFocus,
+      skipTraversal: true,
+      onFocusChange: _controlFocusChanged,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 720, maxHeight: maxHeight),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+          child: Material(
+            color: Theme.of(context).colorScheme.surface.withValues(alpha: .92),
+            borderRadius: BorderRadius.circular(24),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  PlayerSeek(playback: widget.playback, onSeek: _goCurrent),
+                  PlaybackControls(playback: widget.playback),
+                  if (widget.playback.sleep.active)
+                    SleepTimerStatus(playback: widget.playback),
+                ],
+              ),
             ),
           ),
         ),
@@ -778,17 +845,15 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
             Navigator.maybePop(context),
       },
       child: Focus(
+        focusNode: _pageFocus,
         autofocus: true,
-        onKeyEvent: (_, event) {
-          if (event is KeyDownEvent || event is KeyRepeatEvent) _reveal();
-          return KeyEventResult.ignored;
-        },
         child: Scaffold(
           body: PlayerBackground(
             playback: widget.playback,
             child: Listener(
               behavior: HitTestBehavior.opaque,
               onPointerDown: (_) {
+                _keyboardInput = false;
                 _pointers++;
                 _reveal();
               },
@@ -810,19 +875,24 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
                             horizontal: 8,
                             vertical: 4,
                           ),
-                          child: Row(
-                            children: [
-                              if (showControls) const BackButton(),
-                              const Spacer(),
-                              if (!_follow)
-                                Flexible(
-                                  child: FilledButton.tonalIcon(
-                                    onPressed: _goCurrent,
-                                    icon: const Icon(Icons.my_location),
-                                    label: const Text('回到当前句'),
+                          child: Focus(
+                            focusNode: _headerFocus,
+                            skipTraversal: true,
+                            onFocusChange: _controlFocusChanged,
+                            child: Row(
+                              children: [
+                                if (showControls) const BackButton(),
+                                const Spacer(),
+                                if (!_follow)
+                                  Flexible(
+                                    child: FilledButton.tonalIcon(
+                                      onPressed: _goCurrent,
+                                      icon: const Icon(Icons.my_location),
+                                      label: const Text('回到当前句'),
+                                    ),
                                   ),
-                                ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       Expanded(child: LayoutBuilder(builder: _lines)),
@@ -842,7 +912,12 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
   @override
   void dispose() {
     _hide?.cancel();
+    FocusManager.instance.removeEarlyKeyEventHandler(_keyEvent);
     widget.playback.removeListener(_changed);
+    _pageFocus.dispose();
+    _lyricsFocus.dispose();
+    _headerFocus.dispose();
+    _controlsFocus.dispose();
     _scroll.dispose();
     super.dispose();
   }

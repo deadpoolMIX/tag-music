@@ -111,10 +111,19 @@ class _SleepDialDialog extends StatefulWidget {
 }
 
 class _SleepDialDialogState extends State<_SleepDialDialog> {
+  final _dialFocus = FocusNode(debugLabel: 'sleep-time-dial');
   int _hours = 0, _minutes = 15;
-  bool _hourDial = false;
+  bool _hourDial = false, _showFocus = false;
   int get _count => _hourDial ? 13 : 60;
   int get _value => _hourDial ? _hours : _minutes;
+  String get _unit => _hourDial ? '小时' : '分钟';
+
+  @override
+  void dispose() {
+    _dialFocus.dispose();
+    super.dispose();
+  }
+
   void _set(int value) => setState(() {
     if (_hourDial) {
       _hours = value.clamp(0, 12);
@@ -139,17 +148,26 @@ class _SleepDialDialogState extends State<_SleepDialDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
+            Text(
+              '$_hours 小时 $_minutes 分钟',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
               children: [
-                Expanded(
-                  child: Text(
-                    '$_hours 小时 $_minutes 分钟',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                ChoiceChip(
+                  label: const Text('选择小时'),
+                  selected: _hourDial,
+                  onSelected: (_) => setState(() => _hourDial = true),
                 ),
-                TextButton(
-                  onPressed: () => setState(() => _hourDial = !_hourDial),
-                  child: Text(_hourDial ? '选择分钟' : '选择小时'),
+                ChoiceChip(
+                  label: const Text('选择分钟'),
+                  selected: !_hourDial,
+                  onSelected: (_) => setState(() => _hourDial = false),
                 ),
               ],
             ),
@@ -160,11 +178,15 @@ class _SleepDialDialogState extends State<_SleepDialDialog> {
                 final side = math.min(280.0, constraints.maxWidth);
                 return Semantics(
                   label: _hourDial ? '小时圆盘' : '分钟圆盘',
-                  value: '$_value',
-                  increasedValue: '${(_value + 1).clamp(0, _count - 1)}',
-                  decreasedValue: '${(_value - 1).clamp(0, _count - 1)}',
-                  onIncrease: () => _set(_value + 1),
-                  onDecrease: () => _set(_value - 1),
+                  value: '$_value $_unit',
+                  increasedValue: _value < _count - 1
+                      ? '${_value + 1} $_unit'
+                      : null,
+                  decreasedValue: _value > 0 ? '${_value - 1} $_unit' : null,
+                  onIncrease: _value < _count - 1
+                      ? () => _set(_value + 1)
+                      : null,
+                  onDecrease: _value > 0 ? () => _set(_value - 1) : null,
                   child: CallbackShortcuts(
                     bindings: {
                       const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
@@ -177,23 +199,46 @@ class _SleepDialDialogState extends State<_SleepDialDialog> {
                           _set(_value - 1),
                       const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
                           _set(_value - 1),
+                      const SingleActivator(LogicalKeyboardKey.home): () =>
+                          _set(0),
+                      const SingleActivator(LogicalKeyboardKey.end): () =>
+                          _set(_count - 1),
                     },
-                    child: Focus(
+                    child: FocusableActionDetector(
                       autofocus: true,
+                      focusNode: _dialFocus,
+                      onShowFocusHighlight: (value) =>
+                          setState(() => _showFocus = value),
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onTapDown: (event) => _point(event.localPosition, side),
-                        onPanStart: (event) =>
-                            _point(event.localPosition, side),
+                        onTapDown: (event) {
+                          _dialFocus.requestFocus();
+                          _point(event.localPosition, side);
+                        },
+                        onPanStart: (event) {
+                          _dialFocus.requestFocus();
+                          _point(event.localPosition, side);
+                        },
                         onPanUpdate: (event) =>
                             _point(event.localPosition, side),
-                        child: CustomPaint(
-                          size: Size.square(side),
-                          painter: _SleepDialPainter(
-                            count: _count,
-                            selected: _value,
-                            scheme: Theme.of(context).colorScheme,
-                            textScaler: MediaQuery.textScalerOf(context),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              width: 2,
+                              color: _showFocus
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Colors.transparent,
+                            ),
+                          ),
+                          child: CustomPaint(
+                            size: Size.square(side),
+                            painter: _SleepDialPainter(
+                              count: _count,
+                              selected: _value,
+                              scheme: Theme.of(context).colorScheme,
+                              textScaler: MediaQuery.textScalerOf(context),
+                            ),
                           ),
                         ),
                       ),
@@ -201,6 +246,26 @@ class _SleepDialDialogState extends State<_SleepDialDialog> {
                   ),
                 );
               },
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                IconButton.outlined(
+                  tooltip: '减少1$_unit',
+                  onPressed: _value == 0 ? null : () => _set(_value - 1),
+                  icon: const Icon(Icons.remove),
+                ),
+                Expanded(
+                  child: Text('$_value $_unit', textAlign: TextAlign.center),
+                ),
+                IconButton.outlined(
+                  tooltip: '增加1$_unit',
+                  onPressed: _value == _count - 1
+                      ? null
+                      : () => _set(_value + 1),
+                  icon: const Icon(Icons.add),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             const Text('切换小时与分钟会保留选择，最长12小时59分钟。', textAlign: TextAlign.center),
