@@ -76,6 +76,33 @@ void main() {
       playback.queue.entries.map((e) => e.song.track.name).toList();
 
   queueTest(
+    'long queue locates and moves the selected duplicate without reopening',
+    (tester) async {
+      await playback.setMode(PlaybackMode.sequential);
+      await playback.playSongs(List.generate(60, (_) => song('duplicate')), 40);
+      await playback.seek(const Duration(seconds: 8));
+      final current = playback.queue.current!.entryId;
+      final opens = player.opens.length;
+      await mount(tester, QueuePage(playback: playback));
+      expect(find.byKey(ValueKey('queue-entry-$current')), findsOneWidget);
+      await tester.drag(
+        find.byKey(const ValueKey('queue-order')),
+        const Offset(0, 2500),
+      );
+      await tester.pumpAndSettle();
+      await tap(tester, find.text('定位当前歌曲'));
+      expect(find.byKey(ValueKey('queue-entry-$current')), findsOneWidget);
+      await tap(tester, find.byTooltip('队列第41项操作'));
+      await tap(tester, find.text('下移一项'));
+      expect(playback.queue.entries[41].entryId, current);
+      expect(playback.queue.current!.entryId, current);
+      expect(player.state.position.inSeconds, 8);
+      expect(player.opens.length, opens);
+      expect(playback.playing, isTrue);
+    },
+  );
+
+  queueTest(
     'cold empty queue is reachable, silent and default shuffle; modes are exclusive',
     (tester) async {
       await tester.pumpWidget(
@@ -160,8 +187,8 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(find.text('A.flac'), findsNWidgets(2));
-        expect(find.text('优先待播 1'), findsOneWidget);
-        expect(find.text('优先待播 2'), findsOneWidget);
+        expect(find.textContaining('优先待播 1'), findsOneWidget);
+        expect(find.textContaining('优先待播 2'), findsOneWidget);
         final stops = player.stops;
         final start = tester.getCenter(
           find.byType(ReorderableDragStartListener).first,
@@ -192,7 +219,7 @@ void main() {
         expect(player.state.position.inSeconds, 8);
         await tap(tester, find.byTooltip('下一首'));
         expect(playback.queue.current?.entryId, firstA);
-        expect(find.text('优先待播 1'), findsOneWidget);
+        expect(find.textContaining('优先待播 1'), findsOneWidget);
         expect(find.text('当前 · 已暂停'), findsNothing);
         await tap(tester, find.byKey(ValueKey('queue-entry-$secondA')));
         expect(playback.queue.current?.entryId, secondA);

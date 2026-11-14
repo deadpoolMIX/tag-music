@@ -1,8 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../core/reorder_handle.dart';
 import '../library/library_controller.dart';
 import '../library/playlist_actions.dart';
+import '../library/song_information.dart';
 import 'playback_controller.dart';
 import 'playback_status.dart';
 
@@ -118,6 +121,44 @@ class QueuePage extends StatefulWidget {
 
 class _QueuePageState extends State<QueuePage> {
   bool busy = false;
+  final _scroll = ScrollController();
+  bool _positioned = false;
+  double _rowExtent = 72;
+
+  void _locateCurrent({bool animate = true}) {
+    final index = widget.playback.queue.index;
+    if (index < 0 || !_scroll.hasClients) return;
+    final position = _scroll.position;
+    final offset =
+        (index * _rowExtent - (position.viewportDimension - _rowExtent) / 2)
+            .clamp(0.0, position.maxScrollExtent);
+    if (!animate || MediaQuery.disableAnimationsOf(context)) {
+      _scroll.jumpTo(offset);
+    } else {
+      _scroll.animateTo(
+        offset,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  Future<void> _move(String entryId, int delta) => _change(() async {
+    // Resolve identities after a menu closes; the queue may have advanced or
+    // changed while the user was choosing an operation.
+    final ids = widget.playback.queue.entries.map((e) => e.entryId).toList();
+    final index = ids.indexOf(entryId);
+    final target = index + delta;
+    if (index < 0 || target < 0 || target >= ids.length) return;
+    ids.insert(target, ids.removeAt(index));
+    await widget.playback.reorderQueue(ids);
+  });
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   Future<void> _change(Future<void> Function() action) async {
     if (busy) return;
@@ -156,6 +197,17 @@ class _QueuePageState extends State<QueuePage> {
     builder: (context, _) {
       final playback = widget.playback;
       final entries = playback.queue.entries.toList();
+      final scaler = MediaQuery.textScalerOf(context);
+      _rowExtent = math.max(
+        72,
+        scaler.scale(16) * 1.5 + scaler.scale(14) * 1.5 + 24,
+      );
+      if (!_positioned && entries.isNotEmpty) {
+        _positioned = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _locateCurrent(animate: false);
+        });
+      }
       final priority = {
         for (final (index, id) in playback.queue.priorityIds.indexed)
           id: index + 1,
@@ -179,13 +231,20 @@ class _QueuePageState extends State<QueuePage> {
                           icon: const Icon(Icons.close),
                         ),
                         Expanded(child: Text('播放队列 · ${entries.length} 项')),
-                        PlaybackModeButton(playback: playback),
                       ],
                     ),
                     Wrap(
                       spacing: 8,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
+                        PlaybackModeButton(playback: playback),
+                        TextButton.icon(
+                          onPressed: playback.queue.current == null
+                              ? null
+                              : _locateCurrent,
+                          icon: const Icon(Icons.my_location),
+                          label: const Text('定位当前歌曲'),
+                        ),
                         if (widget.library case final library?)
                           TextButton.icon(
                             key: const ValueKey('save-full-queue'),
@@ -225,6 +284,8 @@ class _QueuePageState extends State<QueuePage> {
                   ? const Center(child: Text('队列为空，从曲库、筛选或歌单添加歌曲'))
                   : ReorderableListView.builder(
                       key: const ValueKey('queue-order'),
+                      scrollController: _scroll,
+                      itemExtent: _rowExtent,
                       buildDefaultDragHandles: false,
                       itemCount: entries.length,
                       onReorderItem: (oldIndex, newIndex) {
@@ -239,9 +300,61 @@ class _QueuePageState extends State<QueuePage> {
                         return ListTile(
                           key: ValueKey('queue-entry-${entry.entryId}'),
                           selected: current,
-                          leading: Icon(
-                            current ? Icons.graphic_eq : Icons.music_note,
+                          leading: PopupMenuButton<String>(
+                            tooltip: '队列第${i + 1}项操作',
+                            enabled: !busy,
+                            icon: Icon(
+                              current ? Icons.graphic_eq : Icons.music_note,
+                            ),
+                            itemBuilder: (_) => [
+                              PopupMenuItem(
+                                value: 'up',
+                                enabled: i > 0,
+                                child: const Text('上移一项'),
+                              ),
+                              PopupMenuItem(
+                                value: 'down',
+                                enabled: i + 1 < entries.length,
+                                child: const Text('下移一项'),
+                              ),
+                              if (widget.library?.tracks.any(
+                                    (t) => t.song.id == entry.song.songId,
+                                  ) ==
+                                  true)
+                                const PopupMenuItem(
+                                  value: 'info',
+                                  child: Text('歌曲信息'),
+                                ),
+                            ],
+                            onSelected: (choice) async {
+                              if (!mounted ||
+                                  ModalRoute.of(context)?.isCurrent != true) {
+                                return;
+                              }
+                              if (choice == 'up' || choice == 'down') {
+                                await _move(
+                                  entry.entryId,
+                                  choice == 'up' ? -1 : 1,
+                                );
+                              } else {
+                                final tracks = widget.library?.tracks.where(
+                                  (t) => t.song.id == entry.song.songId,
+                                );
+                                if (tracks?.isNotEmpty == true) {
+                                  await showSongInformation(
+                                    context,
+                                    tracks!.first,
+                                  );
+                                }
+                              }
+                            },
                           ),
+                          titleTextStyle: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(fontSize: 16, height: 1.5),
+                          subtitleTextStyle: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(fontSize: 14, height: 1.5),
                           title: Text(
                             entry.song.track.name,
                             maxLines: 1,
@@ -249,11 +362,14 @@ class _QueuePageState extends State<QueuePage> {
                           ),
                           subtitle: Text(
                             [
+                              '${i + 1} / ${entries.length}',
                               if (current)
                                 '当前 · ${playbackActivityLabel(playback)}',
                               if (priority[entry.entryId] case final rank?)
                                 '优先待播 $rank',
                             ].join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           onTap: busy
                               ? null
