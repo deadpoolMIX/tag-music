@@ -27,10 +27,7 @@ class PlaybackQueue {
   final Random _random;
   List<QueueEntry> _entries = [];
   final List<String> _priority = [];
-  final List<String> _remaining = [];
   final Set<String> _visited = {};
-  final List<String> _history = [];
-  int _historyIndex = -1;
   String? _currentId;
   // Priority detours must not move the resume point of the ordinary sequence.
   String? _baseId;
@@ -41,9 +38,7 @@ class PlaybackQueue {
   PlaybackMode get mode => _mode;
   int get index => _entries.indexWhere((e) => e.entryId == _currentId);
   QueueEntry? get current => index < 0 ? null : _entries[index];
-  bool get canPrevious => _mode == PlaybackMode.shuffle
-      ? _historyIndex > 0
-      : index > 0 || (_wraps && _entries.isNotEmpty);
+  bool get canPrevious => index > 0 || (_wraps && _entries.isNotEmpty);
   bool get canNext =>
       _entries.isNotEmpty &&
       (_mode != PlaybackMode.sequential ||
@@ -69,10 +64,7 @@ class PlaybackQueue {
     _currentId = null;
     _baseId = null;
     _priority.clear();
-    _remaining.clear();
     _visited.clear();
-    _history.clear();
-    _historyIndex = -1;
   }
 
   void setMode(PlaybackMode value) {
@@ -86,19 +78,21 @@ class PlaybackQueue {
     _visited
       ..clear()
       ..addAll([?_currentId]);
-    _history
-      ..clear()
-      ..addAll([?_currentId]);
-    _historyIndex = _history.length - 1;
-    final priority = _priority.toSet();
-    _remaining
-      ..clear()
-      ..addAll(
-        _entries
-            .map((e) => e.entryId)
-            .where((id) => id != _currentId && !priority.contains(id)),
-      )
-      ..shuffle(_random);
+    if (_mode == PlaybackMode.shuffle && current != null) {
+      final selected = current!;
+      final pending = {for (final entry in _entries) entry.entryId: entry};
+      final priority = _priority.toSet();
+      final rest =
+          _entries
+              .where(
+                (entry) =>
+                    entry.entryId != selected.entryId &&
+                    !priority.contains(entry.entryId),
+              )
+              .toList()
+            ..shuffle(_random);
+      _entries = [selected, ..._priority.map((id) => pending[id]!), ...rest];
+    }
   }
 
   /// Insert behind the existing FIFO priority block, never in front of it.
@@ -126,27 +120,17 @@ class PlaybackQueue {
 
   QueueEntry? select(String entryId) {
     if (!_entries.any((e) => e.entryId == entryId)) return null;
-    return _choose(entryId, base: !_priority.contains(entryId));
+    return _choose(
+      entryId,
+      base: _mode == PlaybackMode.shuffle || !_priority.contains(entryId),
+    );
   }
 
-  QueueEntry _choose(String id, {required bool base, bool record = true}) {
+  QueueEntry _choose(String id, {required bool base}) {
     _currentId = id;
     if (base) _baseId = id;
     _priority.remove(id);
-    _remaining.remove(id);
     _visited.add(id);
-    if (record) {
-      if (_historyIndex + 1 < _history.length) {
-        _history.removeRange(_historyIndex + 1, _history.length);
-      }
-      _history.add(id);
-      // Bound continuous playback history to two queue-lengths. No stale IDs
-      // or unbounded session growth; navigation within history adds no visits.
-      final limit = _entries.isEmpty ? 2 : _entries.length * 2;
-      final excess = _history.length - limit;
-      if (excess > 0) _history.removeRange(0, excess);
-      _historyIndex = _history.length - 1;
-    }
     return current!;
   }
 
@@ -171,34 +155,16 @@ class PlaybackQueue {
         !excluded.contains(_currentId)) {
       return current;
     }
-    if (_mode == PlaybackMode.shuffle) {
-      while (_historyIndex + 1 < _history.length) {
-        final id = _history[++_historyIndex];
-        if (!excluded.contains(id)) {
-          return _choose(id, base: false, record: false);
-        }
-      }
-    }
     final priority = _priority
         .where((id) => !excluded.contains(id))
         .firstOrNull;
-    if (priority != null) return _choose(priority, base: false);
-    if (_mode == PlaybackMode.shuffle) {
-      var candidates = _remaining.where((id) => !excluded.contains(id));
-      if (candidates.isEmpty) {
-        _visited.clear();
-        _remaining
-          ..clear()
-          ..addAll(_entries.map((e) => e.entryId))
-          ..shuffle(_random);
-        candidates = _remaining.where((id) => !excluded.contains(id));
-      }
-      final id = candidates.firstOrNull;
-      return id == null ? null : _choose(id, base: true);
+    if (_mode != PlaybackMode.shuffle && priority != null) {
+      return _choose(priority, base: false);
     }
     var candidates = _linearCandidates(excluded);
-    if (candidates.isEmpty && _wraps) {
+    if (candidates.isEmpty && (_wraps || _mode == PlaybackMode.shuffle)) {
       _visited.clear();
+      if (_mode == PlaybackMode.shuffle) _entries.shuffle(_random);
       candidates = _entries
           .map((e) => e.entryId)
           .where((id) => !excluded.contains(id))
@@ -209,9 +175,6 @@ class PlaybackQueue {
 
   QueueEntry? previous() {
     if (!canPrevious) return null;
-    if (_mode == PlaybackMode.shuffle) {
-      return _choose(_history[--_historyIndex], base: false, record: false);
-    }
     final target = index > 0 ? index - 1 : _entries.length - 1;
     return _choose(_entries[target].entryId, base: true);
   }
@@ -228,6 +191,12 @@ class PlaybackQueue {
     _priority
       ..clear()
       ..addAll(orderedIds.where(pending.contains));
+    if (_mode == PlaybackMode.shuffle) {
+      _baseId = _currentId;
+      _visited
+        ..clear()
+        ..addAll([?_currentId]);
+    }
   }
 
   /// Removing current selects its displayed successor, else predecessor.
@@ -238,14 +207,7 @@ class PlaybackQueue {
     final wasCurrent = _currentId == entryId;
     _entries.removeAt(at);
     _priority.remove(entryId);
-    _remaining.remove(entryId);
     _visited.remove(entryId);
-    final beforeCursor = _history
-        .take(_historyIndex + 1)
-        .where((id) => id != entryId)
-        .length;
-    _history.removeWhere((id) => id == entryId);
-    _historyIndex = beforeCursor - 1;
     if (_entries.isEmpty) {
       clear();
       return;
@@ -255,7 +217,10 @@ class PlaybackQueue {
     }
     if (wasCurrent) {
       final id = _entries[min(at, _entries.length - 1)].entryId;
-      _choose(id, base: !_priority.contains(id));
+      _choose(
+        id,
+        base: _mode == PlaybackMode.shuffle || !_priority.contains(id),
+      );
     }
   }
 }

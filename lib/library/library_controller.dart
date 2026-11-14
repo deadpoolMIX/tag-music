@@ -24,8 +24,12 @@ class LibraryTrack {
   bool get available => location != null;
   String get title =>
       song.title?.trim().isNotEmpty == true ? song.title! : song.name;
-  ProbeTrack get probe =>
-      ProbeTrack(location: location ?? song.location, name: song.name);
+  ProbeTrack get probe => ProbeTrack(
+    location: location ?? song.location,
+    name: song.name,
+    size: song.size,
+    modified: song.modified,
+  );
   QueueSong get queueSong => QueueSong(songId: song.id, track: probe);
 }
 

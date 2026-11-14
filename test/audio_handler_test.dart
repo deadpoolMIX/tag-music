@@ -35,6 +35,8 @@ class HandlerController extends ChangeNotifier implements PlaybackController {
   @override
   String? get currentSongId => null;
   @override
+  String? get currentLyric => null;
+  @override
   ProbeTrack? current = const ProbeTrack(
     location: 'test://song',
     name: 'sample.flac',

@@ -62,7 +62,10 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                     }
                 }
             } else {
-                worker.execute {
+                // Companion traversal must never block playback descriptor ownership.
+                val lyricRequest = if (call.method == "findLyrics") lyricGeneration.incrementAndGet() else 0L
+                val executor = if (call.method == "findLyrics" || call.method == "readLyrics") lyricsWorker else worker
+                executor.execute {
                     try {
                         val value: Any? = when (call.method) {
                             "beginScan" -> {
@@ -75,6 +78,22 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                             "nextScan" -> requireNotNull(scans[call.argument<Int>("token")]).next()
                             "endScan" -> { scans.remove(call.argument<Int>("token"))?.close(); null }
                             "list" -> list(Uri.parse(requireNotNull(call.argument<String>("uri"))))
+                            "findLyrics" -> findLyrics(Uri.parse(requireNotNull(call.argument<String>("uri"))), lyricRequest)?.toString()
+                            "readLyrics" -> {
+                                val uri = Uri.parse(requireNotNull(call.argument<String>("uri")))
+                                require(uri.scheme == "content") { "仅支持 SAF content URI" }
+                                requireNotNull(activity.contentResolver.openInputStream(uri)).use { stream ->
+                                    val output = java.io.ByteArrayOutputStream()
+                                    val buffer = ByteArray(8192)
+                                    while (true) {
+                                        val count = stream.read(buffer)
+                                        if (count < 0) break
+                                        require(output.size() + count <= 1024 * 1024) { "歌词超过 1MiB 上限" }
+                                        output.write(buffer, 0, count)
+                                    }
+                                    output.toByteArray()
+                                }
+                            }
                             "open" -> {
                                 val uri = Uri.parse(requireNotNull(call.argument<String>("uri")))
                                 require(uri.scheme == "content") { "仅支持 SAF content URI" }
@@ -152,6 +171,7 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                     val name = it.getString(1) ?: childId
                     if (it.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR) pending.add(childId)
                     else if (name.substringAfterLast('.', "").lowercase() in extensions) {
+                        rememberParent(tree, childId, id)
                         require(tracks.size < 10000) { "R1 验证最多读取一万首" }
                         tracks.add(mapOf("location" to DocumentsContract.buildDocumentUriUsingTree(tree, childId).toString(), "name" to name))
                     }
@@ -161,12 +181,65 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
         return tracks.sortedBy { it["name"] }
     }
 
+    /** Document IDs are opaque: discover the real parent by traversing the granted tree.
+     * Never infer a parent path/ID from a provider's document ID. All cursors close via use.
+     */
+    private fun findLyrics(audio: Uri, generation: Long): Uri? {
+        require(audio.scheme == "content" && DocumentsContract.isTreeUri(audio)) { "需要已授权树中的歌曲" }
+        val treeId = DocumentsContract.getTreeDocumentId(audio)
+        val tree = activity.contentResolver.persistedUriPermissions.firstOrNull {
+            it.isReadPermission && it.uri.authority == audio.authority &&
+                DocumentsContract.isTreeUri(it.uri) && DocumentsContract.getTreeDocumentId(it.uri) == treeId
+        }?.uri ?: throw SecurityException("歌曲目录授权已失效")
+        val target = DocumentsContract.getDocumentId(audio)
+        val pending = java.util.ArrayDeque<String>()
+        val knownParent = parents[ParentKey(audio.authority, treeId, target)]
+        pending.add(knownParent ?: treeId)
+        if (knownParent != null && knownParent != treeId) pending.add(treeId)
+        val visited = mutableSetOf<String>()
+        var examined = 0
+        while (!pending.isEmpty()) {
+            if (generation != lyricGeneration.get()) return null
+            val parent = pending.removeFirst()
+            if (!visited.add(parent)) continue
+            require(visited.size <= 100000) { "歌词目录查询超过安全上限" }
+            var audioName: String? = null
+            val candidates = mutableListOf<Pair<String, String>>()
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parent)
+            val projection = arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE)
+            val cursor = activity.contentResolver.query(children, projection, null, null, null)
+                ?: throw IllegalStateException("歌词目录不可访问")
+            cursor.use {
+                while (it.moveToNext()) {
+                    if (generation != lyricGeneration.get()) return null
+                    require(++examined <= 500000) { "歌词文件查询超过安全上限" }
+                    val id = it.getString(0)
+                    val name = it.getString(1) ?: continue
+                    if (it.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR) pending.add(id)
+                    else {
+                        rememberParent(tree, id, parent)
+                        if (id == target) audioName = name
+                        if (name.substringAfterLast('.', "").equals("lrc", ignoreCase = true)) candidates.add(id to name)
+                    }
+                }
+            }
+            val name = audioName ?: continue
+            val stem = name.substringBeforeLast('.', name)
+            val matching = candidates.filter { it.second.substringBeforeLast('.', it.second) == stem }
+                .sortedBy { it.second }
+            return matching.firstOrNull()?.let { DocumentsContract.buildDocumentUriUsingTree(tree, it.first) }
+        }
+        return null
+    }
+
     /** Bounded pages; the single worker can service playback FD calls between pages. */
     private class Scan(private val tree: Uri, private val resolver: android.content.ContentResolver) {
         private val pending = java.util.ArrayDeque<Pair<String, String>>()
         private val visited = mutableSetOf<String>()
         private var cursor: Cursor? = null
         private var parentPath = ""
+        private var parentId = ""
         init { pending.add(DocumentsContract.getTreeDocumentId(tree) to "") }
         fun close() { cursor?.close(); cursor = null; pending.clear() }
         fun next(): Map<String, Any> {
@@ -180,6 +253,7 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                         if (!visited.add(id)) continue
                         require(visited.size <= 100000) { "目录数量超过安全上限" }
                         parentPath = path
+                        parentId = id
                         cursor = resolver.query(
                             DocumentsContract.buildChildDocumentsUriUsingTree(tree, id),
                             arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID,
@@ -197,6 +271,7 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                     val path = if (parentPath.isEmpty()) name else "$parentPath/$name"
                     if (row.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR) pending.add(id to path)
                     else if (name.substringAfterLast('.', "").lowercase() in extensions) {
+                        rememberParent(tree, id, parentId)
                         files.add(mapOf("identity" to "${tree.authority}:$id",
                             "location" to DocumentsContract.buildDocumentUriUsingTree(tree, id).toString(),
                             "name" to name, "relativePath" to path,
@@ -216,6 +291,14 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
         // AudioService's FlutterEngine survives Activity recreation. Descriptor
         // ownership must survive it too; every access is serialized by worker.
         private val worker = Executors.newSingleThreadExecutor()
+        private val lyricsWorker = Executors.newSingleThreadExecutor()
+        private val lyricGeneration = java.util.concurrent.atomic.AtomicLong()
+        private data class ParentKey(val authority: String?, val treeId: String, val childId: String)
+        private val parents = java.util.concurrent.ConcurrentHashMap<ParentKey, String>()
+        private fun rememberParent(tree: Uri, child: String, parent: String) {
+            if (parents.size >= 100000) parents.clear()
+            parents[ParentKey(tree.authority, DocumentsContract.getTreeDocumentId(tree), child)] = parent
+        }
         private val descriptors = mutableMapOf<Int, ParcelFileDescriptor>()
         private var picker: MethodChannel.Result? = null
         private var notificationRequest: MethodChannel.Result? = null

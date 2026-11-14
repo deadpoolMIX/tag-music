@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../library/library_controller.dart';
 import 'playback_controller.dart';
-import 'playback_page.dart';
+import 'full_player.dart';
+import '../library/track_cover.dart';
 import 'queue_page.dart';
 
 class PlaybackMinibar extends ConsumerWidget {
@@ -25,38 +26,50 @@ class PlaybackMinibar extends ConsumerWidget {
                 child: InkWell(
                   onTap: playback == null
                       ? null
-                      : () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const Scaffold(
-                              appBar: _PlayerAppBar(),
-                              body: PlaybackPage(controlsOnly: true),
-                            ),
-                          ),
-                        ),
+                      : () => openFullPlayer(context),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 8,
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        Text(
-                          current == null
-                              ? '未播放'
-                              : playback?.metadata?.title ?? current.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                        Text(
-                          current == null
-                              ? '选择歌曲开始播放'
-                              : playback?.metadata?.artist ?? '未知歌手',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12),
+                        if (current != null && playback != null) ...[
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: TrackCover(
+                              documents: playback.documents,
+                              track: current,
+                              size: 44,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                        ],
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                current == null
+                                    ? '未播放'
+                                    : playback?.metadata?.title ?? current.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                              Text(
+                                current == null
+                                    ? '选择歌曲开始播放'
+                                    : playback?.currentLyric ??
+                                          playback?.metadata?.artist ??
+                                          '未知歌手',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -91,12 +104,4 @@ class PlaybackMinibar extends ConsumerWidget {
         ? bar()
         : ListenableBuilder(listenable: playback, builder: (_, _) => bar());
   }
-}
-
-class _PlayerAppBar extends StatelessWidget implements PreferredSizeWidget {
-  const _PlayerAppBar();
-  @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
-  @override
-  Widget build(BuildContext context) => AppBar(title: const Text('正在播放'));
 }

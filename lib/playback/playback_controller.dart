@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 
 import 'documents.dart';
+import 'lyrics.dart';
 import 'playback_queue.dart';
 
 export 'playback_queue.dart'
@@ -27,6 +28,7 @@ class PlaybackController extends ChangeNotifier {
     this.documents, {
     PlaybackQueue? playbackQueue,
   }) : queue = playbackQueue ?? PlaybackQueue() {
+    lyrics.addListener(_publish);
     _subscriptions.addAll([
       player.stream.playing.listen((_) => _publish()),
       player.stream.position.listen((_) => _publish()),
@@ -79,6 +81,18 @@ class PlaybackController extends ChangeNotifier {
         );
       }),
     ]);
+  }
+
+  final lyrics = LyricsTimeline();
+  bool simpleLayout = false;
+  void toggleLayout() {
+    simpleLayout = !simpleLayout;
+    _publish();
+  }
+
+  String? get currentLyric {
+    final index = lyrics.value.indexAt(player.state.position);
+    return index < 0 ? null : lyrics.value.lines[index].original;
   }
 
   final Player player;
@@ -282,6 +296,7 @@ class PlaybackController extends ChangeNotifier {
 
   Future<void> setMode(PlaybackMode mode) => _serial(() async {
     queue.setMode(mode);
+    _syncTracks();
   });
 
   Future<void> reorderQueue(List<String> orderedIds) => _serial(() async {
@@ -309,6 +324,7 @@ class PlaybackController extends ChangeNotifier {
   });
 
   Future<void> _clearMedia() async {
+    lyrics.clear();
     _selection++;
     _playIntent = false;
     _playbackFailed = false;
@@ -332,6 +348,7 @@ class PlaybackController extends ChangeNotifier {
     required bool play,
     bool resetFailures = true,
   }) async {
+    _syncTracks();
     if (resetFailures) {
       _failedEntries.clear();
       playbackNotice = null;
@@ -342,6 +359,7 @@ class PlaybackController extends ChangeNotifier {
     try {
       while (queue.current != null) {
         final entry = queue.current!;
+        lyrics.clear();
         _selection++;
         _playbackFailed = false;
         error = null;
@@ -355,6 +373,7 @@ class PlaybackController extends ChangeNotifier {
           if (track == null) throw StateError('文件失联或目录不可访问');
           _resolvedEntryId = entry.entryId;
           _resolvedTrack = track;
+          unawaited(lyrics.load(() => documents.lyrics(track)));
           try {
             metadata = await documents.metadata(track);
             debugPrint(
@@ -494,6 +513,8 @@ class PlaybackController extends ChangeNotifier {
   Future<void> shutdown() async {
     await _pending;
     _closed = true;
+    lyrics.removeListener(_publish);
+    lyrics.dispose();
     for (final subscription in _subscriptions) {
       await subscription.cancel();
     }

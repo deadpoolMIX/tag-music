@@ -9,14 +9,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path/path.dart' as p;
 
 import 'descriptor_file.dart';
+import 'cover_cache.dart';
+import 'lyrics.dart';
 
 const audioExtensions = {'mp3', 'flac', 'm4a', 'aac', 'wav', 'ogg', 'opus'};
 
 // R1 locators, not permanent song IDs. R2 introduces the persistent library.
 class ProbeTrack {
-  const ProbeTrack({required this.location, required this.name});
+  const ProbeTrack({
+    required this.location,
+    required this.name,
+    this.size,
+    this.modified,
+  });
   final String location;
   final String name;
+  final int? size;
+  final int? modified;
 }
 
 class TrackMetadata {
@@ -42,7 +51,12 @@ class ScannedFile {
   final String relativePath;
   final int? size;
   final int? modified;
-  ProbeTrack get probe => ProbeTrack(location: location, name: name);
+  ProbeTrack get probe => ProbeTrack(
+    location: location,
+    name: name,
+    size: size,
+    modified: modified,
+  );
 }
 
 Uint8List? readFileCover(File file) {
@@ -245,6 +259,35 @@ class DocumentAccess {
       await close(fd);
     }
   });
+
+  final coverCache = CoverCache();
+  Future<Uint8List?> cachedCover(ProbeTrack track, {int targetSize = 96}) {
+    final size = targetSize.clamp(32, 1024);
+    final key = (track.location, track.size, track.modified, size);
+    return coverCache.get(key, size, () => cover(track));
+  }
+
+  Future<Uint8List?> lyrics(ProbeTrack track) async {
+    if (android) {
+      final uri = await channel.invokeMethod<String>('findLyrics', {
+        'uri': track.location,
+      });
+      if (uri == null) return null;
+      return channel.invokeMethod<Uint8List>('readLyrics', {'uri': uri});
+    }
+    final file = File(p.setExtension(track.location, '.lrc'));
+    if (!await file.exists()) return null;
+    final handle = await file.open();
+    try {
+      final data = await handle.read(maxLyricsBytes + 1);
+      if (data.length > maxLyricsBytes) {
+        throw const FormatException('歌词超过 1MiB 上限');
+      }
+      return data;
+    } finally {
+      await handle.close();
+    }
+  }
 
   Future<int> open(String uri) async =>
       (await channel.invokeMethod<int>('open', {'uri': uri}))!;

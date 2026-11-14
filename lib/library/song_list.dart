@@ -7,6 +7,7 @@ import '../core/reorder_handle.dart';
 import '../playback/playback_controller.dart';
 import 'library_controller.dart';
 import 'track_cover.dart';
+import 'song_information.dart';
 import 'playlist_actions.dart';
 import 'tags_page.dart';
 
@@ -465,6 +466,9 @@ class SongRow extends StatelessWidget {
                       tooltip: '歌曲操作',
                       enabled: enabled,
                       onSelected: (value) {
+                        if (value == 'information') {
+                          showSongInformation(context, track);
+                        }
                         if (value == 'select' && canSelect) onSelect();
                         if (value == 'tags') {
                           showTagActions(context, library, {track.song.id});
@@ -474,6 +478,10 @@ class SongRow extends StatelessWidget {
                         }
                       },
                       itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'information',
+                          child: Text('歌曲信息'),
+                        ),
                         if (reorderIndex == null)
                           const PopupMenuItem(
                             value: 'select',

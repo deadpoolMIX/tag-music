@@ -19,9 +19,26 @@ class TrackCover extends StatefulWidget {
 }
 
 class _TrackCoverState extends State<TrackCover> {
-  late final Future<Uint8List?> _cover = widget.documents.cover(widget.track);
+  late Future<Uint8List?> _cover = _load();
+  Future<Uint8List?> _load() => widget.documents.cachedCover(
+    widget.track,
+    targetSize: widget.size <= 64 ? 96 : (widget.size * 2).round(),
+  );
+  @override
+  void didUpdateWidget(TrackCover oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.documents != widget.documents ||
+        oldWidget.size != widget.size ||
+        oldWidget.track.location != widget.track.location ||
+        oldWidget.track.size != widget.track.size ||
+        oldWidget.track.modified != widget.track.modified) {
+      _cover = _load();
+    }
+  }
+
   @override
   Widget build(BuildContext context) => FutureBuilder<Uint8List?>(
+    key: ValueKey(_cover),
     future: _cover,
     builder: (context, snapshot) => SizedBox(
       height: widget.size,

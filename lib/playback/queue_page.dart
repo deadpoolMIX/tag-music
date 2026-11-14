@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
 import '../core/reorder_handle.dart';
 import '../library/library_controller.dart';
@@ -13,8 +14,13 @@ const playbackModeNames = {
 };
 
 class PlaybackControls extends StatelessWidget {
-  const PlaybackControls({required this.playback, super.key});
+  const PlaybackControls({
+    required this.playback,
+    this.onToggleLayout,
+    super.key,
+  });
   final PlaybackController playback;
+  final VoidCallback? onToggleLayout;
 
   @override
   Widget build(BuildContext context) => Row(
@@ -25,16 +31,24 @@ class PlaybackControls extends StatelessWidget {
         onPressed: playback.canPrevious ? playback.previous : null,
         icon: const Icon(Icons.skip_previous),
       ),
-      IconButton.filled(
-        key: const ValueKey('play-pause'),
-        tooltip: playback.playing ? '暂停' : '播放',
-        onPressed: playback.togglePlayPause,
-        icon: Icon(playback.playing ? Icons.pause : Icons.play_arrow),
-      ),
-      IconButton(
-        tooltip: '停止',
-        onPressed: playback.stop,
-        icon: const Icon(Icons.stop),
+      Semantics(
+        customSemanticsActions: onToggleLayout == null
+            ? null
+            : {
+                const CustomSemanticsAction(label: '切换标准或简洁布局'):
+                    onToggleLayout!,
+              },
+        child: GestureDetector(
+          onLongPress: onToggleLayout,
+          child: IconButton.filled(
+            key: const ValueKey('play-pause'),
+            tooltip: playback.playing ? '暂停' : '播放',
+            onPressed: playback.current == null
+                ? null
+                : playback.togglePlayPause,
+            icon: Icon(playback.playing ? Icons.pause : Icons.play_arrow),
+          ),
+        ),
       ),
       IconButton(
         tooltip: '下一首',
@@ -247,6 +261,13 @@ class _QueuePageState extends State<QueuePage> {
           ),
           if (playback.queue.current != null)
             PlaybackControls(playback: playback),
+          PopupMenuButton<String>(
+            tooltip: '更多播放操作',
+            onSelected: (_) => playback.stop(),
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'stop', child: Text('停止播放')),
+            ],
+          ),
         ],
       );
     },

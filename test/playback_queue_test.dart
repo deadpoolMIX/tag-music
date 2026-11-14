@@ -82,21 +82,18 @@ void main() {
     },
   );
 
-  test(
-    'empty add selects first; replace clears priority and history, keeps mode',
-    () {
-      final value = PlaybackQueue()..add([song('A'), song('B')]);
-      expect(id(value.current), 'A');
-      expect(value.priorityIds, [value.entries[1].entryId]);
-      value.next();
-      expect(value.canPrevious, isTrue);
-      value.replace([song('new')], 0);
-      expect(value.priorityIds, isEmpty);
-      expect(value.canPrevious, isFalse);
-      expect(value.mode, PlaybackMode.shuffle);
-      expect(id(value.current), 'new');
-    },
-  );
+  test('empty add selects first; replace clears priority and resets visible traversal, keeps mode', () {
+    final value = PlaybackQueue()..add([song('A'), song('B')]);
+    expect(id(value.current), 'A');
+    expect(value.priorityIds, [value.entries[1].entryId]);
+    value.next();
+    expect(value.canPrevious, isTrue);
+    value.replace([song('new')], 0);
+    expect(value.priorityIds, isEmpty);
+    expect(value.canPrevious, isFalse);
+    expect(value.mode, PlaybackMode.shuffle);
+    expect(id(value.current), 'new');
+  });
 
   test('single repeat waits for manual next; manual navigation wraps', () {
     final value = queue(['start', 'original'], mode: PlaybackMode.repeatOne);
@@ -138,51 +135,74 @@ void main() {
     },
   );
 
-  test(
-    'shuffle priority precedes random, history wins on forward navigation',
-    () {
-      final value = queue(['start', 'X', 'Y', 'Z']);
-      value.add([song('A')]);
-      value.add([song('B')]);
-      expect(id(value.next()), 'A');
-      expect(id(value.next()), 'B');
-      expect(id(value.previous()), 'A');
-      value.add([song('C')]);
-      expect(id(value.next()), 'B');
-      expect(id(value.next()), 'C');
-      final remainder = [for (var i = 0; i < 3; i++) id(value.next())];
-      expect(remainder.toSet(), {'X', 'Y', 'Z'});
-      final second = [for (var i = 0; i < 7; i++) value.next()!.entryId];
-      expect(second.toSet(), value.entries.map((e) => e.entryId).toSet());
-    },
-  );
+  test('shuffle follows visible FIFO insertion even after previous', () {
+    final value = queue(['start', 'X', 'Y', 'Z']);
+    value.add([song('A')]);
+    value.add([song('B')]);
+    expect(id(value.next()), 'A');
+    expect(id(value.next()), 'B');
+    expect(id(value.previous()), 'A');
+    value.add([song('C')]);
+    expect(id(value.next()), 'C');
+    expect(id(value.next()), 'B');
+    final remainder = [for (var i = 0; i < 3; i++) id(value.next())];
+    expect(remainder.toSet(), {'X', 'Y', 'Z'});
+    final second = [for (var i = 0; i < 7; i++) value.next()!.entryId];
+    expect(second.toSet(), value.entries.map((e) => e.entryId).toSet());
+  });
 
-  test(
-    'reorder keeps current identity and shuffle schedule; priority can reorder',
-    () {
-      final value = queue(['A', 'B', 'C', 'D']);
-      final control = queue(['A', 'B', 'C', 'D']);
-      final current = value.current!.entryId;
-      value.reorder(
-        value.entries.map((e) => e.entryId).toList().reversed.toList(),
-      );
-      expect(value.current!.entryId, current);
-      expect(
-        [for (var i = 0; i < 3; i++) id(value.next())],
-        [for (var i = 0; i < 3; i++) id(control.next())],
-      );
-      value.add([song('X'), song('Y')]);
-      final ordered = value.entries.map((e) => e.entryId).toList();
-      final a = ordered.indexOf(value.priorityIds[0]);
-      final b = ordered.indexOf(value.priorityIds[1]);
-      final first = ordered[a];
-      ordered[a] = ordered[b];
-      ordered[b] = first;
-      value.reorder(ordered);
-      expect([id(value.next()), id(value.next())], ['Y', 'X']);
-      expect(() => value.reorder([current]), throwsArgumentError);
-    },
-  );
+  test('shuffle display is the fixed round and manual reorder defines subsequent playback', () {
+    final value = queue(['A', 'B', 'C', 'D', 'E'], target: 2);
+    final current = value.current!.entryId;
+    final initial = value.entries.map((e) => e.entryId).toList();
+    expect(initial.first, current);
+    final expectedRest = ['A', 'B', 'D', 'E']..shuffle(Random(53));
+    expect(value.entries.map((entry) => entry.song.songId), [
+      'C',
+      ...expectedRest,
+    ]);
+    final reordered = [current, ...initial.skip(1).toList().reversed];
+    value.reorder(reordered);
+    expect(value.entries.map((e) => e.entryId), reordered);
+    for (var i = 1; i < reordered.length; i++) {
+      expect(value.next(natural: i.isEven)!.entryId, reordered[i]);
+      expect(value.entries.map((e) => e.entryId), reordered);
+    }
+    expect(value.previous()!.entryId, reordered[reordered.length - 2]);
+    expect(value.next(natural: true)!.entryId, reordered.last);
+    final nextRoundFirst = value.next()!.entryId;
+    expect(value.entries.first.entryId, nextRoundFirst);
+    final nextRound = value.entries.map((e) => e.entryId).toList();
+    expect([
+      nextRoundFirst,
+      for (var i = 1; i < nextRound.length; i++)
+        value.next(natural: true)!.entryId,
+    ], nextRound);
+    value.add([song('X'), song('Y')]);
+    final ordered = value.entries.map((e) => e.entryId).toList();
+    final a = ordered.indexOf(value.priorityIds[0]);
+    final b = ordered.indexOf(value.priorityIds[1]);
+    final first = ordered[a];
+    ordered[a] = ordered[b];
+    ordered[b] = first;
+    value.reorder(ordered);
+    expect([id(value.next()), id(value.next(natural: true))], ['Y', 'X']);
+    expect(() => value.reorder([current]), throwsArgumentError);
+  });
+
+  test('shuffle append stays visible FIFO and resumes the unchanged unfinished round', () {
+    final value = queue(['A', 'B', 'C', 'D', 'E']);
+    final remaining = value.entries.skip(1).map((e) => e.entryId).toList();
+    value.add([song('X')]);
+    value.add([song('Y')]);
+    expect(value.entries.skip(1).take(2).map((e) => e.song.songId), ['X', 'Y']);
+    expect(id(value.next(natural: true)), 'X');
+    value.add([song('Z')]);
+    expect([id(value.next()), id(value.next(natural: true))], ['Y', 'Z']);
+    for (final expected in remaining) {
+      expect(value.next(natural: true)!.entryId, expected);
+    }
+  });
 
   test('remove current selects successor then predecessor; duplicate is independent', () {
     final value = queue(['A', 'A', 'B'], mode: PlaybackMode.sequential);
@@ -201,20 +221,17 @@ void main() {
     expect(value.canNext, isFalse);
   });
 
-  test(
-    'remove history and pending references leaves no dangling selections',
-    () {
-      final value = queue(['A', 'B', 'C']);
-      value.add([song('X'), song('Y')]);
-      final removed = value.priorityIds.first;
-      value.next();
-      value.next();
-      value.remove(removed);
-      expect(id(value.previous()), 'A');
-      expect(id(value.next()), 'Y');
-      expect(value.priorityIds, isEmpty);
-    },
-  );
+  test('remove prior and pending entries leaves no dangling selections', () {
+    final value = queue(['A', 'B', 'C']);
+    value.add([song('X'), song('Y')]);
+    final removed = value.priorityIds.first;
+    value.next();
+    value.next();
+    value.remove(removed);
+    expect(id(value.previous()), 'A');
+    expect(id(value.next()), 'Y');
+    expect(value.priorityIds, isEmpty);
+  });
 
   test(
     'mode change preserves current and priority, starts new shuffle traversal',
