@@ -514,7 +514,12 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
   int _last = -2;
   Lyrics? _lyrics;
   List<double> _offsets = [], _heights = [];
-  double _width = 0, _scale = 0, _viewportHeight = 0;
+  double _width = 0, _viewportHeight = 0;
+  TextScaler? _textScaler;
+  TextStyle? _baseStyle;
+  TextDirection? _direction;
+  Locale? _locale;
+  bool _boldText = false;
   static const _original = TextStyle(
     fontSize: 26,
     fontWeight: FontWeight.w300,
@@ -617,14 +622,27 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
   }
 
   void _metrics(Lyrics lyrics, double width, TextScaler scaler) {
-    final scale = scaler.scale(26);
-    if (identical(lyrics, _lyrics) && width == _width && scale == _scale) {
+    final baseStyle = DefaultTextStyle.of(context).style;
+    final direction = Directionality.of(context);
+    final locale = Localizations.maybeLocaleOf(context);
+    final boldText = MediaQuery.boldTextOf(context);
+    if (identical(lyrics, _lyrics) &&
+        width == _width &&
+        scaler == _textScaler &&
+        baseStyle == _baseStyle &&
+        direction == _direction &&
+        locale == _locale &&
+        boldText == _boldText) {
       return;
     }
     final changedTrack = !identical(lyrics, _lyrics);
     _lyrics = lyrics;
     _width = width;
-    _scale = scale;
+    _textScaler = scaler;
+    _baseStyle = baseStyle;
+    _direction = direction;
+    _locale = locale;
+    _boldText = boldText;
     _last = -2;
     _followGeneration++;
     if (changedTrack) _follow = true;
@@ -635,12 +653,11 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
       var height = 32.0;
       for (var i = 0; i < line.texts.length; i++) {
         final painter = TextPainter(
-          text: TextSpan(
-            text: line.texts[i],
-            style: i == 0 ? _original : _translation,
-          ),
-          textDirection: Directionality.of(context),
+          text: TextSpan(text: line.texts[i], style: _lineStyle(i)),
+          textDirection: direction,
           textScaler: scaler,
+          locale: locale,
+          textHeightBehavior: const ui.TextHeightBehavior(),
         )..layout(maxWidth: width);
         height += painter.height + (i == 0 ? 0 : 6);
         painter.dispose();
@@ -649,6 +666,12 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
       _heights.add(height);
       offset += height;
     }
+  }
+
+  TextStyle _lineStyle(int index) {
+    var style = _baseStyle!.merge(index == 0 ? _original : _translation);
+    if (_boldText) style = style.copyWith(fontWeight: FontWeight.bold);
+    return style.copyWith(inherit: false);
   }
 
   Widget _lines(BuildContext context, BoxConstraints constraints) {
@@ -737,6 +760,17 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
               itemExtentBuilder: (index, _) => _heights[index],
               itemBuilder: (context, index) {
                 final line = lyrics.lines[index];
+                void seekLine() {
+                  if (entryId == null) return;
+                  _goCurrent();
+                  unawaited(
+                    playback.seek(
+                      Duration(milliseconds: line.milliseconds),
+                      expectedEntryId: entryId,
+                    ),
+                  );
+                }
+
                 final distance = (index - active).abs();
                 final alpha = active < 0
                     ? .65
@@ -749,20 +783,13 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
                 return Semantics(
                   selected: index == active,
                   button: true,
+                  enabled: entryId != null,
+                  onTap: entryId == null ? null : seekLine,
                   label:
                       '${line.texts.join('，')}，${formatPosition(Duration(milliseconds: line.milliseconds))}',
                   child: ExcludeSemantics(
                     child: InkWell(
-                      onTap: () {
-                        _goCurrent();
-                        if (entryId == null) return;
-                        unawaited(
-                          playback.seek(
-                            Duration(milliseconds: line.milliseconds),
-                            expectedEntryId: entryId,
-                          ),
-                        );
-                      },
+                      onTap: entryId == null ? null : seekLine,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         child: AnimatedOpacity(
@@ -779,12 +806,15 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
                                   padding: EdgeInsets.only(top: i == 0 ? 0 : 6),
                                   child: Text(
                                     line.texts[i],
-                                    style: (i == 0 ? _original : _translation)
-                                        .copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurface,
-                                        ),
+                                    locale: _locale,
+                                    textAlign: TextAlign.start,
+                                    textHeightBehavior:
+                                        const ui.TextHeightBehavior(),
+                                    style: _lineStyle(i).copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface,
+                                    ),
                                   ),
                                 ),
                             ],

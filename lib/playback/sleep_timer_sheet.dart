@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -39,70 +38,145 @@ Future<void> showSleepTimer(
   context: context,
   isScrollControlled: true,
   showDragHandle: true,
-  builder: (context) => SafeArea(
+  builder: (_) => _SleepTimerPanel(playback: playback),
+);
+
+class _SleepTimerPanel extends StatefulWidget {
+  const _SleepTimerPanel({required this.playback});
+  final PlaybackController playback;
+  @override
+  State<_SleepTimerPanel> createState() => _SleepTimerPanelState();
+}
+
+class _SleepTimerPanelState extends State<_SleepTimerPanel> {
+  bool _submitting = false, _choosing = false;
+  String? _error;
+  bool get _busy => _submitting || _choosing;
+
+  Future<void> _apply(Duration? duration) async {
+    if (_busy) return;
+    final playback = widget.playback;
+    final generation = playback.sleep.generation;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      if (duration == null) {
+        await playback.cancelSleepTimer();
+      } else {
+        await playback.setSleepTimer(duration);
+      }
+      if (!mounted) return;
+      // The controller serial lane reports errors without throwing. An unchanged
+      // generation also covers a request ignored by a disposed controller.
+      if (playback.sleep.generation == generation) {
+        setState(() => _error = playback.error ?? '定时尚未更新，请稍后重试。');
+      } else if (ModalRoute.of(context)?.isCurrent == true) {
+        Navigator.pop(context);
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = '定时操作失败：$error');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _custom() async {
+    if (_busy) return;
+    setState(() => _choosing = true);
+    Duration? duration;
+    try {
+      duration = await showDialog<Duration>(
+        context: context,
+        builder: (_) => const _SleepDialDialog(),
+      );
+    } finally {
+      if (mounted) setState(() => _choosing = false);
+    }
+    if (!mounted || duration == null) return;
+    await _apply(duration);
+  }
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
     child: SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
         child: ListenableBuilder(
-          listenable: playback,
-          builder: (context, _) => Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('睡眠定时', style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 12),
-              Text(
-                playback.sleep.waitingForEnd
-                    ? '已到时间，将在当前歌曲结束后停止。切换歌曲会停止播放；取消定时后可继续切换。'
-                    : playback.sleep.active
-                    ? '剩余实际播放时间：${sleepTimeLabel(playback.sleep.remaining)}'
-                    : '按实际播放时间计时，暂停或缓冲时不计。到时间后播完当前歌曲再停止。',
-              ),
-              const SizedBox(height: 20),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final minutes in [15, 30, 45, 60])
-                    FilledButton.tonal(
-                      onPressed: () {
-                        unawaited(
-                          playback.setSleepTimer(Duration(minutes: minutes)),
-                        );
-                        Navigator.pop(context);
-                      },
-                      child: Text('$minutes 分钟'),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: () async {
-                  final duration = await showDialog<Duration>(
-                    context: context,
-                    builder: (_) => const _SleepDialDialog(),
-                  );
-                  if (duration == null) return;
-                  await playback.setSleepTimer(duration);
-                  if (context.mounted) Navigator.pop(context);
-                },
-                child: const Text('自定义时间'),
-              ),
-              if (playback.sleep.active)
-                TextButton(
-                  onPressed: () {
-                    unawaited(playback.cancelSleepTimer());
-                    Navigator.pop(context);
-                  },
-                  child: const Text('取消定时'),
+          listenable: widget.playback,
+          builder: (context, _) {
+            final sleep = widget.playback.sleep;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('睡眠定时', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 12),
+                Text(
+                  sleep.waitingForEnd
+                      ? '已到时间，将在当前歌曲结束后停止。切换歌曲会停止播放；取消定时后可继续切换。'
+                      : sleep.active
+                      ? '剩余实际播放时间：${sleepTimeLabel(sleep.remaining)}'
+                      : '按实际播放时间计时，暂停或缓冲时不计。到时间后播完当前歌曲再停止。',
                 ),
-            ],
-          ),
+                if (sleep.active && !sleep.waitingForEnd) ...[
+                  const SizedBox(height: 8),
+                  const Text('选择新时长会重新开始计时；暂停和缓冲时不计时。'),
+                ],
+                const SizedBox(height: 20),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final minutes in [15, 30, 45, 60])
+                      FilledButton.tonal(
+                        onPressed: _busy
+                            ? null
+                            : () => _apply(Duration(minutes: minutes)),
+                        child: Text('$minutes 分钟'),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  onPressed: _busy ? null : _custom,
+                  child: const Text('自定义时间'),
+                ),
+                if (sleep.active)
+                  TextButton(
+                    onPressed: _busy ? null : () => _apply(null),
+                    child: const Text('取消定时'),
+                  ),
+                if (_submitting)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: const Text('正在更新定时…', textAlign: TextAlign.center),
+                    ),
+                  ),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        _error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ),
     ),
-  ),
-);
+  );
+}
 
 class _SleepDialDialog extends StatefulWidget {
   const _SleepDialDialog();
