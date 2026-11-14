@@ -150,125 +150,148 @@ class _QueuePageState extends State<QueuePage> {
         for (final (index, id) in playback.queue.priorityIds.indexed)
           id: index + 1,
       };
-      return Column(
-        children: [
-          Row(
-            children: [
-              IconButton(
-                tooltip: '关闭队列',
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close),
+      return LayoutBuilder(
+        builder: (context, constraints) => Column(
+          children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: constraints.maxHeight * .45,
               ),
-              Expanded(child: Text('播放队列 · ${entries.length} 项')),
-              PlaybackModeButton(playback: playback),
-            ],
-          ),
-          Wrap(
-            spacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              if (widget.library case final library?)
-                TextButton.icon(
-                  key: const ValueKey('save-full-queue'),
-                  onPressed: entries.isEmpty || busy
-                      ? null
-                      : () => savePlaylist(
-                          context,
-                          library,
-                          entries.map((e) => e.song.songId),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          tooltip: '关闭队列',
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
                         ),
-                  icon: const Icon(Icons.playlist_add),
-                  label: const Text('保存完整队列为歌单'),
+                        Expanded(child: Text('播放队列 · ${entries.length} 项')),
+                        PlaybackModeButton(playback: playback),
+                      ],
+                    ),
+                    Wrap(
+                      spacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        if (widget.library case final library?)
+                          TextButton.icon(
+                            key: const ValueKey('save-full-queue'),
+                            onPressed: entries.isEmpty || busy
+                                ? null
+                                : () => savePlaylist(
+                                    context,
+                                    library,
+                                    entries.map((e) => e.song.songId),
+                                  ),
+                            icon: const Icon(Icons.playlist_add),
+                            label: const Text('保存完整队列为歌单'),
+                          ),
+                        TextButton(
+                          key: const ValueKey('clear-playback-queue'),
+                          onPressed: entries.isEmpty || busy ? null : _clear,
+                          child: const Text('清空队列'),
+                        ),
+                      ],
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
+                      child: Text('优先待播按编号播放一次，再续原序列；已播条目保留。拖动可调整队列和待播顺序。'),
+                    ),
+                    if (playback.error case final error?)
+                      Text(error, key: const ValueKey('queue-error')),
+                  ],
                 ),
-              TextButton(
-                key: const ValueKey('clear-playback-queue'),
-                onPressed: entries.isEmpty || busy ? null : _clear,
-                child: const Text('清空队列'),
               ),
-            ],
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Text('优先待播按编号播放一次，再续原序列；已播条目保留。拖动可调整队列和待播顺序。'),
-          ),
-          if (playback.error case final error?)
-            Text(error, key: const ValueKey('queue-error')),
-          if (busy) const LinearProgressIndicator(),
-          Expanded(
-            child: entries.isEmpty
-                ? const Center(child: Text('队列为空，从曲库、筛选或歌单添加歌曲'))
-                : ReorderableListView.builder(
-                    key: const ValueKey('queue-order'),
-                    buildDefaultDragHandles: false,
-                    itemCount: entries.length,
-                    onReorderItem: (oldIndex, newIndex) {
-                      final ids = entries.map((e) => e.entryId).toList();
-                      ids.insert(newIndex, ids.removeAt(oldIndex));
-                      _change(() => playback.reorderQueue(ids));
-                    },
-                    itemBuilder: (_, i) {
-                      final entry = entries[i];
-                      final current =
-                          playback.queue.current?.entryId == entry.entryId;
-                      return ListTile(
-                        key: ValueKey('queue-entry-${entry.entryId}'),
-                        selected: current,
-                        leading: Icon(
-                          current ? Icons.graphic_eq : Icons.music_note,
-                        ),
-                        title: Text(
-                          entry.song.track.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(
-                          [
-                            if (current) playback.playing ? '正在播放' : '当前 · 已暂停',
-                            if (priority[entry.entryId] case final rank?)
-                              '优先待播 $rank',
-                          ].join(' · '),
-                        ),
-                        onTap: busy
-                            ? null
-                            : () => _change(
-                                () => playback.selectEntry(entry.entryId),
-                              ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              key: ValueKey('queue-remove-${entry.entryId}'),
-                              tooltip: '移除此条目',
-                              onPressed: busy
-                                  ? null
-                                  : () => _change(
-                                      () => playback.removeFromQueue(
-                                        entry.entryId,
+            ),
+            if (busy) const LinearProgressIndicator(),
+            Expanded(
+              child: entries.isEmpty
+                  ? const Center(child: Text('队列为空，从曲库、筛选或歌单添加歌曲'))
+                  : ReorderableListView.builder(
+                      key: const ValueKey('queue-order'),
+                      buildDefaultDragHandles: false,
+                      itemCount: entries.length,
+                      onReorderItem: (oldIndex, newIndex) {
+                        final ids = entries.map((e) => e.entryId).toList();
+                        ids.insert(newIndex, ids.removeAt(oldIndex));
+                        _change(() => playback.reorderQueue(ids));
+                      },
+                      itemBuilder: (_, i) {
+                        final entry = entries[i];
+                        final current =
+                            playback.queue.current?.entryId == entry.entryId;
+                        return ListTile(
+                          key: ValueKey('queue-entry-${entry.entryId}'),
+                          selected: current,
+                          leading: Icon(
+                            current ? Icons.graphic_eq : Icons.music_note,
+                          ),
+                          title: Text(
+                            entry.song.track.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            [
+                              if (current)
+                                playback.playing ? '正在播放' : '当前 · 已暂停',
+                              if (priority[entry.entryId] case final rank?)
+                                '优先待播 $rank',
+                            ].join(' · '),
+                          ),
+                          onTap: busy
+                              ? null
+                              : () => _change(
+                                  () => playback.selectEntry(entry.entryId),
+                                ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                key: ValueKey('queue-remove-${entry.entryId}'),
+                                tooltip: '移除此条目',
+                                onPressed: busy
+                                    ? null
+                                    : () => _change(
+                                        () => playback.removeFromQueue(
+                                          entry.entryId,
+                                        ),
                                       ),
-                                    ),
-                              icon: const Icon(Icons.remove_circle_outline),
-                            ),
-                            ReorderHandle(
-                              index: i,
-                              enabled: !busy,
-                              label: '拖动队列条目排序',
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-          ),
-          if (playback.queue.current != null)
-            PlaybackControls(playback: playback),
-          PopupMenuButton<String>(
-            tooltip: '更多播放操作',
-            onSelected: (_) => playback.stop(),
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'stop', child: Text('停止播放')),
-            ],
-          ),
-        ],
+                                icon: const Icon(Icons.remove_circle_outline),
+                              ),
+                              ReorderHandle(
+                                index: i,
+                                enabled: !busy,
+                                label: '拖动队列条目排序',
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (playback.queue.current != null)
+                  PlaybackControls(playback: playback),
+                PopupMenuButton<String>(
+                  tooltip: '更多播放操作',
+                  onSelected: (_) => playback.stop(),
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'stop', child: Text('停止播放')),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
       );
     },
   );

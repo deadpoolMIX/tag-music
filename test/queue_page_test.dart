@@ -198,7 +198,8 @@ void main() {
         expect(playback.queue.current?.entryId, secondA);
         expect(playback.playing, isTrue);
         expect(playback.queue.entries, hasLength(5));
-        await tap(tester, find.byTooltip('停止'));
+        await tap(tester, find.byTooltip('更多播放操作'));
+        await tap(tester, find.text('停止播放'));
         expect(playback.queue.entries, hasLength(5));
         expect(player.state.position, Duration.zero);
         await tap(tester, find.byTooltip('播放'));

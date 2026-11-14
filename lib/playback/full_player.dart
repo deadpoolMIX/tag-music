@@ -152,12 +152,13 @@ class _PlayerSeekState extends State<PlayerSeek> {
           .round(),
     );
     final enabled = playback.current != null && state.duration > Duration.zero;
-    return Row(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(formatPosition(position)),
-        Expanded(
-          child: KeyedSubtree(
-            key: ValueKey(enabled),
+        KeyedSubtree(
+          key: ValueKey(enabled),
+          child: Semantics(
+            label: '播放进度',
             child: Slider(
               key: const ValueKey('playback-seek'),
               semanticFormatterCallback: (value) =>
@@ -178,7 +179,29 @@ class _PlayerSeekState extends State<PlayerSeek> {
             ),
           ),
         ),
-        Text(formatPosition(state.duration)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  formatPosition(position),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  formatPosition(state.duration),
+                  textAlign: TextAlign.end,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -196,7 +219,6 @@ class FullPlayer extends ConsumerWidget {
     return ListenableBuilder(
       listenable: playback,
       builder: (context, _) {
-        final current = playback.current;
         final simple = playback.simpleLayout;
         void menu(String value) {
           switch (value) {
@@ -269,170 +291,11 @@ class FullPlayer extends ConsumerWidget {
                     minimum: EdgeInsets.only(
                       top: MediaQuery.paddingOf(context).top + kToolbarHeight,
                     ),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final coverSize = math
-                            .min(
-                              440.0,
-                              math.min(
-                                constraints.maxWidth - 64,
-                                constraints.maxHeight * (simple ? .62 : .47),
-                              ),
-                            )
-                            .clamp(96.0, 440.0);
-                        return SingleChildScrollView(
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              minHeight: constraints.maxHeight,
-                            ),
-                            child: Center(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 16,
-                                ),
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 560,
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (!simple) ...[
-                                        Text(
-                                          playback.metadata?.title ??
-                                              current?.name ??
-                                              '未播放',
-                                          textAlign: TextAlign.center,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .headlineSmall,
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          playback.metadata?.artist ?? '未知歌手',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 24),
-                                      ],
-                                      Semantics(
-                                        button: true,
-                                        label: '打开沉浸歌词',
-                                        child: InkWell(
-                                          borderRadius: BorderRadius.circular(
-                                            28,
-                                          ),
-                                          onTap: current == null
-                                              ? null
-                                              : () => Navigator.push<void>(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (_) =>
-                                                        ImmersiveLyrics(
-                                                          playback: playback,
-                                                        ),
-                                                  ),
-                                                ),
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(
-                                              28,
-                                            ),
-                                            child: SizedBox(
-                                              width: coverSize,
-                                              height: coverSize,
-                                              child: ColoredBox(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .surfaceContainer
-                                                    .withValues(alpha: .6),
-                                                child: current == null
-                                                    ? const Icon(
-                                                        Icons.album_outlined,
-                                                        size: 96,
-                                                      )
-                                                    : TrackCover(
-                                                        documents:
-                                                            playback.documents,
-                                                        track: current,
-                                                        size: coverSize,
-                                                      ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 28),
-                                      if (!simple)
-                                        PlayerSeek(playback: playback),
-                                      PlaybackControls(
-                                        playback: playback,
-                                        onToggleLayout: playback.toggleLayout,
-                                      ),
-                                      if (!simple) ...[
-                                        const SizedBox(height: 16),
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceEvenly,
-                                          children: [
-                                            PlaybackModeButton(
-                                              playback: playback,
-                                            ),
-                                            IconButton(
-                                              tooltip: playback.sleep.active
-                                                  ? '睡眠定时已开启'
-                                                  : '睡眠定时',
-                                              icon: Icon(
-                                                playback.sleep.active
-                                                    ? Icons.bedtime
-                                                    : Icons.bedtime_outlined,
-                                              ),
-                                              onPressed: () => showSleepTimer(
-                                                context,
-                                                playback,
-                                              ),
-                                            ),
-                                            IconButton(
-                                              tooltip: '播放队列',
-                                              icon: const Icon(
-                                                Icons.queue_music,
-                                              ),
-                                              onPressed: () =>
-                                                  showPlaybackQueue(
-                                                    context,
-                                                    playback,
-                                                    library,
-                                                  ),
-                                            ),
-                                            more(),
-                                          ],
-                                        ),
-                                        if (playback.sleep.active)
-                                          SleepTimerStatus(playback: playback),
-                                        if (playback.error != null ||
-                                            playback.playbackNotice != null)
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: 8,
-                                            ),
-                                            child: Text(
-                                              playback.error ??
-                                                  playback.playbackNotice!,
-                                              maxLines: 3,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
+                    child: _PlayerBody(
+                      playback: playback,
+                      library: library,
+                      simple: simple,
+                      more: more(),
                     ),
                   ),
                 ),
@@ -443,6 +306,187 @@ class FullPlayer extends ConsumerWidget {
       },
     );
   }
+}
+
+class _PlayerBody extends StatelessWidget {
+  const _PlayerBody({
+    required this.playback,
+    required this.library,
+    required this.simple,
+    required this.more,
+  });
+  final PlaybackController playback;
+  final LibraryController? library;
+  final bool simple;
+  final Widget more;
+
+  Widget _artwork(BuildContext context, double size) {
+    final current = playback.current;
+    return Semantics(
+      button: true,
+      enabled: current != null,
+      label: '打开沉浸歌词',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(28),
+        onTap: current == null
+            ? null
+            : () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ImmersiveLyrics(playback: playback),
+                ),
+              ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: SizedBox.square(
+            dimension: size,
+            child: ColoredBox(
+              color: Theme.of(context).colorScheme.surfaceContainer
+                  .withValues(alpha: .6),
+              child: current == null
+                  ? Icon(Icons.album_outlined, size: math.min(96, size))
+                  : TrackCover(
+                      documents: playback.documents,
+                      track: current,
+                      size: size,
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _heading(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        playback.metadata?.title ?? playback.current?.name ?? '未播放',
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.headlineSmall,
+      ),
+      const SizedBox(height: 6),
+      Text(
+        playback.metadata?.artist ?? '未知歌手',
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+    ],
+  );
+
+  Widget _controls(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      if (!simple) PlayerSeek(playback: playback),
+      PlaybackControls(
+        playback: playback,
+        onToggleLayout: playback.toggleLayout,
+      ),
+      if (!simple) ...[
+        const SizedBox(height: 16),
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            PlaybackModeButton(playback: playback),
+            IconButton(
+              tooltip: playback.sleep.active ? '睡眠定时已开启' : '睡眠定时',
+              icon: Icon(
+                playback.sleep.active ? Icons.bedtime : Icons.bedtime_outlined,
+              ),
+              onPressed: () => showSleepTimer(context, playback),
+            ),
+            IconButton(
+              tooltip: '播放队列',
+              icon: const Icon(Icons.queue_music),
+              onPressed: () => showPlaybackQueue(context, playback, library),
+            ),
+            more,
+          ],
+        ),
+        if (playback.sleep.active) SleepTimerStatus(playback: playback),
+        if (playback.error != null || playback.playbackNotice != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              playback.error ?? playback.playbackNotice!,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final horizontalPadding = constraints.maxWidth < 360 ? 16.0 : 32.0;
+      final width = math.max(0.0, constraints.maxWidth - horizontalPadding * 2);
+      final wide = !simple && width >= 760;
+      final target = wide
+          ? math.min(width * .44, constraints.maxHeight - 48)
+          : constraints.maxHeight * (simple ? .62 : .45);
+      final coverSize = math.min(
+        width,
+        math.min(440.0, math.max(96.0, target)),
+      );
+      final artwork = _artwork(context, coverSize);
+      final controls = _controls(context);
+      return SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding,
+              vertical: 24,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: wide ? 1080 : 560),
+                child: wide
+                    ? Row(
+                        key: const ValueKey('player-wide-layout'),
+                        children: [
+                          Expanded(child: Center(child: artwork)),
+                          const SizedBox(width: 32),
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _heading(context),
+                                const SizedBox(height: 24),
+                                controls,
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        key: const ValueKey('player-stacked-layout'),
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (!simple) ...[
+                            _heading(context),
+                            const SizedBox(height: 24),
+                          ],
+                          artwork,
+                          const SizedBox(height: 28),
+                          controls,
+                        ],
+                      ),
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class ImmersiveLyrics extends StatefulWidget {
@@ -460,7 +504,7 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
   int _last = -2;
   Lyrics? _lyrics;
   List<double> _offsets = [], _heights = [];
-  double _width = 0, _scale = 0;
+  double _width = 0, _scale = 0, _viewportHeight = 0;
   static const _original = TextStyle(
     fontSize: 26,
     fontWeight: FontWeight.w300,
@@ -552,15 +596,182 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _lines(BuildContext context, BoxConstraints constraints) {
     final playback = widget.playback;
     final lyrics = playback.lyrics.value;
+    final entryId = playback.queue.current?.entryId;
     final active = lyrics.indexAt(playback.player.state.position);
+    final padding = math.max(24.0, (constraints.maxWidth - 720) / 2);
+    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    _metrics(
+      lyrics,
+      math.max(0.0, constraints.maxWidth - padding * 2),
+      MediaQuery.textScalerOf(context),
+    );
+    if (_viewportHeight != constraints.maxHeight) {
+      _viewportHeight = constraints.maxHeight;
+      _last = -2;
+      _followGeneration++;
+    }
+    if (_follow && _pointers == 0 && active != _last) {
+      _last = active;
+      final target = active < 0 ? 0.0 : _offsets[active];
+      final generation = ++_followGeneration;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            !_follow ||
+            generation != _followGeneration ||
+            !_scroll.hasClients) {
+          return;
+        }
+        final offset = target.clamp(0.0, _scroll.position.maxScrollExtent);
+        if (reducedMotion) {
+          _scroll.jumpTo(offset);
+        } else {
+          unawaited(
+            _scroll.animateTo(
+              offset,
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOut,
+            ),
+          );
+        }
+      });
+    }
+    if (lyrics.lines.isEmpty) {
+      return Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Text(lyrics.message ?? '暂无歌词', textAlign: TextAlign.center),
+        ),
+      );
+    }
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (rect) => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Colors.transparent,
+          Colors.black,
+          Colors.black,
+          Colors.transparent,
+        ],
+        stops: [0, .12, .83, 1],
+      ).createShader(rect),
+      child: NotificationListener<ScrollStartNotification>(
+        onNotification: (notice) {
+          if (notice.dragDetails != null) _pauseFollow();
+          return false;
+        },
+        child: Listener(
+          onPointerSignal: (_) => _pauseFollow(),
+          child: ListView.builder(
+            controller: _scroll,
+            padding: EdgeInsets.fromLTRB(
+              padding,
+              constraints.maxHeight * .30,
+              padding,
+              constraints.maxHeight * .65,
+            ),
+            itemCount: lyrics.lines.length,
+            itemExtentBuilder: (index, _) => _heights[index],
+            itemBuilder: (context, index) {
+              final line = lyrics.lines[index];
+              final distance = (index - active).abs();
+              final alpha = active < 0
+                  ? .65
+                  : switch (distance) {
+                      0 => 1.0,
+                      1 => .65,
+                      2 => .45,
+                      _ => .30,
+                    };
+              return Semantics(
+                selected: index == active,
+                button: true,
+                label:
+                    '${line.texts.join('，')}，${formatPosition(Duration(milliseconds: line.milliseconds))}',
+                child: ExcludeSemantics(
+                  child: InkWell(
+                    onTap: () {
+                      _goCurrent();
+                      if (entryId == null) return;
+                      unawaited(
+                        playback.seek(
+                          Duration(milliseconds: line.milliseconds),
+                          expectedEntryId: entryId,
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: AnimatedOpacity(
+                        duration: reducedMotion
+                            ? Duration.zero
+                            : const Duration(milliseconds: 250),
+                        opacity: alpha,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (var i = 0; i < line.texts.length; i++)
+                              Padding(
+                                padding: EdgeInsets.only(top: i == 0 ? 0 : 6),
+                                child: Text(
+                                  line.texts[i],
+                                  style: (i == 0 ? _original : _translation)
+                                      .copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
+                                      ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _controlPanel(BuildContext context, double maxHeight) => Align(
+    alignment: Alignment.bottomCenter,
+    child: ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: 720, maxHeight: maxHeight),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+        child: Material(
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: .92),
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                PlayerSeek(playback: widget.playback, onSeek: _goCurrent),
+                PlaybackControls(playback: widget.playback),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
     final showControls =
         _controls ||
-        (MediaQuery.accessibleNavigationOf(context) ||
-            WidgetsBinding.instance.semanticsEnabled);
+        MediaQuery.accessibleNavigationOf(context) ||
+        WidgetsBinding.instance.semanticsEnabled;
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.escape): () =>
@@ -568,9 +779,13 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
       },
       child: Focus(
         autofocus: true,
+        onKeyEvent: (_, event) {
+          if (event is KeyDownEvent || event is KeyRepeatEvent) _reveal();
+          return KeyEventResult.ignored;
+        },
         child: Scaffold(
           body: PlayerBackground(
-            playback: playback,
+            playback: widget.playback,
             child: Listener(
               behavior: HitTestBehavior.opaque,
               onPointerDown: (_) {
@@ -578,219 +793,43 @@ class _ImmersiveLyricsState extends State<ImmersiveLyrics> {
                 _reveal();
               },
               onPointerUp: (_) {
-                _pointers = math.max(0, _pointers - 1);
+                setState(() => _pointers = math.max(0, _pointers - 1));
                 _arm();
               },
               onPointerCancel: (_) {
-                _pointers = math.max(0, _pointers - 1);
+                setState(() => _pointers = math.max(0, _pointers - 1));
                 _arm();
               },
               child: SafeArea(
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final padding = math.max(
-                            24.0,
-                            (constraints.maxWidth - 720) / 2,
-                          );
-                          _metrics(
-                            lyrics,
-                            constraints.maxWidth - padding * 2,
-                            MediaQuery.textScalerOf(context),
-                          );
-                          if (_follow && active != _last) {
-                            _last = active;
-                            final target = active < 0 ? 0.0 : _offsets[active];
-                            final generation = ++_followGeneration;
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              if (!mounted ||
-                                  !_follow ||
-                                  generation != _followGeneration ||
-                                  !_scroll.hasClients) {
-                                return;
-                              }
-                              unawaited(
-                                _scroll.animateTo(
-                                  target.clamp(
-                                    0,
-                                    _scroll.position.maxScrollExtent,
+                child: LayoutBuilder(
+                  builder: (context, constraints) => Column(
+                    children: [
+                      if (showControls || !_follow)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          child: Row(
+                            children: [
+                              if (showControls) const BackButton(),
+                              const Spacer(),
+                              if (!_follow)
+                                Flexible(
+                                  child: FilledButton.tonalIcon(
+                                    onPressed: _goCurrent,
+                                    icon: const Icon(Icons.my_location),
+                                    label: const Text('回到当前句'),
                                   ),
-                                  duration: const Duration(milliseconds: 350),
-                                  curve: Curves.easeOut,
                                 ),
-                              );
-                            });
-                          }
-                          if (lyrics.lines.isEmpty) {
-                            return Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(32),
-                                child: Text(
-                                  lyrics.message ?? '暂无歌词',
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            );
-                          }
-                          return ShaderMask(
-                            blendMode: BlendMode.dstIn,
-                            shaderCallback: (rect) => const LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Colors.black,
-                                Colors.black,
-                                Colors.transparent,
-                              ],
-                              stops: [0, .12, .83, 1],
-                            ).createShader(rect),
-                            child: NotificationListener<ScrollStartNotification>(
-                              onNotification: (notice) {
-                                if (notice.dragDetails != null) {
-                                  _pauseFollow();
-                                }
-                                return false;
-                              },
-                              child: Listener(
-                                onPointerSignal: (_) {
-                                  _pauseFollow();
-                                },
-                                child: ListView.builder(
-                                  controller: _scroll,
-                                  padding: EdgeInsets.fromLTRB(
-                                    padding,
-                                    constraints.maxHeight * .30,
-                                    padding,
-                                    constraints.maxHeight * .65,
-                                  ),
-                                  itemCount: lyrics.lines.length,
-                                  itemExtentBuilder: (index, _) =>
-                                      _heights[index],
-                                  itemBuilder: (context, index) {
-                                    final line = lyrics.lines[index];
-                                    final distance = (index - active).abs();
-                                    final alpha = active < 0
-                                        ? .65
-                                        : distance == 0
-                                        ? 1.0
-                                        : distance == 1
-                                        ? .65
-                                        : distance == 2
-                                        ? .45
-                                        : .30;
-                                    return Semantics(
-                                      selected: index == active,
-                                      button: true,
-                                      label:
-                                          '${line.texts.join('，')}，${formatPosition(Duration(milliseconds: line.milliseconds))}',
-                                      child: ExcludeSemantics(
-                                        child: InkWell(
-                                          onTap: () {
-                                            _goCurrent();
-                                            unawaited(
-                                              playback.seek(
-                                                Duration(
-                                                  milliseconds:
-                                                      line.milliseconds,
-                                                ),
-                                                expectedEntryId: playback
-                                                    .queue
-                                                    .current
-                                                    ?.entryId,
-                                              ),
-                                            );
-                                          },
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 16,
-                                            ),
-                                            child: AnimatedOpacity(
-                                              duration: const Duration(
-                                                milliseconds: 250,
-                                              ),
-                                              opacity: alpha,
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  for (
-                                                    var i = 0;
-                                                    i < line.texts.length;
-                                                    i++
-                                                  )
-                                                    Padding(
-                                                      padding: EdgeInsets.only(
-                                                        top: i == 0 ? 0 : 6,
-                                                      ),
-                                                      child: Text(
-                                                        line.texts[i],
-                                                        style:
-                                                            (i == 0
-                                                                    ? _original
-                                                                    : _translation)
-                                                                .copyWith(
-                                                                  color: Theme.of(
-                                                                    context,
-                                                                  ).colorScheme.onSurface,
-                                                                ),
-                                                      ),
-                                                    ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    if (showControls)
-                      Positioned(left: 8, top: 8, child: BackButton()),
-                    if (!_follow)
-                      Positioned(
-                        right: 16,
-                        top: 16,
-                        child: FilledButton.tonalIcon(
-                          onPressed: _goCurrent,
-                          icon: const Icon(Icons.my_location),
-                          label: const Text('回到当前句'),
-                        ),
-                      ),
-                    if (showControls)
-                      Positioned(
-                        left: 16,
-                        right: 16,
-                        bottom: 8,
-                        child: Material(
-                          color: Theme.of(context).colorScheme.surface
-                              .withValues(alpha: .92),
-                          borderRadius: BorderRadius.circular(24),
-                          child: Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                PlayerSeek(
-                                  playback: playback,
-                                  onSeek: _goCurrent,
-                                ),
-                                PlaybackControls(playback: playback),
-                              ],
-                            ),
+                            ],
                           ),
                         ),
-                      ),
-                  ],
+                      Expanded(child: LayoutBuilder(builder: _lines)),
+                      if (showControls)
+                        _controlPanel(context, constraints.maxHeight * .45),
+                    ],
+                  ),
                 ),
               ),
             ),
