@@ -1,6 +1,11 @@
 # R6 验收记录
 
-当前候选为 Windows 48 号和 Android 43 号。此前保留[25号待测清单](R6-MANUAL-CHECKLIST.md)及各批次原始证据。
+当前候选为 Windows 49 号和 Android 43 号。此前保留[25号待测清单](R6-MANUAL-CHECKLIST.md)及各批次原始证据。
+
+## Windows 模糊背景和歌词渐隐（0.6.0+49）
+
+- 48 号用户反馈背景出现小块模糊图，歌词底缘有残影。49 号让背景切换图层铺满窗口，歌词在底栏前完全淡出并裁切。待体验展开、换歌及歌词滚动。
+- Windows release 构建退出 0，已解压并核对版本与 ZIP 哈希。Android 沿用 43 号。本批未启动或测试，见[49 号索引](../../artifacts/R6/windows-backdrop-build-49/index.md)。
 
 ## Windows 标题栏、播放器淡入及进度对齐（0.6.0+48）
 
