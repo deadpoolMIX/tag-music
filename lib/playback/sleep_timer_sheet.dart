@@ -177,6 +177,7 @@ class _SleepDialDialogState extends State<_SleepDialDialog> {
               onPointerUp: _releaseDial,
               onPointerCancel: _releaseDial,
               child: DecoratedBox(
+                position: DecorationPosition.foreground,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: _showFocus
