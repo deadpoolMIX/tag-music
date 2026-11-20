@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 /// Recreate a page when the user follows the Windows forward history.
 Future<void> pushAppPage(
@@ -15,7 +16,8 @@ Future<void> pushAppPage(
 class DesktopNavigation extends NavigatorObserver {
   final _activeRoute = ValueNotifier<Route<dynamic>?>(null);
   ValueListenable<Route<dynamic>?> get activeRoute => _activeRoute;
-  Route<dynamic>? get top => _activeRoute.value;
+  Route<dynamic>? top;
+  bool _disposed = false;
   final _pages = Expando<(Object, PageRoute<void> Function())>();
   final _forward = <(Object, VoidCallback)>[];
   final _local = <(ModalRoute<dynamic>, Object)>[];
@@ -105,10 +107,24 @@ class DesktopNavigation extends NavigatorObserver {
 
   @override
   void didChangeTop(Route<dynamic> topRoute, Route<dynamic>? previousTopRoute) {
-    _activeRoute.value = topRoute;
+    top = topRoute;
+    final scheduler = SchedulerBinding.instance;
+    if (scheduler.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      // Initial routes can be added while the navigator's parent is building.
+      scheduler.addPostFrameCallback((_) => _notifyActiveRoute());
+    } else {
+      _notifyActiveRoute();
+    }
   }
 
-  void dispose() => _activeRoute.dispose();
+  void _notifyActiveRoute() {
+    if (!_disposed) _activeRoute.value = top;
+  }
+
+  void dispose() {
+    _disposed = true;
+    _activeRoute.dispose();
+  }
 }
 
 class DesktopNavigationScope extends InheritedWidget {

@@ -158,7 +158,17 @@ class _PlayerSeekState extends State<PlayerSeek> {
         spacing: 12,
         children: [
           Flexible(child: elapsed),
-          Expanded(flex: 5, child: slider),
+          Expanded(
+            flex: 5,
+            child: enabled
+                ? slider
+                : GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    excludeFromSemantics: true,
+                    onTap: () {},
+                    child: slider,
+                  ),
+          ),
           Flexible(child: total),
         ],
       );

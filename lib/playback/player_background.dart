@@ -18,11 +18,13 @@ class PlayerBackground extends StatefulWidget {
     required this.immersive,
     required this.lyricsVisible,
     required this.builder,
+    this.surfaceColor,
     super.key,
   });
 
-  final PlaybackController playback;
+  final PlaybackController? playback;
   final bool immersive, lyricsVisible;
+  final Color? surfaceColor;
   final Widget Function(
     BuildContext context,
     Color? controlColor,
@@ -39,7 +41,7 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
   Future<((String, int?, int?), _BlurredCover?)?>? _cover;
 
   (String, int?, int?)? get _currentKey {
-    final track = widget.playback.current;
+    final track = widget.playback?.current;
     return track == null ? null : (track.location, track.size, track.modified);
   }
 
@@ -57,8 +59,9 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
   Future<((String, int?, int?), _BlurredCover?)?> _loadCover(
     (String, int?, int?) key,
   ) async {
-    final track = widget.playback.current!;
-    final bytes = await widget.playback.documents.cachedCover(
+    final playback = widget.playback!;
+    final track = playback.current!;
+    final bytes = await playback.documents.cachedCover(
       track,
       priority: () => mounted && _currentKey == key
           ? CoverPriority.current
@@ -76,7 +79,9 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
     final immersive = widget.immersive;
     final lyrics = immersive && widget.lyricsVisible;
     final surfaceIsDark = scheme.brightness == Brightness.dark;
-    final surface = surfaceIsDark ? const Color(0xFF161616) : Colors.white;
+    final surface =
+        widget.surfaceColor ??
+        (surfaceIsDark ? const Color(0xFF161616) : Colors.white);
     return FutureBuilder(
       future: _cover,
       builder: (context, snapshot) {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -35,6 +37,41 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
   final _routes = DesktopNavigation();
   double _swipeStartX = 0;
   Route<dynamic>? _swipeRoute;
+  final _desktop = defaultTargetPlatform == TargetPlatform.windows;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_desktop) FocusManager.instance.addEarlyKeyEventHandler(_spaceToPlay);
+  }
+
+  KeyEventResult _spaceToPlay(KeyEvent event) {
+    final keyboard = HardwareKeyboard.instance;
+    if (event.logicalKey != LogicalKeyboardKey.space ||
+        event is KeyUpEvent ||
+        keyboard.isAltPressed ||
+        keyboard.isControlPressed ||
+        keyboard.isMetaPressed ||
+        keyboard.isShiftPressed ||
+        _appNavigator.currentState?.canPop() != false ||
+        _routes.top is PopupRoute) {
+      return KeyEventResult.ignored;
+    }
+
+    final focus = FocusManager.instance.primaryFocus?.context;
+    if (focus?.findAncestorStateOfType<EditableTextState>() != null) {
+      return KeyEventResult.ignored;
+    }
+
+    final playback = ref.read(playbackProvider);
+    if (playback == null || playback.current == null || playback.changingTrack) {
+      return KeyEventResult.ignored;
+    }
+    if (event is KeyDownEvent) {
+      unawaited(playback.togglePlayPause());
+    }
+    return KeyEventResult.handled;
+  }
 
   bool _allowsNavigationSwipe(Route<dynamic>? route) =>
       route is PageRoute &&
@@ -66,6 +103,7 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
 
   @override
   void dispose() {
+    if (_desktop) FocusManager.instance.removeEarlyKeyEventHandler(_spaceToPlay);
     _routes.dispose();
     super.dispose();
   }
@@ -73,7 +111,9 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
   @override
   Widget build(BuildContext context) {
     final color = ref.watch(themeColorProvider);
-    final desktop = defaultTargetPlatform == TargetPlatform.windows;
+    final desktop = _desktop;
+    final lightTheme = _theme(Brightness.light, color);
+    final darkTheme = _theme(Brightness.dark, color);
     final shell = AppShell(key: _shell);
     return MaterialApp(
       navigatorKey: _appNavigator,
@@ -141,10 +181,15 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
       supportedLocales: const [Locale('zh', 'CN')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       themeMode: ref.watch(themeProvider),
-      theme: _theme(Brightness.light, color),
-      darkTheme: _theme(Brightness.dark, color),
+      theme: lightTheme,
+      darkTheme: darkTheme,
       home: desktop
-          ? DesktopPlaybackFrame(navigation: _routes, libraryPage: shell)
+          ? DesktopPlaybackFrame(
+              navigation: _routes,
+              libraryPage: shell,
+              lightTheme: lightTheme,
+              darkTheme: darkTheme,
+            )
           : shell,
     );
   }
