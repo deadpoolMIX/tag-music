@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/desktop_navigation.dart';
 import '../library/track_cover.dart';
 import 'documents.dart';
 
@@ -20,8 +21,9 @@ Future<void> showCoverViewer(
 }) async {
   if (ModalRoute.of(context)?.isCurrent != true) return;
   final reduceMotion = MediaQuery.disableAnimationsOf(context);
-  await Navigator.of(context).push<void>(
-    PageRouteBuilder(
+  await pushAppPage(
+    context,
+    () => PageRouteBuilder<void>(
       settings: const RouteSettings(name: coverViewerRouteName),
       transitionDuration: reduceMotion
           ? Duration.zero

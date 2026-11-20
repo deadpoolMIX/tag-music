@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 
+import '../core/settings.dart';
 import 'documents.dart';
 import 'lyrics.dart';
 import 'sleep_countdown.dart';
@@ -32,7 +33,9 @@ class PlaybackController extends ChangeNotifier {
     PlaybackQueue? playbackQueue,
     Duration Function()? sleepClock,
     SleepSchedule? sleepSchedule,
-  }) : queue = playbackQueue ?? PlaybackQueue() {
+    PreferencesSettingsStore? volumeStore,
+  }) : _volumeStore = volumeStore,
+       queue = playbackQueue ?? PlaybackQueue() {
     sleep = SleepCountdown(
       clock: sleepClock ?? (() => _sleepWatch.elapsed),
       schedule: sleepSchedule ?? scheduleSleepWakeup,
@@ -178,6 +181,9 @@ class PlaybackController extends ChangeNotifier {
   }
 
   final Player player;
+  final PreferencesSettingsStore? _volumeStore;
+  double? _volume;
+  double get volume => _volume ?? player.state.volume;
   final DocumentAccess documents;
   final PlaybackQueue queue;
   FutureOr<ProbeTrack?> Function(String songId)? resolveSong;
@@ -289,6 +295,16 @@ class PlaybackController extends ChangeNotifier {
       // Tag Music reads LRC itself. Keep sidecar subtitles out of mpv's open path.
       await native.setProperty('options/sub-auto', 'no');
     }
+    if (_volumeStore case final store?) {
+      try {
+        final saved = await store.readDesktopVolume();
+        if (saved != null && saved.isFinite) {
+          await _applyVolume(saved, save: false);
+        }
+      } catch (error) {
+        debugPrint('无法恢复 Windows 播放音量：$error');
+      }
+    }
     if (Platform.isAndroid) {
       session = await AudioSession.instance;
       await session!.configure(const AudioSessionConfiguration.music());
@@ -306,12 +322,20 @@ class PlaybackController extends ChangeNotifier {
     _publish();
   }
 
-  Future<void> setVolume(double volume) =>
-      _serial(() => player.setVolume(volume.clamp(0.0, 100.0)));
+  Future<void> setVolume(double volume, {bool save = true}) =>
+      _serial(() => _applyVolume(volume, save: save));
 
-  Future<void> adjustVolume(double delta) => _serial(
-    () => player.setVolume((player.state.volume + delta).clamp(0.0, 100.0)),
-  );
+  Future<void> adjustVolume(double delta) =>
+      _serial(() => _applyVolume(volume + delta, save: true));
+
+  Future<void> _applyVolume(double value, {required bool save}) async {
+    final normalized = value.clamp(0.0, 100.0);
+    if (normalized != _volume) {
+      await player.setVolume(normalized);
+      _volume = normalized;
+    }
+    if (save) await _volumeStore?.writeDesktopVolume(normalized);
+  }
 
   Future<void> refreshNotificationPermission() async {
     if (!documents.android || _closed) return;

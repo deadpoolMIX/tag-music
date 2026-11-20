@@ -17,9 +17,17 @@ import 'library/library_controller.dart';
 Future<PlaybackController>? _playback;
 bool _nativeLicensesRegistered = false;
 
-Future<PlaybackController> initializePlayback() async {
+Future<PlaybackController> initializePlayback({
+  PreferencesSettingsStore? settings,
+}) async {
   MediaKit.ensureInitialized();
-  final controller = PlaybackController(Player(), DocumentAccess());
+  final controller = PlaybackController(
+    Player(),
+    DocumentAccess(),
+    volumeStore: Platform.isWindows
+        ? settings ?? PreferencesSettingsStore()
+        : null,
+  );
   if (Platform.isAndroid) {
     await AudioService.init(
       builder: () => TagAudioHandler(controller),
@@ -67,7 +75,7 @@ Future<void> main() async {
   PlaybackController? playback;
   LibraryController? library;
   try {
-    playback = await (_playback ??= initializePlayback());
+    playback = await (_playback ??= initializePlayback(settings: store));
   } catch (e) {
     _playback = null;
     warning = '播放初始化失败：$e';

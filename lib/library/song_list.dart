@@ -395,16 +395,20 @@ class _SongListState extends State<SongList> {
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, listConstraints) {
-                      final longList =
-                          widget.rows.length * extent >
-                          listConstraints.maxHeight * 1.75;
-                      // The edge can reuse the row's outer padding without
-                      // covering the menu or reorder handle.
-                      final gutter = longList ? FastScrollbar.gutter : 0.0;
+                      final desktop =
+                          Theme.of(context).platform == TargetPlatform.windows;
                       final reordering =
                           widget.reordering &&
                           !_selecting &&
                           widget.onReorder != null;
+                      final rowsHeight = widget.rows.length * extent;
+                      final showRail = desktop
+                          ? rowsHeight + (reordering ? 0 : 64) >
+                                listConstraints.maxHeight
+                          : rowsHeight > listConstraints.maxHeight * 1.75;
+                      // The edge can reuse the row's outer padding without
+                      // covering the menu or reorder handle.
+                      final gutter = showRail ? FastScrollbar.gutter : 0.0;
                       final scrollKey = PageStorageKey((
                         widget.scope,
                         widget.key,
@@ -420,7 +424,7 @@ class _SongListState extends State<SongList> {
                               cache: widget.playback.documents.coverCache,
                               child: FastScrollbar(
                                 controller: _scroll,
-                                visible: longList,
+                                visible: showRail,
                                 child: reordering
                                     ? ReorderableListView.builder(
                                         key: scrollKey,

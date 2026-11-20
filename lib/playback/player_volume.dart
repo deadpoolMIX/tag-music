@@ -46,7 +46,7 @@ class _PlayerVolumeState extends State<PlayerVolume> {
 
   @override
   Widget build(BuildContext context) {
-    final volume = widget.playback.player.state.volume.clamp(0.0, 100.0);
+    final volume = widget.playback.volume.clamp(0.0, 100.0);
     return OverlayPortal.overlayChildLayoutBuilder(
       controller: _overlay,
       overlayChildBuilder: (context, info) {
@@ -88,7 +88,11 @@ class _PlayerVolumeState extends State<PlayerVolume> {
                                 max: 100,
                                 semanticFormatterCallback: (value) =>
                                     '${value.round()}%',
-                                onChanged: widget.playback.setVolume,
+                                onChanged: (value) => widget.playback.setVolume(
+                                  value,
+                                  save: false,
+                                ),
+                                onChangeEnd: widget.playback.setVolume,
                               ),
                             ),
                           ),

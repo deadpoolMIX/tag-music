@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 
 import '../core/compact_dialog.dart';
+import '../core/desktop_navigation.dart';
 import '../core/fast_scrollbar.dart';
 import '../core/reorder_handle.dart';
 import '../library/library_controller.dart';
@@ -99,23 +100,27 @@ Future<void> showPlaybackQueue(
   BuildContext context,
   PlaybackController playback,
   LibraryController? library,
-) => Navigator.of(context).push(
-  SlideDismissRoute(
-    name: playbackQueueRouteName,
-    reduceMotion: MediaQuery.disableAnimationsOf(context),
-    builder: (context) => Scaffold(
-      body: SafeArea(
-        child: Semantics(
-          customSemanticsActions: {
-            const CustomSemanticsAction(label: '关闭队列'): () =>
-                Navigator.maybePop(context),
-          },
-          child: QueuePage(playback: playback, library: library),
+) {
+  final reduceMotion = MediaQuery.disableAnimationsOf(context);
+  return pushAppPage(
+    context,
+    () => SlideDismissRoute(
+      name: playbackQueueRouteName,
+      reduceMotion: reduceMotion,
+      builder: (context) => Scaffold(
+        body: SafeArea(
+          child: Semantics(
+            customSemanticsActions: {
+              const CustomSemanticsAction(label: '关闭队列'): () =>
+                  Navigator.maybePop(context),
+            },
+            child: QueuePage(playback: playback, library: library),
+          ),
         ),
       ),
     ),
-  ),
-);
+  );
+}
 
 class QueuePage extends StatefulWidget {
   const QueuePage({required this.playback, this.library, super.key});

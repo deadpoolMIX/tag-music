@@ -14,8 +14,34 @@ class PlaybackMinibar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final playback = ref.watch(playbackProvider);
     final library = ref.watch(libraryProvider);
+    final desktop = Theme.of(context).platform == TargetPlatform.windows;
     Widget bar() {
       final current = playback?.current;
+      final lyric = current != null && playback?.changingTrack == false
+          ? playback?.currentLyric
+          : null;
+      final title = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            current == null ? '未播放' : playbackTitle(playback!),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 16),
+          ),
+          Text(
+            current == null
+                ? '选择歌曲开始播放'
+                : playback!.changingTrack
+                ? '正在装载歌曲'
+                : (desktop ? null : lyric) ?? playbackArtist(playback),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12),
+          ),
+        ],
+      );
       return Material(
         key: const ValueKey('global-minibar'),
         color: Theme.of(context).colorScheme.surfaceContainer,
@@ -50,31 +76,34 @@ class PlaybackMinibar extends ConsumerWidget {
                             const SizedBox(width: 12),
                           ],
                           Expanded(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  current == null
-                                      ? '未播放'
-                                      : playbackTitle(playback!),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                                Text(
-                                  current == null
-                                      ? '选择歌曲开始播放'
-                                      : playback!.changingTrack
-                                      ? '正在装载歌曲'
-                                      : playback.currentLyric ??
-                                            playbackArtist(playback),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ],
-                            ),
+                            child: desktop && lyric != null
+                                ? LayoutBuilder(
+                                    builder: (context, constraints) => Row(
+                                      spacing: constraints.maxWidth < 260
+                                          ? 8
+                                          : 24,
+                                      children: [
+                                        ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            maxWidth:
+                                                constraints.maxWidth * .42,
+                                          ),
+                                          child: title,
+                                        ),
+                                        Expanded(
+                                          child: Text(
+                                            lyric,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyMedium,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : title,
                           ),
                         ],
                       ),

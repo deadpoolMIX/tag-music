@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/compact_dialog.dart';
+import '../core/desktop_navigation.dart';
 import '../library/group_pages.dart';
 import '../library/library_controller.dart';
 import '../library/track_cover.dart';
@@ -26,13 +27,17 @@ import 'slide_dismiss_route.dart';
 
 const fullPlayerRouteName = '/player';
 
-Future<void> openFullPlayer(BuildContext context) => Navigator.of(context).push(
-  SlideDismissRoute(
-    name: fullPlayerRouteName,
-    reduceMotion: MediaQuery.disableAnimationsOf(context),
-    builder: (_) => const FullPlayer(),
-  ),
-);
+Future<void> openFullPlayer(BuildContext context) {
+  final reduceMotion = MediaQuery.disableAnimationsOf(context);
+  return pushAppPage(
+    context,
+    () => SlideDismissRoute(
+      name: fullPlayerRouteName,
+      reduceMotion: reduceMotion,
+      builder: (_) => const FullPlayer(),
+    ),
+  );
+}
 
 class PlayerSeek extends StatefulWidget {
   const PlayerSeek({required this.playback, this.onSeek, super.key});
@@ -168,7 +173,9 @@ class _PlayerSeekState extends State<PlayerSeek> {
 }
 
 class FullPlayer extends ConsumerStatefulWidget {
-  const FullPlayer({super.key});
+  const FullPlayer({this.lyricsPage = false, super.key});
+
+  final bool lyricsPage;
 
   @override
   ConsumerState<FullPlayer> createState() => _FullPlayerState();
@@ -179,7 +186,29 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
 
   Future<void> _openLyrics() async {
     final route = ModalRoute.of(context);
-    if (_showLyrics || route == null || !route.isCurrent) return;
+    if (_showLyrics || widget.lyricsPage || route == null || !route.isCurrent)
+      return;
+    if (DesktopNavigation.maybeOf(context) != null) {
+      final fade =
+          ref.read(playbackProvider)?.simpleLayout == true &&
+          !MediaQuery.disableAnimationsOf(context);
+      await pushAppPage(
+        context,
+        () => PageRouteBuilder<void>(
+          settings: const RouteSettings(name: '/player/lyrics'),
+          transitionDuration: fade
+              ? const Duration(milliseconds: 240)
+              : Duration.zero,
+          reverseTransitionDuration: fade
+              ? const Duration(milliseconds: 240)
+              : Duration.zero,
+          pageBuilder: (_, _, _) => const FullPlayer(lyricsPage: true),
+          transitionsBuilder: (_, animation, _, child) =>
+              FadeTransition(opacity: animation, child: child),
+        ),
+      );
+      return;
+    }
     route.addLocalHistoryEntry(
       LocalHistoryEntry(
         impliesAppBarDismissal: false,
@@ -198,7 +227,8 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
     final playback = ref.watch(playbackProvider);
     final library = ref.watch(libraryProvider);
     final route = ModalRoute.of(context);
-    final dismissRoute = !_showLyrics && route is SlideDismissRoute
+    final showLyrics = _showLyrics || widget.lyricsPage;
+    final dismissRoute = !showLyrics && route is SlideDismissRoute
         ? route
         : null;
     if (playback == null) {
@@ -221,7 +251,7 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
             child: Scaffold(
               body: Semantics(
                 customSemanticsActions: {
-                  CustomSemanticsAction(label: _showLyrics ? '返回播放器' : '关闭播放页'):
+                  CustomSemanticsAction(label: showLyrics ? '返回播放器' : '关闭播放页'):
                       _back,
                 },
                 child: GestureDetector(
@@ -243,7 +273,7 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                   onVerticalDragCancel: dismissRoute == null
                       ? null
                       : () => dismissRoute.finishDrag(cancelled: true),
-                  onSecondaryTapUp: simple || _showLyrics
+                  onSecondaryTapUp: simple || showLyrics
                       ? null
                       : (details) => unawaited(
                           actions.show(
@@ -254,7 +284,7 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                   child: PlayerBackground(
                     playback: playback,
                     immersive: simple,
-                    lyricsVisible: _showLyrics,
+                    lyricsVisible: showLyrics,
                     builder: (context, controlColor, lyricsColor) => SafeArea(
                       child: AnimatedSwitcher(
                         duration:
@@ -278,7 +308,7 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                               ),
                           ],
                         ),
-                        child: _showLyrics
+                        child: showLyrics
                             ? ImmersiveLyrics(
                                 playback: playback,
                                 onBack: _back,
@@ -635,50 +665,77 @@ class _PlayerBody extends StatelessWidget {
     ),
   );
 
-  Widget _controls(BuildContext context, {required bool desktop}) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      PlaybackControls(
-        playback: playback,
-        onToggleLayout: playback.toggleLayout,
-        large: true,
-        immersiveColor: controlColor,
+  Widget _controls(BuildContext context, {required bool desktop}) {
+    final transport = PlaybackControls(
+      playback: playback,
+      onToggleLayout: playback.toggleLayout,
+      large: !desktop,
+      immersiveColor: controlColor,
+    );
+    final mode = PlaybackModeButton(playback: playback);
+    final timer = IconButton(
+      tooltip: playback.sleep.active ? '睡眠定时已开启' : '睡眠定时',
+      icon: Icon(
+        playback.sleep.active ? Icons.bedtime : Icons.bedtime_outlined,
       ),
-      _StandardPlayerControl(
-        visible: !simple,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      onPressed: () => showSleepTimer(context, playback),
+    );
+    final queue = IconButton(
+      tooltip: '播放队列',
+      icon: const Icon(Icons.queue_music),
+      onPressed: () => showPlaybackQueue(context, playback, library),
+    );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (desktop)
+          IconButtonTheme(
+            data: IconButtonThemeData(
+              style: IconButton.styleFrom(
+                iconSize: 22,
+                minimumSize: const Size.square(40),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 10,
               children: [
-                PlaybackModeButton(playback: playback),
-                IconButton(
-                  tooltip: playback.sleep.active ? '睡眠定时已开启' : '睡眠定时',
-                  icon: Icon(
-                    playback.sleep.active
-                        ? Icons.bedtime
-                        : Icons.bedtime_outlined,
+                if (!simple) Wrap(children: [mode, timer]),
+                transport,
+                if (!simple)
+                  Wrap(
+                    children: [
+                      queue,
+                      PlayerVolume(playback: playback),
+                    ],
                   ),
-                  onPressed: () => showSleepTimer(context, playback),
-                ),
-                IconButton(
-                  tooltip: '播放队列',
-                  icon: const Icon(Icons.queue_music),
-                  onPressed: () =>
-                      showPlaybackQueue(context, playback, library),
-                ),
-                if (desktop && !simple) PlayerVolume(playback: playback),
               ],
             ),
-            if (playback.sleep.active) SleepTimerStatus(playback: playback),
-          ],
+          )
+        else
+          transport,
+        _StandardPlayerControl(
+          visible: !simple,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!desktop) ...[
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [mode, timer, queue],
+                ),
+              ],
+              if (playback.sleep.active) SleepTimerStatus(playback: playback),
+            ],
+          ),
         ),
-      ),
-      PlaybackFeedback(playback: playback, color: controlColor),
-    ],
-  );
+        PlaybackFeedback(playback: playback, color: controlColor),
+      ],
+    );
+  }
 
   Widget _coverArea(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) => Center(
@@ -699,10 +756,10 @@ class _PlayerBody extends StatelessWidget {
 
   Widget _coverWithSeek({required bool desktop}) => LayoutBuilder(
     builder: (context, constraints) {
-      const gap = 8.0;
+      final gap = desktop ? 4.0 : 8.0;
       final seekHeight = PlayerSeek.heightOf(context);
       final size = math.min(
-        500.0,
+        desktop ? 580.0 : 500.0,
         math.min(
           constraints.maxWidth,
           math.max(0.0, constraints.maxHeight - seekHeight - gap),
@@ -711,7 +768,7 @@ class _PlayerBody extends StatelessWidget {
       return Column(
         children: [
           Expanded(child: Center(child: _artwork(context, size))),
-          const SizedBox(height: gap),
+          SizedBox(height: gap),
           _seekBar(desktop ? constraints.maxWidth : size),
         ],
       );
@@ -729,7 +786,8 @@ class _PlayerBody extends StatelessWidget {
       final controls = _controls(context, desktop: desktop);
       final wide = !desktop && width >= 760 && height >= 320;
       final short =
-          height < 355 || MediaQuery.textScalerOf(context).scale(16) > 26;
+          height < (desktop ? 290 : 355) ||
+          MediaQuery.textScalerOf(context).scale(16) > 26;
       final Widget content;
       if (wide && !short) {
         content = Row(
@@ -764,7 +822,7 @@ class _PlayerBody extends StatelessWidget {
           key: const ValueKey('player-stacked-layout'),
           children: [
             Expanded(child: _coverWithSeek(desktop: desktop)),
-            const SizedBox(height: 8),
+            SizedBox(height: desktop ? 4 : 8),
             controls,
           ],
         );

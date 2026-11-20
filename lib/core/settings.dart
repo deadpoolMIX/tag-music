@@ -22,6 +22,12 @@ class PreferencesSettingsStore implements SettingsStore {
 
   Future<void> writeThemeColor(String value) =>
       _preferences.setString('settings.v1.themeColor', value);
+
+  Future<double?> readDesktopVolume() =>
+      _preferences.getDouble('settings.v1.desktopVolume');
+
+  Future<void> writeDesktopVolume(double value) =>
+      _preferences.setDouble('settings.v1.desktopVolume', value);
 }
 
 enum ThemeColor {

@@ -5,9 +5,10 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/diagnostics.dart';
+import 'core/desktop_navigation.dart';
 import 'core/settings.dart';
 import 'playback/cover_viewer.dart' show coverViewerRouteName;
-import 'playback/full_player.dart' show fullPlayerRouteName, openFullPlayer;
+import 'playback/full_player.dart' show fullPlayerRouteName;
 import 'playback/playback_minibar.dart';
 import 'playback/queue_page.dart' show playbackQueueRouteName;
 import 'library/library_page.dart';
@@ -29,7 +30,7 @@ class TagMusicApp extends ConsumerStatefulWidget {
 class _TagMusicAppState extends ConsumerState<TagMusicApp> {
   final _appNavigator = GlobalKey<NavigatorState>();
   final _shell = GlobalKey<_AppShellState>();
-  final _routes = _TopRouteObserver();
+  final _routes = DesktopNavigation();
   double _swipeStartX = 0;
   Route<dynamic>? _swipeRoute;
 
@@ -41,17 +42,10 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
 
   void _handleMouseNavigation(PointerDownEvent event) {
     if (event.kind != PointerDeviceKind.mouse) return;
-    final navigator = _appNavigator.currentState;
-    final top = _routes.top;
-    if (navigator == null || top == null) return;
-    if (event.buttons == kBackMouseButton &&
-        top.settings.name == fullPlayerRouteName) {
-      final showingLyrics = top.willHandlePopInternally;
-      navigator.pop();
-      if (showingLyrics && top.isCurrent) navigator.pop();
-    } else if (event.buttons == kForwardMouseButton &&
-        identical(top, _routes.playerForwardFrom)) {
-      openFullPlayer(navigator.context);
+    if (event.buttons == kBackMouseButton) {
+      _routes.back();
+    } else if (event.buttons == kForwardMouseButton) {
+      _routes.forward();
     }
   }
 
@@ -61,18 +55,28 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
     return MaterialApp(
       navigatorKey: _appNavigator,
       navigatorObservers: [_routes],
+      scrollBehavior: const _TagMusicScrollBehavior(),
       builder: (context, child) {
         final desktop = Theme.of(context).platform == TargetPlatform.windows;
         return CallbackShortcuts(
           bindings: {
             const SingleActivator(LogicalKeyboardKey.escape): () =>
                 _appNavigator.currentState?.maybePop(),
+            if (desktop) ...{
+              const SingleActivator(LogicalKeyboardKey.browserBack):
+                  _routes.back,
+              const SingleActivator(LogicalKeyboardKey.browserForward):
+                  _routes.forward,
+            },
           },
           child: desktop
-              ? Listener(
-                  behavior: HitTestBehavior.translucent,
-                  onPointerDown: _handleMouseNavigation,
-                  child: child,
+              ? DesktopNavigationScope(
+                  history: _routes,
+                  child: Listener(
+                    behavior: HitTestBehavior.translucent,
+                    onPointerDown: _handleMouseNavigation,
+                    child: child,
+                  ),
                 )
               : RawGestureDetector(
                   behavior: HitTestBehavior.translucent,
@@ -180,27 +184,24 @@ class _NavigationSwipeRecognizer extends HorizontalDragGestureRecognizer {
       canStart() && super.isPointerAllowed(event);
 }
 
-class _TopRouteObserver extends NavigatorObserver {
-  Route<dynamic>? top;
-  Route<dynamic>? playerForwardFrom;
+class _TagMusicScrollBehavior extends MaterialScrollBehavior {
+  const _TagMusicScrollBehavior();
 
   @override
-  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    if (route is PageRoute) playerForwardFrom = null;
-  }
-
-  @override
-  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    if (route.settings.name == fullPlayerRouteName) {
-      playerForwardFrom = previousRoute;
-    } else if (identical(route, playerForwardFrom)) {
-      playerForwardFrom = null;
+  Widget buildScrollbar(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    if (getPlatform(context) == TargetPlatform.windows &&
+        axisDirectionToAxis(details.direction) == Axis.vertical) {
+      return Scrollbar(
+        controller: details.controller,
+        thumbVisibility: true,
+        child: child,
+      );
     }
-  }
-
-  @override
-  void didChangeTop(Route<dynamic> topRoute, Route<dynamic>? previousTopRoute) {
-    top = topRoute;
+    return super.buildScrollbar(context, child, details);
   }
 }
 
@@ -283,8 +284,18 @@ class _AppShellState extends ConsumerState<AppShell>
     _select(destination);
   }
 
-  void _select(AppDestination destination) =>
-      setState(() => _selected = destination);
+  void _select(AppDestination destination) {
+    final history = DesktopNavigation.maybeOf(context);
+    if (history == null) {
+      _showDestination(destination);
+    } else {
+      history.visit(context, this, _selected, destination, _showDestination);
+    }
+  }
+
+  void _showDestination(AppDestination destination) {
+    if (mounted) setState(() => _selected = destination);
+  }
 
   @override
   void initState() {
@@ -477,9 +488,8 @@ class _AppShellState extends ConsumerState<AppShell>
                                 content: Text(warning),
                                 actions: [
                                   TextButton(
-                                    onPressed: () => setState(
-                                      () => _selected = AppDestination.settings,
-                                    ),
+                                    onPressed: () =>
+                                        _select(AppDestination.settings),
                                     child: const Text('查看设置'),
                                   ),
                                 ],
@@ -542,6 +552,29 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _saving = false;
+
+  void _showLicenses(BuildContext context, String version) {
+    const legalese = '原创代码采用 MIT 许可；第三方组件保留各自许可。';
+    if (DesktopNavigation.maybeOf(context) != null) {
+      pushAppPage(
+        context,
+        () => MaterialPageRoute<void>(
+          builder: (_) => LicensePage(
+            applicationName: 'Tag Music',
+            applicationVersion: version,
+            applicationLegalese: legalese,
+          ),
+        ),
+      );
+    } else {
+      showLicensePage(
+        context: context,
+        applicationName: 'Tag Music',
+        applicationVersion: version,
+        applicationLegalese: legalese,
+      );
+    }
+  }
 
   Future<void> _save(Future<void> Function() apply) async {
     setState(() => _saving = true);
@@ -722,13 +755,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                   },
                                 ),
                                 TextButton(
-                                  onPressed: () => showLicensePage(
-                                    context: context,
-                                    applicationName: 'Tag Music',
-                                    applicationVersion:
-                                        '${info.version}+${info.buildNumber}',
-                                    applicationLegalese:
-                                        '原创代码采用 MIT 许可；第三方组件保留各自许可。',
+                                  onPressed: () => _showLicenses(
+                                    context,
+                                    '${info.version}+${info.buildNumber}',
                                   ),
                                   child: const Text('开源许可'),
                                 ),

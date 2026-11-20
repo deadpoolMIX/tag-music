@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/compact_dialog.dart';
+import '../core/desktop_navigation.dart';
 
 import 'library_controller.dart';
 import '../playback/playback_controller.dart';
@@ -147,6 +148,19 @@ class _TagsPageState extends State<TagsPage> {
   String? openedId;
   bool descending = false;
 
+  void _openTag(String? id, {bool returning = false}) {
+    void show(String? next) {
+      if (mounted) setState(() => openedId = next);
+    }
+
+    final history = DesktopNavigation.maybeOf(context);
+    if (history == null) {
+      show(id);
+    } else {
+      history.visit(context, this, openedId, id, show, returning: returning);
+    }
+  }
+
   Future<void> _delete(BuildContext context, String id, String name) async {
     final count = library.countForTag(id);
     late final List<String> effects;
@@ -190,10 +204,13 @@ class _TagsPageState extends State<TagsPage> {
       final tag = library.tags.where((t) => t.id == openedId).firstOrNull;
       if (tag != null) {
         final rows = library.tracksForTag(tag.id);
+        final desktop = DesktopNavigation.maybeOf(context) != null;
         return PopScope(
-          canPop: !widget.active,
+          canPop: desktop || !widget.active,
           onPopInvokedWithResult: (didPop, _) {
-            if (!didPop && widget.active) setState(() => openedId = null);
+            if (!desktop && !didPop && widget.active) {
+              setState(() => openedId = null);
+            }
           },
           child: Column(
             children: [
@@ -202,7 +219,7 @@ class _TagsPageState extends State<TagsPage> {
                   ?widget.menuButton,
                   IconButton(
                     tooltip: '返回标签',
-                    onPressed: () => setState(() => openedId = null),
+                    onPressed: () => _openTag(null, returning: true),
                     icon: const Icon(Icons.arrow_back),
                   ),
                   Expanded(
@@ -263,7 +280,7 @@ class _TagsPageState extends State<TagsPage> {
             leading: const Icon(Icons.sell_outlined),
             title: Text(tag.name, maxLines: 1, overflow: TextOverflow.ellipsis),
             subtitle: Text('${library.tracksForTag(tag.id).length} 首'),
-            onTap: () => setState(() => openedId = tag.id),
+            onTap: () => _openTag(tag.id),
             trailing: PopupMenuButton<String>(
               tooltip: '标签操作',
               onSelected: (action) {

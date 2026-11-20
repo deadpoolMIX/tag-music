@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/compact_dialog.dart';
+import '../core/desktop_navigation.dart';
 import '../playback/playback_controller.dart';
 import 'library_controller.dart';
 import 'library_search_page.dart';
@@ -84,8 +85,9 @@ class LibraryPage extends StatelessWidget {
               IconButton(
                 key: const ValueKey('open-library-search'),
                 tooltip: '搜索全曲库',
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
+                onPressed: () => pushAppPage(
+                  context,
+                  () => MaterialPageRoute<void>(
                     builder: (_) =>
                         LibrarySearchPage(library: library, playback: playback),
                   ),

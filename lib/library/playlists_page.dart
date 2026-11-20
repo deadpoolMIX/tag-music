@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/compact_dialog.dart';
+import '../core/desktop_navigation.dart';
 import '../playback/playback_controller.dart';
 import '../playback/queue_actions.dart';
 import 'database.dart';
@@ -295,24 +296,36 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
           ],
         ),
       );
+      final desktop = DesktopNavigation.maybeOf(context) != null;
       return PopScope(
-        canPop: !widget.active,
+        canPop: !widget.active || (desktop && !busy),
         onPopInvokedWithResult: (didPop, _) {
-          if (!didPop && !busy && widget.active) _closePlaylist();
+          if (!desktop && !didPop && !busy && widget.active) _closePlaylist();
         },
         child: detail,
       );
     },
   );
 
-  void _closePlaylist() {
-    FocusScope.of(context).unfocus();
-    setState(() {
-      openedId = null;
-      query = '';
+  void _closePlaylist() => _openPlaylist(null, returning: true);
 
-      reorderingMode = false;
-    });
+  void _openPlaylist(String? id, {bool returning = false}) {
+    void show(String? next) {
+      if (!mounted) return;
+      if (next == null) FocusScope.of(context).unfocus();
+      setState(() {
+        openedId = next;
+        query = '';
+        reorderingMode = false;
+      });
+    }
+
+    final history = DesktopNavigation.maybeOf(context);
+    if (history == null) {
+      show(id);
+    } else {
+      history.visit(context, this, openedId, id, show, returning: returning);
+    }
   }
 
   String _count(LibraryController library, Playlist list) {
@@ -354,12 +367,7 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
           subtitle: Text(
             '${list.kind == 'smart' ? '智能歌单' : '普通歌单'} · ${_count(library, list)}',
           ),
-          onTap: () => setState(() {
-            openedId = list.id;
-            query = '';
-
-            reorderingMode = false;
-          }),
+          onTap: () => _openPlaylist(list.id),
         );
       },
     );

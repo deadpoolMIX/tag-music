@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/fast_scrollbar.dart';
+import '../core/desktop_navigation.dart';
 import '../playback/cover_cache.dart';
 import '../playback/playback_controller.dart';
 import 'library_controller.dart';
@@ -20,8 +21,9 @@ Future<void> openArtistTracks(
   LibraryController library,
   PlaybackController playback,
   String artist,
-) => Navigator.of(context).push<void>(
-  MaterialPageRoute(
+) => pushAppPage(
+  context,
+  () => MaterialPageRoute<void>(
     builder: (_) => Scaffold(
       appBar: AppBar(
         title: Text(artist, maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -188,6 +190,30 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
   bool opened = false;
   String? selected;
 
+  void _viewGroup(bool open, String? name, {bool returning = false}) {
+    void show((bool, String?) view) {
+      if (!mounted) return;
+      setState(() {
+        opened = view.$1;
+        selected = view.$2;
+      });
+    }
+
+    final history = DesktopNavigation.maybeOf(context);
+    if (history == null) {
+      show((open, name));
+    } else {
+      history.visit(
+        context,
+        this,
+        (opened, selected),
+        (open, name),
+        show,
+        returning: returning,
+      );
+    }
+  }
+
   Iterable<String?> groupNames(LibraryTrack track) {
     if (widget.albums) {
       final album = track.song.album;
@@ -210,10 +236,13 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
       final unknown = widget.albums ? '未知专辑' : '未知歌手';
       if (opened) {
         final rows = groups[selected] ?? <LibraryTrack>[];
+        final desktop = DesktopNavigation.maybeOf(context) != null;
         return PopScope(
-          canPop: !widget.active,
+          canPop: desktop || !widget.active,
           onPopInvokedWithResult: (didPop, _) {
-            if (!didPop && widget.active) setState(() => opened = false);
+            if (!desktop && !didPop && widget.active) {
+              setState(() => opened = false);
+            }
           },
           child: Column(
             children: [
@@ -222,7 +251,8 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
                   ?widget.menuButton,
                   IconButton(
                     tooltip: '返回分组',
-                    onPressed: () => setState(() => opened = false),
+                    onPressed: () =>
+                        _viewGroup(false, selected, returning: true),
                     icon: const Icon(Icons.arrow_back),
                   ),
                   Expanded(
@@ -311,10 +341,7 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-            onTap: () => setState(() {
-              selected = key;
-              opened = true;
-            }),
+            onTap: () => _viewGroup(true, key),
           );
         },
       );
