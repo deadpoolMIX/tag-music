@@ -1,10 +1,9 @@
-import 'dart:io';
-
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/compact_dialog.dart';
+import 'backup_folder.dart';
 import 'library_backup.dart';
 import 'library_controller.dart';
 
@@ -55,29 +54,55 @@ class _BackupDialogState extends State<_BackupDialog> {
 
   Future<void> _export() => _run(() async {
     final library = widget.library;
-    final bytes = await LibraryBackup.export(library.db);
-    final date = DateTime.now().toLocal().toIso8601String().substring(0, 19);
-    final name = 'Tag Music-${date.replaceAll(':', '-')}.tagmusic';
-    if (library.documents.android) {
-      if (await library.documents.channel.invokeMethod<bool>(
-            'exportLibraryBackup',
-            {'name': name, 'bytes': bytes},
-          ) !=
-          true) {
-        return;
-      }
-    } else {
-      final target = await getSaveLocation(
-        suggestedName: name,
-        acceptedTypeGroups: const [
-          XTypeGroup(label: 'Tag Music 备份', extensions: ['tagmusic']),
-        ],
-      );
-      if (target == null) return;
-      await writeBackupFile(File(target.path), bytes);
-    }
-    _status = '备份已导出。';
+    final root = await BackupFolder.pick(library.documents, write: true);
+    if (root == null) return;
+    await library.scheduledBackup.manualBackup(root);
+    _status = '完整备份已保存，之后每 7 天自动保存一次增量。';
   }, '导出失败，请检查保存位置和可用空间。');
+
+  Future<void> _readFolder() => _run(() async {
+    final documents = widget.library.documents;
+    final root = await BackupFolder.pick(documents, write: false);
+    if (root == null) return;
+    final folder = BackupFolder(documents, root);
+    final choices = <({BackupFolder folder, BackupEntry file})>[];
+    final entries = await folder.list();
+    for (final entry in entries) {
+      if (entry.isBackup) {
+        choices.add((folder: folder, file: entry));
+      } else if (entry.isDirectory && entry.name.startsWith(backupFolderName)) {
+        final child = folder.child(entry);
+        for (final file in await child.list()) {
+          if (file.isBackup) choices.add((folder: child, file: file));
+        }
+      }
+    }
+    if (choices.isEmpty) {
+      _status = '所选文件夹没有备份文件。';
+      return;
+    }
+    choices.sort((a, b) => b.file.name.compareTo(a.file.name));
+    if (!mounted) return;
+    final index = await showDialog<int>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('选择恢复时间'),
+        children: [
+          for (final (index, choice) in choices.indexed)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, index),
+              child: Text(choice.file.name),
+            ),
+        ],
+      ),
+    );
+    if (index == null) return;
+    final choice = choices[index];
+    _preview = await LibraryBackup.decode(
+      await choice.folder.readSnapshot(choice.file.name),
+    );
+    _local = false;
+  }, '无法读取备份文件夹，请检查授权和备份记录。');
 
   Future<Uint8List?> _pick() async {
     final documents = widget.library.documents;
@@ -129,10 +154,11 @@ class _BackupDialogState extends State<_BackupDialog> {
   @override
   Widget build(BuildContext context) {
     final preview = _preview;
+    final backup = widget.library.scheduledBackup;
     return PopScope(
       canPop: !_busy,
       child: ListenableBuilder(
-        listenable: widget.library,
+        listenable: Listenable.merge([widget.library, backup]),
         builder: (context, _) => CompactAlertDialog(
           scrollable: true,
           title: Text(preview == null ? '备份与恢复' : '确认恢复备份'),
@@ -144,12 +170,26 @@ class _BackupDialogState extends State<_BackupDialog> {
               children: [
                 if (preview == null) ...[
                   const Text('备份包含曲库记录、标签、歌单和筛选规则，不包含音乐文件。'),
+                  Text(
+                    backup.lastBackup == null
+                        ? '手动备份一次后，每 7 天自动增量备份。'
+                        : '自动备份已开启，应用运行时每 7 天保存一次增量。',
+                  ),
+                  if (backup.problem case final problem?) Text(problem),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.save_alt),
-                    title: const Text('导出备份'),
+                    title: const Text('手动备份'),
+                    subtitle: const Text('选择文件夹并保存完整备份'),
                     enabled: !_busy,
                     onTap: _busy ? null : _export,
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.folder_open),
+                    title: const Text('从备份文件夹恢复'),
+                    enabled: !_busy,
+                    onTap: _busy ? null : _readFolder,
                   ),
                   ListTile(
                     contentPadding: EdgeInsets.zero,

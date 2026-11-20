@@ -730,25 +730,10 @@ class _PlayerBody extends StatelessWidget {
                     : null,
                 icon: const Icon(Icons.playlist_add),
               ),
-              ListenableBuilder(
-                listenable: Listenable.merge([songLibrary]),
-                builder: (context, _) {
-                  final liked =
-                      canEditPlaylists && songLibrary.isFavorite(songId);
-                  return IconButton(
-                    tooltip: '我喜欢',
-                    isSelected: liked,
-                    color: controlColor,
-                    onPressed: canEditPlaylists
-                        ? () => playlistAction(
-                            context,
-                            () => songLibrary.toggleFavorite(songId),
-                          )
-                        : null,
-                    icon: const Icon(Icons.favorite_border),
-                    selectedIcon: const Icon(Icons.favorite),
-                  );
-                },
+              FavoriteSongButton(
+                library: songLibrary,
+                songId: songId,
+                color: controlColor,
               ),
             ])
               Expanded(

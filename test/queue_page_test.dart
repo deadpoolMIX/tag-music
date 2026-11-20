@@ -80,6 +80,8 @@ void main() {
   queueTest('desktop keeps transport and right-side actions in order', (
     tester,
   ) async {
+    final track = tracks['A']!;
+    await playback.playSongs([track.queueSong], 0);
     final navigation = DesktopNavigation();
     addTearDown(navigation.dispose);
     await mount(
@@ -106,6 +108,7 @@ void main() {
 
     final actions = [
       find.byKey(const ValueKey('player-add-tag')),
+      find.byTooltip('我喜欢'),
       find.byKey(const ValueKey('playback-mode')),
       find.byTooltip('睡眠定时'),
       find.byKey(const ValueKey('open-playback-queue')),
@@ -119,6 +122,15 @@ void main() {
     final seek = tester.getRect(find.byKey(const ValueKey('playback-seek')));
     expect(seek.center.dx, closeTo(play.dx, 1));
     expect(seek.right, lessThan(actions.first.dx));
+    final favorite = find.byWidgetPredicate(
+      (widget) => widget is IconButton && widget.tooltip == '我喜欢',
+    );
+    expect(tester.widget<IconButton>(favorite).isSelected, isFalse);
+    await tap(tester, favorite);
+    expect(library.isFavorite(track.song.id), isTrue);
+    expect(tester.widget<IconButton>(favorite).isSelected, isTrue);
+    await tap(tester, favorite);
+    expect(library.isFavorite(track.song.id), isFalse);
   });
 
   queueTest(

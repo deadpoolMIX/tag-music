@@ -20,5 +20,5 @@
 
 - 在 `artifacts/R9/` 核对构建元数据、EXE 版本及包哈希。两个 APK 用 Android Build Tools 的 `aapt2 dump badging` 和 `apksigner verify --print-certs` 核对包名、版本、最低 API 及各自的旧签名。现有 `verify-apk.ps1` 仅针对正式包，随身听包须单独核对。
 - 原生音频和许可审计用 `scripts/verify-packages.py`，显式传实际 `--round R9 --version … --build … --native-reference-round R1`，APK 与 ZIP 用 `--android-archive`、`--windows-archive` 指定，两个变体用不同报告路径。
-- 三包都核对后复制到 `output/`，按文件名核对副本哈希。原包和报告保留于 `artifacts/R9/`。重复运行会追加或覆盖固定日志时，先保留原证据。
+- 三包都核对后复制到 `output/`，按文件名核对副本哈希，然后移除与归档原包哈希相同的旧包副本。原包和报告保留于 `artifacts/R9/`。重复运行会追加或覆盖固定日志时，先保留原证据。
 - `install-android.ps1` 会安装、启动并读日志，执行前须有覆盖这些操作的本批授权。

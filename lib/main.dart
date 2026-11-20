@@ -127,4 +127,5 @@ Future<void> main() async {
       child: const TagMusicApp(),
     ),
   );
+  library?.scheduledBackup.start();
 }

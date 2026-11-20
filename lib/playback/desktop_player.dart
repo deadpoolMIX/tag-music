@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/desktop_navigation.dart';
 import '../core/desktop_title_bar.dart';
 import '../library/library_controller.dart';
+import '../library/playlist_actions.dart';
 import '../library/song_selection.dart';
 import '../library/track_cover.dart';
 import 'cover_viewer.dart';
@@ -215,10 +216,7 @@ class _DesktopPlaybackBar extends ConsumerWidget {
     mainAxisSize: MainAxisSize.min,
     children: [
       if (playback != null)
-        PlaybackControls(
-          playback: playback,
-          blockBackgroundTap: true,
-        )
+        PlaybackControls(playback: playback, blockBackgroundTap: true)
       else
         const IconButton.filled(
           tooltip: '播放',
@@ -255,17 +253,24 @@ class _DesktopPlaybackBar extends ConsumerWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         if (library != null)
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            excludeFromSemantics: true,
-            // Leave the player layer alone when the tag button is disabled.
-            onTap: () {},
-            child: PlaybackTagButton(
+          for (final button in [
+            PlaybackTagButton(
               playback: playback,
               library: library,
               iconSize: 20,
             ),
-          ),
+            FavoriteSongButton(
+              library: library,
+              songId: playback.currentSongId,
+            ),
+          ])
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              excludeFromSemantics: true,
+              // Disabled actions should leave the player layer alone.
+              onTap: () {},
+              child: button,
+            ),
         PlaybackModeButton(playback: playback),
         IconButton(
           tooltip: playback.sleep.active

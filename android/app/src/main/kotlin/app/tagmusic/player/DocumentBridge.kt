@@ -52,8 +52,21 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
             } else if (call.method == "cancelMusicHash") {
                 hashGeneration.incrementAndGet()
                 result.success(null)
+            } else if (call.method == "pickBackupDirectory") {
+                if (backupTreePicker != null || backupPicker != null || picker != null) result.error("busy", "文件选择器已打开", null)
+                else try {
+                    val write = call.argument<Boolean>("write") == true
+                    backupTreePicker = result to write
+                    val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
+                    activity.startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(
+                        if (write) flags or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION else flags
+                    ), PICK_BACKUP_TREE)
+                } catch (e: Exception) {
+                    backupTreePicker = null
+                    result.error("backup", e.message, null)
+                }
             } else if (call.method == "exportLibraryBackup" || call.method == "importLibraryBackup") {
-                if (backupPicker != null || picker != null) result.error("busy", "文件选择器已打开", null)
+                if (backupTreePicker != null || backupPicker != null || picker != null) result.error("busy", "文件选择器已打开", null)
                 else try {
                     val exporting = call.method == "exportLibraryBackup"
                     val bytes = if (exporting) requireNotNull(call.argument<ByteArray>("bytes")) else null
@@ -69,7 +82,7 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                     result.error("backup", e.message, null)
                 }
             } else if (call.method == "pickDirectory") {
-                if (picker != null || backupPicker != null) result.error("busy", "文件选择器已打开", null)
+                if (picker != null || backupPicker != null || backupTreePicker != null) result.error("busy", "文件选择器已打开", null)
                 else {
                     picker = result
                     temporaryPicker = call.argument<Boolean>("temporary") == true
@@ -91,11 +104,13 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                 val executor = when (call.method) {
                     "findLyrics", "readLyrics" -> lyricsWorker
                     "hashMusic" -> hashWorker
+                    "backupFolderList", "backupFolderCreate", "backupFolderRead", "backupFolderWrite", "backupFolderRemove", "persistBackupDirectory" -> backupWorker
                     else -> worker
                 }
                 executor.execute {
                     try {
                         val value: Any? = when (call.method) {
+                            "backupFolderList", "backupFolderCreate", "backupFolderRead", "backupFolderWrite", "backupFolderRemove", "persistBackupDirectory" -> backupFolderOperation(call)
                             "beginScan" -> {
                                 val tree = Uri.parse(requireNotNull(call.argument<String>("uri")))
                                 require(tree.scheme == "content" && DocumentsContract.isTreeUri(tree))
@@ -233,6 +248,23 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
     }
 
     fun onActivityResult(request: Int, result: Int, data: Intent?): Boolean {
+        if (request == PICK_BACKUP_TREE) {
+            val (callback, write) = backupTreePicker ?: return true
+            backupTreePicker = null
+            val uri = data?.data
+            if (result != Activity.RESULT_OK || uri == null) callback.success(null)
+            else try {
+                require(uri.scheme == "content" && DocumentsContract.isTreeUri(uri)) { "请选择备份文件夹" }
+                if (write) {
+                    val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    require(data.flags and flags == flags) { "备份文件夹需要读写授权" }
+                }
+                callback.success(uri.toString())
+            } catch (e: Exception) {
+                callback.error("permission", e.message, null)
+            }
+            return true
+        }
         if (request == PICK_BACKUP) {
             val (callback, bytes) = backupPicker ?: return true
             backupPicker = null
@@ -246,17 +278,7 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                         requireNotNull(resolver.openOutputStream(uri, "wt")).use { it.write(bytes) }
                         main.post { callback.success(true) }
                     } else {
-                        val output = java.io.ByteArrayOutputStream()
-                        requireNotNull(resolver.openInputStream(uri)).use { stream ->
-                            val buffer = ByteArray(64 * 1024)
-                            while (true) {
-                                val count = stream.read(buffer)
-                                if (count < 0) break
-                                require(output.size() + count <= BACKUP_BYTE_LIMIT) { "备份超过 64 MiB" }
-                                output.write(buffer, 0, count)
-                            }
-                        }
-                        val imported = output.toByteArray()
+                        val imported = readBackupDocument(uri)
                         main.post { callback.success(imported) }
                     }
                 } catch (e: Exception) {
@@ -282,6 +304,78 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
             pending.error("permission", e.message, null)
         }
         return true
+    }
+
+    private fun readBackupDocument(uri: Uri): ByteArray {
+        val output = java.io.ByteArrayOutputStream()
+        requireNotNull(activity.contentResolver.openInputStream(uri)).use { stream ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val count = stream.read(buffer)
+                if (count < 0) break
+                require(output.size() + count <= BACKUP_BYTE_LIMIT) { "备份超过 64 MiB" }
+                output.write(buffer, 0, count)
+            }
+        }
+        return output.toByteArray()
+    }
+
+    private fun backupFolderOperation(call: io.flutter.plugin.common.MethodCall): Any? {
+        val tree = Uri.parse(requireNotNull(call.argument<String>("tree")))
+        require(tree.scheme == "content" && DocumentsContract.isTreeUri(tree)) { "需要系统目录授权 URI" }
+        val resolver = activity.contentResolver
+        val folder = call.argument<String>("folder").orEmpty().ifEmpty { DocumentsContract.getTreeDocumentId(tree) }
+        fun document(id: String) = DocumentsContract.buildDocumentUriUsingTree(tree, id)
+        fun name(uri: Uri): String? = resolver.query(uri, arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)
+            ?.use { if (it.moveToFirst()) it.getString(0) else null }
+
+        return when (call.method) {
+            "persistBackupDirectory" -> {
+                resolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                null
+            }
+            "backupFolderList" -> {
+                val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, folder)
+                val projection = arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE)
+                val cursor = checkNotNull(resolver.query(children, projection, null, null, null)) { "备份文件夹不可访问" }
+                cursor.use {
+                    buildList {
+                        while (it.moveToNext()) {
+                            add(mapOf("id" to it.getString(0), "name" to it.getString(1),
+                                "kind" to if (it.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR) "directory" else "file"))
+                        }
+                    }
+                }
+            }
+            "backupFolderRead" -> readBackupDocument(document(requireNotNull(call.argument<String>("document"))))
+            "backupFolderRemove" -> {
+                val target = document(requireNotNull(call.argument<String>("document")))
+                require(name(target)?.matches(managedBackupName) == true) { "只移除应用创建的备份副本" }
+                check(DocumentsContract.deleteDocument(resolver, target)) { "无法移除旧备份副本" }
+                null
+            }
+            else -> {
+                val backupName = requireNotNull(call.argument<String>("name"))
+                val directory = call.method == "backupFolderCreate"
+                require(backupName.matches(if (directory) backupDirectoryName else managedBackupName))
+                val bytes = if (directory) null else requireNotNull(call.argument<ByteArray>("bytes"))
+                require(bytes == null || bytes.size <= BACKUP_BYTE_LIMIT) { "备份超过 64 MiB" }
+                val mime = if (directory) DocumentsContract.Document.MIME_TYPE_DIR else "application/octet-stream"
+                val target = checkNotNull(DocumentsContract.createDocument(resolver, document(folder), mime, backupName)) { "无法创建备份文件或文件夹" }
+                try {
+                    check(name(target) == backupName) { "文件夹无法保留备份文件名，请选择其他位置" }
+                    if (bytes == null) DocumentsContract.getDocumentId(target)
+                    else {
+                        checkNotNull(resolver.openOutputStream(target, "w")).use { it.write(bytes) }
+                        null
+                    }
+                } catch (e: Exception) {
+                    runCatching { DocumentsContract.deleteDocument(resolver, target) }
+                    throw e
+                }
+            }
+        }
     }
 
     private fun directoryName(tree: Uri): String? {
@@ -433,6 +527,7 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
         private const val PICK_DIRECTORY = 4011
         private const val NOTIFICATIONS = 4012
         private const val PICK_BACKUP = 4013
+        private const val PICK_BACKUP_TREE = 4014
         private const val BACKUP_BYTE_LIMIT = 64 * 1024 * 1024
         // AudioService's FlutterEngine survives Activity recreation. Descriptor
         // ownership must survive it too; every access is serialized by worker.
@@ -452,6 +547,9 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
         private var picker: MethodChannel.Result? = null
         private var temporaryPicker = false
         private var backupPicker: Pair<MethodChannel.Result, ByteArray?>? = null
+        private var backupTreePicker: Pair<MethodChannel.Result, Boolean>? = null
+        private val managedBackupName = Regex("Tag Music-\\d{4}-\\d\\d-\\d\\dT\\d\\d-\\d\\d-\\d\\dZ-(full|increment)-[0-9a-f-]{36}\\.tagmusic")
+        private val backupDirectoryName = Regex("Tag Music 备份( \\d+)?")
         private var notificationRequest: MethodChannel.Result? = null
         private var scanToken = 0
         private val scans = mutableMapOf<Int, Scan>()

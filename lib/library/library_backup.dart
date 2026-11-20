@@ -13,6 +13,8 @@ import 'database.dart';
 import 'filter_rule.dart';
 import 'playlist_repository.dart';
 
+part 'backup_delta.dart';
+
 const backupByteLimit = 64 * 1024 * 1024;
 const _format = 'tag-music-library';
 const _version = 1;
@@ -167,7 +169,7 @@ Future<Uint8List> _encode(LibraryBackup backup) =>
     Isolate.run(() => _encodeBackup(backup));
 
 Uint8List _encodeBackup(LibraryBackup backup) {
-  final data = {
+  final data = <String, dynamic>{
     'songs': backup.songs.map((row) => row.toJson()).toList(),
     'roots': backup.roots.map((row) => row.toJson()).toList(),
     'locations': backup.locations.map((row) => row.toJson()).toList(),
@@ -177,37 +179,23 @@ Uint8List _encodeBackup(LibraryBackup backup) {
     'playlists': backup.playlists.map((row) => row.toJson()).toList(),
     'playlistSongs': backup.playlistSongs.map((row) => row.toJson()).toList(),
   };
-  final bytes = Uint8List.fromList(
-    utf8.encode(
-      jsonEncode({
-        'format': _format,
-        'version': _version,
-        'checksum': sha256.convert(utf8.encode(jsonEncode(data))).toString(),
-        'data': data,
-      }),
-    ),
-  );
-  if (bytes.length > backupByteLimit) {
-    throw const FormatException('备份超过 64 MiB');
+  for (final entry in data.entries) {
+    final rows = entry.value as List<Map<String, dynamic>>;
+    rows.sort((a, b) => _rowKey(entry.key, a).compareTo(_rowKey(entry.key, b)));
   }
-  return bytes;
+  return _encodePackage(_format, data);
 }
 
 LibraryBackup _decodeBackup(Uint8List bytes) {
   try {
-    final package = jsonDecode(utf8.decode(bytes));
-    if (package is! Map<String, dynamic> || package['format'] != _format) {
+    final package = _readPackage(bytes);
+    if (package.format == _incrementFormat) {
+      throw const FormatException('请使用「从备份文件夹恢复」打开增量备份。');
+    }
+    if (package.format != _format) {
       throw const FormatException('请选择 Tag Music 备份文件');
     }
-    if (package['version'] is! int || package['version'] != _version) {
-      throw const FormatException('备份版本不受支持');
-    }
-    final data = package['data'];
-    if (data is! Map<String, dynamic> ||
-        sha256.convert(utf8.encode(jsonEncode(data))).toString() !=
-            package['checksum']) {
-      throw const FormatException('备份校验失败，文件可能损坏');
-    }
+    final data = package.data;
     List<T> rows<T>(String key, T Function(Map<String, dynamic>) parse) =>
         (data[key] as List)
             .map((item) => parse(item as Map<String, dynamic>))

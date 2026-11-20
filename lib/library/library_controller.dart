@@ -14,6 +14,7 @@ import 'tag_repository.dart';
 import 'filter_rule.dart';
 import 'filter_repository.dart';
 import 'playlist_repository.dart';
+import 'scheduled_backup.dart';
 import '../playback/playback_queue.dart';
 
 export 'filter_rule.dart' show LibrarySort;
@@ -43,6 +44,7 @@ class LibraryController extends ChangeNotifier {
       filterStore = filterStore ?? FilterRepository(db);
   final LibraryDatabase db;
   final DocumentAccess documents;
+  late final scheduledBackup = ScheduledLibraryBackup(db, documents);
   final TagRepository tagsStore;
   final PlaylistRepository playlistsStore;
   List<Playlist> playlists = [];
@@ -987,6 +989,7 @@ class LibraryController extends ChangeNotifier {
     await _relocationTask;
     await _baselineTask;
     await _filterWrites;
+    await scheduledBackup.close();
     await db.close();
     super.dispose();
   }

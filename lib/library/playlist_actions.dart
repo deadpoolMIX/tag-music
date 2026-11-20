@@ -19,6 +19,35 @@ Future<void> playlistAction(
   }
 }
 
+class FavoriteSongButton extends StatelessWidget {
+  const FavoriteSongButton({this.library, this.songId, this.color, super.key});
+
+  final LibraryController? library;
+  final String? songId;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: Listenable.merge([library]),
+    builder: (context, _) {
+      final songLibrary = library;
+      final id = songId;
+      final enabled = songLibrary != null && id != null;
+      return IconButton(
+        tooltip: '我喜欢',
+        isSelected: enabled && songLibrary.isFavorite(id),
+        color: color,
+        onPressed: enabled
+            ? () =>
+                  playlistAction(context, () => songLibrary.toggleFavorite(id))
+            : null,
+        icon: const Icon(Icons.favorite_border),
+        selectedIcon: const Icon(Icons.favorite),
+      );
+    },
+  );
+}
+
 /// Capture the source before opening a dialog; later search/queue changes do not
 /// change what is saved. The repository performs stable-ID deduplication.
 Future<void> savePlaylist(
