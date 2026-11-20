@@ -33,6 +33,12 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
   double _swipeStartX = 0;
   Route<dynamic>? _swipeRoute;
 
+  bool _allowsNavigationSwipe(Route<dynamic>? route) =>
+      route is PageRoute &&
+      route.settings.name != fullPlayerRouteName &&
+      route.settings.name != coverViewerRouteName &&
+      route.settings.name != playbackQueueRouteName;
+
   @override
   Widget build(BuildContext context) {
     final color = ref.watch(themeColorProvider);
@@ -48,25 +54,35 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
           },
           child: desktop
               ? child!
-              : GestureDetector(
+              : RawGestureDetector(
                   behavior: HitTestBehavior.translucent,
-                  supportedDevices: const {PointerDeviceKind.touch},
                   excludeFromSemantics: true,
-                  dragStartBehavior: DragStartBehavior.down,
-                  onHorizontalDragStart: (details) {
-                    _swipeStartX = details.globalPosition.dx;
-                    _swipeRoute = _routes.top;
-                  },
-                  onHorizontalDragEnd: (details) {
-                    final route = _routes.top;
-                    if (details.globalPosition.dx - _swipeStartX >= 56 &&
-                        identical(route, _swipeRoute) &&
-                        route is PageRoute &&
-                        route.settings.name != fullPlayerRouteName &&
-                        route.settings.name != coverViewerRouteName &&
-                        route.settings.name != playbackQueueRouteName) {
-                      _shell.currentState?._openNavigation();
-                    }
+                  gestures: {
+                    _NavigationSwipeRecognizer:
+                        GestureRecognizerFactoryWithHandlers<
+                          _NavigationSwipeRecognizer
+                        >(
+                          () => _NavigationSwipeRecognizer(
+                            () => _allowsNavigationSwipe(_routes.top),
+                          ),
+                          (recognizer) {
+                            recognizer.dragStartBehavior =
+                                DragStartBehavior.down;
+                            recognizer.onStart = (details) {
+                              _swipeStartX = details.globalPosition.dx;
+                              _swipeRoute = _routes.top;
+                            };
+                            recognizer.onEnd = (details) {
+                              final route = _routes.top;
+                              if (details.globalPosition.dx - _swipeStartX >=
+                                      56 &&
+                                  identical(route, _swipeRoute) &&
+                                  _allowsNavigationSwipe(route)) {
+                                _shell.currentState?._openNavigation();
+                              }
+                            };
+                          },
+                        ),
                   },
                   child: child,
                 ),
@@ -131,6 +147,17 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
       fontFamily: 'Microsoft YaHei',
     );
   }
+}
+
+class _NavigationSwipeRecognizer extends HorizontalDragGestureRecognizer {
+  _NavigationSwipeRecognizer(this.canStart)
+    : super(supportedDevices: const {PointerDeviceKind.touch});
+
+  final bool Function() canStart;
+
+  @override
+  bool isPointerAllowed(PointerEvent event) =>
+      canStart() && super.isPointerAllowed(event);
 }
 
 class _TopRouteObserver extends NavigatorObserver {
