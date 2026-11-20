@@ -1048,18 +1048,19 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
         }
       });
     }
-    return ShaderMask(
+    final desktop = Theme.of(context).platform == TargetPlatform.windows;
+    final masked = ShaderMask(
       blendMode: BlendMode.dstIn,
-      shaderCallback: (rect) => const LinearGradient(
+      shaderCallback: (rect) => LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [
+        colors: const [
           Colors.transparent,
           Colors.black,
           Colors.black,
           Colors.transparent,
         ],
-        stops: [0, .06, .91, 1],
+        stops: desktop ? const [0, .06, .84, .97] : const [0, .06, .91, 1],
       ).createShader(rect),
       child: NotificationListener<ScrollStartNotification>(
         onNotification: (notice) {
@@ -1160,6 +1161,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
         ),
       ),
     );
+    return desktop ? ClipRect(child: masked) : masked;
   }
 
   Widget _lyricsStatus(Lyrics lyrics) {

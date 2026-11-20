@@ -121,6 +121,11 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
               _gradient(scheme),
               AnimatedSwitcher(
                 duration: fade,
+                // The default switcher loosens constraints for its layers.
+                layoutBuilder: (current, outgoing) => Stack(
+                  fit: StackFit.expand,
+                  children: [...outgoing, ?current],
+                ),
                 child: cover == null
                     ? const SizedBox.expand()
                     : Image.memory(
