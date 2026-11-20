@@ -507,8 +507,19 @@ class LibraryController extends ChangeNotifier {
     String tagId,
     Iterable<String> songIds, {
     required bool add,
+  }) => editSongTags(
+    songIds,
+    add: add ? {tagId} : const {},
+    remove: add ? const {} : {tagId},
+  );
+
+  Future<void> editSongTags(
+    Iterable<String> songIds, {
+    required Set<String> add,
+    required Set<String> remove,
   }) async {
-    await tagsStore.changeSongs(tagId, songIds, add: add);
+    if (add.isEmpty && remove.isEmpty) return;
+    await tagsStore.editSongs(songIds, add: add, remove: remove);
     await reloadTags();
   }
 

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/desktop_navigation.dart';
 import '../core/fast_scrollbar.dart';
 import '../core/reorder_handle.dart';
 import '../playback/playback_controller.dart';
@@ -14,6 +15,26 @@ import 'song_information.dart';
 import 'playlist_actions.dart';
 import 'tags_page.dart';
 
+class SongListPageActivity extends InheritedWidget {
+  const SongListPageActivity({
+    required this.active,
+    required super.child,
+    super.key,
+  });
+
+  final bool active;
+
+  static bool isActiveOf(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<SongListPageActivity>()
+          ?.active ??
+      true;
+
+  @override
+  bool updateShouldNotify(SongListPageActivity oldWidget) =>
+      active != oldWidget.active;
+}
+
 /// Every owner supplies its complete ordered membership, separately from search.
 /// Selection and scrolling belong to this mounted page, never the controller.
 class SongList extends StatefulWidget {
@@ -23,6 +44,8 @@ class SongList extends StatefulWidget {
     required this.source,
     required this.rows,
     this.enabled = true,
+    this.header,
+    this.onBack,
     this.reordering = false,
     this.onReorder,
     this.onRemove,
@@ -38,6 +61,8 @@ class SongList extends StatefulWidget {
   final List<LibraryTrack> source;
   final List<LibraryTrack> rows;
   final bool enabled;
+  final Widget? header;
+  final VoidCallback? onBack;
   final bool reordering;
   final void Function(int, int)? onReorder;
   final Future<void> Function(Set<String>)? onRemove;
@@ -54,11 +79,14 @@ class SongList extends StatefulWidget {
   State<SongList> createState() => _SongListState();
 }
 
-class _SongListState extends State<SongList> {
+class _SongListState extends State<SongList> with RouteAware {
   final _scroll = ScrollController();
   final _selectionFocus = FocusNode(debugLabel: 'song-list-selection');
   final _selected = <String>{};
   bool _selecting = false;
+  bool _active = true;
+  RouteObserver<PageRoute<dynamic>>? _observer;
+  PageRoute<dynamic>? _route;
   String? _highlight;
   Timer? _timer;
   int _locateToken = 0;
@@ -69,6 +97,26 @@ class _SongListState extends State<SongList> {
   void initState() {
     super.initState();
     _indexRows();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _active = SongListPageActivity.isActiveOf(context);
+    if (!_active && _selecting) _clearSelection();
+    final observer = PageNavigationScope.of(context);
+    final route = ModalRoute.of(context);
+    if (!identical(observer, _observer) || !identical(route, _route)) {
+      _observer?.unsubscribe(this);
+      _observer = observer;
+      _route = route is PageRoute<dynamic> ? route : null;
+      if (_route case final page?) _observer?.subscribe(this, page);
+    }
+  }
+
+  @override
+  void didPushNext() {
+    if (_selecting) _exitSelection();
   }
 
   void _indexRows() {
@@ -83,8 +131,7 @@ class _SongListState extends State<SongList> {
     if (!oldWidget.reordering && widget.reordering) {
       // Reordering and selection are exclusive modes. In particular, a held
       // drag handle must not be claimed by the row's long-press recognizer.
-      _selected.clear();
-      _selecting = false;
+      _clearSelection();
     }
     final members = widget.source.map((t) => t.song.id).toSet();
     _selected.removeWhere((id) => !members.contains(id));
@@ -114,6 +161,7 @@ class _SongListState extends State<SongList> {
 
   @override
   void dispose() {
+    _observer?.unsubscribe(this);
     _timer?.cancel();
     _scroll.dispose();
     _selectionFocus.dispose();
@@ -128,10 +176,13 @@ class _SongListState extends State<SongList> {
     _selectionFocus.requestFocus();
   }
 
-  void _exitSelection() => setState(() {
+  void _clearSelection() {
     _selected.clear();
     _selecting = false;
-  });
+    _selectionFocus.unfocus();
+  }
+
+  void _exitSelection() => setState(_clearSelection);
 
   List<LibraryTrack> _snapshot() => List.unmodifiable(
     widget.source.where((t) => _selected.contains(t.song.id)),
@@ -189,144 +240,72 @@ class _SongListState extends State<SongList> {
   Widget _toolbar(double maxHeight) {
     final visibleIds = widget.rows.map((t) => t.song.id).toSet();
     final visibleSelected = _selected.where(visibleIds.contains).length;
-    final hiddenSelected = _selected.length - visibleSelected;
-    final unavailable = _snapshot().where((t) => !t.available).length;
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: maxHeight),
-      child: SingleChildScrollView(
-        child: Material(
-          color: Theme.of(context).colorScheme.surfaceContainer,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Semantics(
-                        liveRegion: true,
-                        child: Text('已选 ${_selected.length} 首'),
-                      ),
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: _exitSelection,
-                    icon: const Icon(Icons.close),
-                    label: const Text('退出多选'),
-                  ),
-                ],
-              ),
-              if (hiddenSelected > 0 || unavailable > 0)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final canEdit = widget.enabled && _selected.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+      child: Material(
+        color: colors.secondaryContainer,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+            child: Wrap(
+              spacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Semantics(
+                  liveRegion: true,
                   child: Text(
-                    [
-                      if (hiddenSelected > 0)
-                        '当前结果已选 $visibleSelected 首，另有 $hiddenSelected 首在当前结果外。',
-                      if (unavailable > 0) '已选中 $unavailable 首失联歌曲，加入队列时会跳过。',
-                    ].join(' '),
-                    style: Theme.of(context).textTheme.bodySmall,
+                    '已选 ${_selected.length} 首',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: colors.onSecondaryContainer,
+                    ),
                   ),
                 ),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    Tooltip(
-                      message: '全选当前结果，保留其他结果中的选择',
-                      child: TextButton(
-                        onPressed:
-                            !widget.enabled ||
-                                visibleSelected == visibleIds.length
-                            ? null
-                            : () =>
-                                  setState(() => _selected.addAll(visibleIds)),
-                        child: const Text('全选'),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: !widget.enabled || visibleSelected == 0
-                          ? null
-                          : () =>
-                                setState(() => _selected.removeAll(visibleIds)),
-                      child: const Text('取消当前结果选择'),
-                    ),
-                    TextButton(
-                      onPressed: _selected.isEmpty
-                          ? null
-                          : () => setState(_selected.clear),
-                      child: const Text('清空选择'),
-                    ),
-                    TextButton(
-                      key: const ValueKey('batch-tags'),
-                      onPressed: !widget.enabled || _selected.isEmpty
-                          ? null
-                          : () {
-                              final snapshot = _snapshot();
-                              showTagActions(
-                                context,
-                                widget.library,
-                                snapshot.map((t) => t.song.id).toSet(),
-                              );
-                            },
-                      child: const Text('批量编辑标签'),
-                    ),
-                    TextButton(
-                      key: ValueKey('enqueue-${widget.scope}-selected'),
-                      onPressed:
-                          !widget.enabled ||
-                              !_snapshot().any((t) => t.available)
-                          ? null
-                          : () {
-                              final snapshot = _snapshot()
-                                  .where((t) => t.available)
-                                  .map((t) => t.queueSong)
-                                  .toList();
-                              widget.playback.addToQueue(snapshot);
-                            },
-                      child: const Text('加入队列'),
-                    ),
-                    TextButton(
-                      key: const ValueKey('batch-add-playlist'),
-                      onPressed: !widget.enabled || _selected.isEmpty
-                          ? null
-                          : () {
-                              final ids = _snapshot()
-                                  .map((t) => t.song.id)
-                                  .toList();
-                              addToPlaylist(context, widget.library, ids);
-                            },
-                      child: const Text('添加到歌单'),
-                    ),
-                    TextButton(
-                      onPressed: !widget.enabled || _selected.isEmpty
-                          ? null
-                          : () {
-                              final ids = _snapshot()
-                                  .map((t) => t.song.id)
-                                  .toList();
-                              savePlaylist(context, widget.library, ids);
-                            },
-                      child: const Text('保存歌单'),
-                    ),
-                    if (widget.onRemove != null)
-                      TextButton(
-                        onPressed: !widget.enabled || _selected.isEmpty
-                            ? null
-                            : () {
-                                final ids = _snapshot()
-                                    .map((t) => t.song.id)
-                                    .toSet();
-                                widget.onRemove!(ids);
-                              },
-                        child: const Text('移除所选歌曲'),
-                      ),
-                  ],
+                TextButton(
+                  onPressed:
+                      widget.enabled && visibleSelected < visibleIds.length
+                      ? () => setState(() => _selected.addAll(visibleIds))
+                      : null,
+                  child: const Text('全选'),
                 ),
-              ),
-            ],
+                TextButton(
+                  key: const ValueKey('batch-tags'),
+                  onPressed: canEdit
+                      ? () => showTagActions(
+                          context,
+                          widget.library,
+                          _snapshot().map((t) => t.song.id).toSet(),
+                        )
+                      : null,
+                  child: const Text('批量编辑标签'),
+                ),
+                TextButton(
+                  key: const ValueKey('batch-add-playlist'),
+                  onPressed: canEdit
+                      ? () => addToPlaylist(
+                          context,
+                          widget.library,
+                          _snapshot().map((t) => t.song.id).toList(),
+                        )
+                      : null,
+                  child: const Text('添加到歌单'),
+                ),
+                if (widget.onRemove != null)
+                  TextButton(
+                    onPressed: canEdit
+                        ? () => widget.onRemove!(
+                            _snapshot().map((t) => t.song.id).toSet(),
+                          )
+                        : null,
+                    child: const Text('移除所选歌曲'),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -380,100 +359,119 @@ class _SongListState extends State<SongList> {
         );
       }
 
-      return CallbackShortcuts(
-        bindings: {
-          if (_selecting)
-            const SingleActivator(LogicalKeyboardKey.escape): _exitSelection,
+      return PopScope(
+        canPop: !_active || (!_selecting && widget.onBack == null),
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop || !_active) return;
+          if (_selecting) {
+            _exitSelection();
+          } else {
+            widget.onBack?.call();
+          }
         },
-        child: Focus(
-          focusNode: _selectionFocus,
-          skipTraversal: true,
-          child: LayoutBuilder(
-            builder: (context, constraints) => Column(
-              children: [
-                if (_selecting) _toolbar(constraints.maxHeight * .45),
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, listConstraints) {
-                      final desktop =
-                          Theme.of(context).platform == TargetPlatform.windows;
-                      final reordering =
-                          widget.reordering &&
-                          !_selecting &&
-                          widget.onReorder != null;
-                      final rowsHeight = widget.rows.length * extent;
-                      final showRail = desktop
-                          ? rowsHeight + (reordering ? 0 : 64) >
-                                listConstraints.maxHeight
-                          : rowsHeight > listConstraints.maxHeight * 1.75;
-                      // The edge can reuse the row's outer padding without
-                      // covering the menu or reorder handle.
-                      final gutter = showRail ? FastScrollbar.gutter : 0.0;
-                      final scrollKey = PageStorageKey((
-                        widget.scope,
-                        widget.key,
-                      ));
+        child: CallbackShortcuts(
+          bindings: {
+            if (_selecting)
+              const SingleActivator(LogicalKeyboardKey.escape): _exitSelection,
+          },
+          child: Focus(
+            focusNode: _selectionFocus,
+            skipTraversal: true,
+            child: LayoutBuilder(
+              builder: (context, constraints) => Column(
+                children: [
+                  if (widget.header case final header?)
+                    Offstage(
+                      offstage: _selecting,
+                      child: ExcludeFocus(excluding: _selecting, child: header),
+                    ),
+                  if (_selecting) _toolbar(constraints.maxHeight * .45),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, listConstraints) {
+                        final desktop =
+                            Theme.of(context).platform ==
+                            TargetPlatform.windows;
+                        final reordering =
+                            widget.reordering &&
+                            !_selecting &&
+                            widget.onReorder != null;
+                        final rowsHeight = widget.rows.length * extent;
+                        final showRail = desktop
+                            ? rowsHeight + (reordering ? 0 : 64) >
+                                  listConstraints.maxHeight
+                            : rowsHeight > listConstraints.maxHeight * 1.75;
+                        // The edge can reuse the row's outer padding without
+                        // covering the menu or reorder handle.
+                        final gutter = showRail ? FastScrollbar.gutter : 0.0;
+                        final scrollKey = PageStorageKey((
+                          widget.scope,
+                          widget.key,
+                        ));
 
-                      return Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          if (widget.rows.isEmpty)
-                            Center(child: Text(widget.emptyText))
-                          else
-                            CoverScrollRegion(
-                              cache: widget.playback.documents.coverCache,
-                              child: FastScrollbar(
-                                controller: _scroll,
-                                visible: showRail,
-                                child: reordering
-                                    ? ReorderableListView.builder(
-                                        key: scrollKey,
-                                        scrollController: _scroll,
-                                        keyboardDismissBehavior:
-                                            widget.keyboardDismissBehavior,
-                                        itemExtent: extent,
-                                        buildDefaultDragHandles: false,
-                                        itemCount: widget.rows.length,
-                                        padding: EdgeInsets.only(right: gutter),
-                                        itemBuilder: row,
-                                        onReorderItem: widget.onReorder!,
-                                      )
-                                    : ListView.builder(
-                                        key: scrollKey,
-                                        controller: _scroll,
-                                        keyboardDismissBehavior:
-                                            widget.keyboardDismissBehavior,
-                                        itemExtent: extent,
-                                        itemCount: widget.rows.length,
-                                        padding: EdgeInsets.only(
-                                          right: gutter,
-                                          bottom: 64,
+                        return Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            if (widget.rows.isEmpty)
+                              Center(child: Text(widget.emptyText))
+                            else
+                              CoverScrollRegion(
+                                cache: widget.playback.documents.coverCache,
+                                child: FastScrollbar(
+                                  controller: _scroll,
+                                  visible: showRail,
+                                  child: reordering
+                                      ? ReorderableListView.builder(
+                                          key: scrollKey,
+                                          scrollController: _scroll,
+                                          keyboardDismissBehavior:
+                                              widget.keyboardDismissBehavior,
+                                          itemExtent: extent,
+                                          buildDefaultDragHandles: false,
+                                          itemCount: widget.rows.length,
+                                          padding: EdgeInsets.only(
+                                            right: gutter,
+                                          ),
+                                          itemBuilder: row,
+                                          onReorderItem: widget.onReorder!,
+                                        )
+                                      : ListView.builder(
+                                          key: scrollKey,
+                                          controller: _scroll,
+                                          keyboardDismissBehavior:
+                                              widget.keyboardDismissBehavior,
+                                          itemExtent: extent,
+                                          itemCount: widget.rows.length,
+                                          padding: EdgeInsets.only(
+                                            right: gutter,
+                                            bottom: 64,
+                                          ),
+                                          itemBuilder: row,
                                         ),
-                                        itemBuilder: row,
-                                      ),
+                                ),
+                              ),
+                            Positioned(
+                              right: 12 + gutter,
+                              bottom: 12,
+                              child: Opacity(
+                                opacity: .85,
+                                child: IconButton.filledTonal(
+                                  key: const ValueKey('locate-current-song'),
+                                  tooltip: '定位当前歌曲',
+                                  onPressed: canLocate
+                                      ? () => _locate(current, extent)
+                                      : null,
+                                  icon: const Icon(Icons.my_location),
+                                ),
                               ),
                             ),
-                          Positioned(
-                            right: 12 + gutter,
-                            bottom: 12,
-                            child: Opacity(
-                              opacity: .85,
-                              child: IconButton.filledTonal(
-                                key: const ValueKey('locate-current-song'),
-                                tooltip: '定位当前歌曲',
-                                onPressed: canLocate
-                                    ? () => _locate(current, extent)
-                                    : null,
-                                icon: const Icon(Icons.my_location),
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
+                          ],
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -513,7 +511,9 @@ class SongRow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final playing = playback.currentSongId == track.song.id;
     final canSelect = enabled && reorderIndex == null;
+    const radius = BorderRadius.all(Radius.circular(10));
     return Material(
+      borderRadius: radius,
       key: highlighted ? ValueKey('located-${track.song.id}') : null,
       color: highlighted || selected
           ? scheme.secondaryContainer
@@ -521,6 +521,7 @@ class SongRow extends StatelessWidget {
       child: GestureDetector(
         onSecondaryTap: canSelect ? onSelect : null,
         child: InkWell(
+          borderRadius: radius,
           onLongPress: canSelect ? onSelect : null,
           onTap: canSelect && (selecting || track.available) ? onTap : null,
           child: SizedBox(
@@ -612,35 +613,44 @@ class SongRow extends StatelessWidget {
                   SizedBox(
                     width: 48,
                     height: 48,
-                    child: PopupMenuButton<String>(
-                      tooltip: '歌曲操作',
-                      enabled: enabled,
-                      onSelected: (value) {
-                        if (value == 'information') {
-                          showSongInformation(context, track);
-                        }
-                        if (value == 'select' && canSelect) onSelect();
-                        if (value == 'tags') {
-                          showTagActions(context, library, {track.song.id});
-                        }
-                        if (value == 'playlist') {
-                          addToPlaylist(context, library, [track.song.id]);
-                        }
-                      },
-                      itemBuilder: (_) => [
-                        const PopupMenuItem(
-                          value: 'information',
-                          child: Text('歌曲信息'),
+                    child: MenuAnchor(
+                      consumeOutsideTap: true,
+                      style: const MenuStyle(
+                        alignment: AlignmentDirectional.bottomEnd,
+                      ),
+                      alignmentOffset: const Offset(0, 2),
+                      builder: (context, controller, _) => IconButton(
+                        tooltip: '歌曲操作',
+                        icon: const Icon(Icons.more_vert),
+                        onPressed: !enabled
+                            ? null
+                            : () {
+                                if (controller.isOpen) {
+                                  controller.close();
+                                } else {
+                                  controller.open();
+                                }
+                              },
+                      ),
+                      menuChildren: [
+                        MenuItemButton(
+                          onPressed: () => showSongInformation(context, track),
+                          child: const Text('歌曲信息'),
                         ),
-                        if (reorderIndex == null)
-                          const PopupMenuItem(
-                            value: 'select',
-                            child: Text('多选歌曲'),
+                        if (canSelect)
+                          MenuItemButton(
+                            onPressed: onSelect,
+                            child: const Text('多选歌曲'),
                           ),
-                        const PopupMenuItem(value: 'tags', child: Text('编辑标签')),
-                        const PopupMenuItem(
-                          value: 'playlist',
-                          child: Text('加入歌单'),
+                        MenuItemButton(
+                          onPressed: () =>
+                              showTagActions(context, library, {track.song.id}),
+                          child: const Text('编辑标签'),
+                        ),
+                        MenuItemButton(
+                          onPressed: () =>
+                              addToPlaylist(context, library, [track.song.id]),
+                          child: const Text('加入歌单'),
                         ),
                       ],
                     ),

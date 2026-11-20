@@ -23,6 +23,7 @@ import 'library/library_controller.dart';
 import 'library/tags_page.dart';
 import 'library/group_pages.dart';
 import 'library/library_header.dart';
+import 'library/song_list.dart' show SongListPageActivity;
 
 class TagMusicApp extends ConsumerStatefulWidget {
   const TagMusicApp({super.key});
@@ -64,7 +65,9 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
     }
 
     final playback = ref.read(playbackProvider);
-    if (playback == null || playback.current == null || playback.changingTrack) {
+    if (playback == null ||
+        playback.current == null ||
+        playback.changingTrack) {
       return KeyEventResult.ignored;
     }
     if (event is KeyDownEvent) {
@@ -103,7 +106,8 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
 
   @override
   void dispose() {
-    if (_desktop) FocusManager.instance.removeEarlyKeyEventHandler(_spaceToPlay);
+    if (_desktop)
+      FocusManager.instance.removeEarlyKeyEventHandler(_spaceToPlay);
     _routes.dispose();
     super.dispose();
   }
@@ -120,59 +124,62 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
       navigatorObservers: desktop ? const [] : [_routes],
       scrollBehavior: const _TagMusicScrollBehavior(),
       builder: (context, child) {
-        return CallbackShortcuts(
-          bindings: {
-            const SingleActivator(LogicalKeyboardKey.escape): desktop
-                ? _desktopBack
-                : () => _appNavigator.currentState?.maybePop(),
-            if (desktop) ...{
-              const SingleActivator(LogicalKeyboardKey.browserBack):
-                  _desktopBack,
-              const SingleActivator(LogicalKeyboardKey.browserForward):
-                  _desktopForward,
+        return PageNavigationScope(
+          observer: _routes,
+          child: CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.escape): desktop
+                  ? _desktopBack
+                  : () => _appNavigator.currentState?.maybePop(),
+              if (desktop) ...{
+                const SingleActivator(LogicalKeyboardKey.browserBack):
+                    _desktopBack,
+                const SingleActivator(LogicalKeyboardKey.browserForward):
+                    _desktopForward,
+              },
             },
-          },
-          child: desktop
-              ? DesktopNavigationScope(
-                  history: _routes,
-                  child: Listener(
+            child: desktop
+                ? DesktopNavigationScope(
+                    history: _routes,
+                    child: Listener(
+                      behavior: HitTestBehavior.translucent,
+                      onPointerDown: _handleMouseNavigation,
+                      child: child,
+                    ),
+                  )
+                : RawGestureDetector(
                     behavior: HitTestBehavior.translucent,
-                    onPointerDown: _handleMouseNavigation,
+                    excludeFromSemantics: true,
+                    gestures: {
+                      _NavigationSwipeRecognizer:
+                          GestureRecognizerFactoryWithHandlers<
+                            _NavigationSwipeRecognizer
+                          >(
+                            () => _NavigationSwipeRecognizer(
+                              () => _allowsNavigationSwipe(_routes.top),
+                            ),
+                            (recognizer) {
+                              recognizer.dragStartBehavior =
+                                  DragStartBehavior.down;
+                              recognizer.onStart = (details) {
+                                _swipeStartX = details.globalPosition.dx;
+                                _swipeRoute = _routes.top;
+                              };
+                              recognizer.onEnd = (details) {
+                                final route = _routes.top;
+                                if (details.globalPosition.dx - _swipeStartX >=
+                                        56 &&
+                                    identical(route, _swipeRoute) &&
+                                    _allowsNavigationSwipe(route)) {
+                                  _shell.currentState?._openNavigation();
+                                }
+                              };
+                            },
+                          ),
+                    },
                     child: child,
                   ),
-                )
-              : RawGestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  excludeFromSemantics: true,
-                  gestures: {
-                    _NavigationSwipeRecognizer:
-                        GestureRecognizerFactoryWithHandlers<
-                          _NavigationSwipeRecognizer
-                        >(
-                          () => _NavigationSwipeRecognizer(
-                            () => _allowsNavigationSwipe(_routes.top),
-                          ),
-                          (recognizer) {
-                            recognizer.dragStartBehavior =
-                                DragStartBehavior.down;
-                            recognizer.onStart = (details) {
-                              _swipeStartX = details.globalPosition.dx;
-                              _swipeRoute = _routes.top;
-                            };
-                            recognizer.onEnd = (details) {
-                              final route = _routes.top;
-                              if (details.globalPosition.dx - _swipeStartX >=
-                                      56 &&
-                                  identical(route, _swipeRoute) &&
-                                  _allowsNavigationSwipe(route)) {
-                                _shell.currentState?._openNavigation();
-                              }
-                            };
-                          },
-                        ),
-                  },
-                  child: child,
-                ),
+          ),
         );
       },
       title: 'Tag Music',
@@ -216,6 +223,8 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
             onSurfaceVariant: const Color(0xFF494E57),
           )
         : generated;
+    const controlRadius = BorderRadius.all(Radius.circular(12));
+    const controlShape = RoundedRectangleBorder(borderRadius: controlRadius);
     return ThemeData(
       useMaterial3: true,
       dialogTheme: DialogThemeData(
@@ -225,16 +234,45 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
           fontFamily: 'Microsoft YaHei',
           fontSize: 20,
           fontWeight: FontWeight.w600,
-          color: brightness == Brightness.dark ? Colors.white : Colors.black87,
+          color: scheme.onSurface,
         ),
       ),
       inputDecorationTheme: const InputDecorationThemeData(
         isDense: true,
+        border: OutlineInputBorder(borderRadius: controlRadius),
         contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         prefixIconConstraints: BoxConstraints(minWidth: 36, minHeight: 36),
       ),
-      popupMenuTheme: const PopupMenuThemeData(
+      popupMenuTheme: PopupMenuThemeData(
         menuPadding: EdgeInsets.symmetric(vertical: 4),
+        shape: controlShape,
+        color: scheme.surfaceContainerHigh,
+      ),
+      menuTheme: MenuThemeData(
+        style: MenuStyle(
+          shape: const WidgetStatePropertyAll(controlShape),
+          backgroundColor: WidgetStatePropertyAll(scheme.surfaceContainerHigh),
+        ),
+      ),
+      cardTheme: CardThemeData(
+        shape: controlShape,
+        color: scheme.surfaceContainerLow,
+      ),
+      listTileTheme: ListTileThemeData(
+        shape: controlShape,
+        selectedTileColor: scheme.secondaryContainer,
+      ),
+      checkboxTheme: const CheckboxThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(4)),
+        ),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: scheme.surfaceContainerLow,
+        modalBackgroundColor: scheme.surfaceContainerLow,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        ),
       ),
       scaffoldBackgroundColor: scheme.surface,
       colorScheme: scheme,
@@ -465,53 +503,56 @@ class _AppShellState extends ConsumerState<AppShell>
       Widget unavailable() => const Center(child: Text('曲库尚未就绪'));
       Widget branch(AppDestination destination) => KeyedSubtree(
         key: ValueKey(destination),
-        child: switch (destination) {
-          AppDestination.songs =>
-            library == null || playback == null
-                ? unavailable()
-                : LibraryPage(
-                    library: library,
-                    playback: playback,
-                    menuButton: menuButton,
-                  ),
-          AppDestination.filter =>
-            library == null || playback == null
-                ? unavailable()
-                : FilterPage(
-                    library: library,
-                    playback: playback,
-                    menuButton: menuButton,
-                  ),
-          AppDestination.playlists =>
-            library == null || playback == null
-                ? unavailable()
-                : PlaylistsPage(
-                    library: library,
-                    playback: playback,
-                    active: _selected == AppDestination.playlists,
-                    menuButton: menuButton,
-                  ),
-          AppDestination.tags =>
-            library == null || playback == null
-                ? unavailable()
-                : TagsPage(
-                    library: library,
-                    playback: playback,
-                    active: _selected == AppDestination.tags,
-                    menuButton: menuButton,
-                  ),
-          AppDestination.settings => SettingsPage(menuButton: menuButton),
-          AppDestination.albums || AppDestination.artists =>
-            library == null || playback == null
-                ? unavailable()
-                : MetadataGroupsPage(
-                    library: library,
-                    playback: playback,
-                    albums: destination == AppDestination.albums,
-                    active: _selected == destination,
-                    menuButton: menuButton,
-                  ),
-        },
+        child: SongListPageActivity(
+          active: _selected == destination,
+          child: switch (destination) {
+            AppDestination.songs =>
+              library == null || playback == null
+                  ? unavailable()
+                  : LibraryPage(
+                      library: library,
+                      playback: playback,
+                      menuButton: menuButton,
+                    ),
+            AppDestination.filter =>
+              library == null || playback == null
+                  ? unavailable()
+                  : FilterPage(
+                      library: library,
+                      playback: playback,
+                      menuButton: menuButton,
+                    ),
+            AppDestination.playlists =>
+              library == null || playback == null
+                  ? unavailable()
+                  : PlaylistsPage(
+                      library: library,
+                      playback: playback,
+                      active: _selected == AppDestination.playlists,
+                      menuButton: menuButton,
+                    ),
+            AppDestination.tags =>
+              library == null || playback == null
+                  ? unavailable()
+                  : TagsPage(
+                      library: library,
+                      playback: playback,
+                      active: _selected == AppDestination.tags,
+                      menuButton: menuButton,
+                    ),
+            AppDestination.settings => SettingsPage(menuButton: menuButton),
+            AppDestination.albums || AppDestination.artists =>
+              library == null || playback == null
+                  ? unavailable()
+                  : MetadataGroupsPage(
+                      library: library,
+                      playback: playback,
+                      albums: destination == AppDestination.albums,
+                      active: _selected == destination,
+                      menuButton: menuButton,
+                    ),
+          },
+        ),
       );
       return Scaffold(
         body: Column(

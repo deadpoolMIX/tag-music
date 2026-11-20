@@ -63,7 +63,6 @@ class _LibrarySearchState extends State<LibrarySearch> {
     onChanged: (v) => widget.library.filter(text: v),
     decoration: InputDecoration(
       isDense: true,
-      border: const OutlineInputBorder(),
       prefixIcon: const Icon(Icons.search),
       hintText: '搜索歌曲、歌手、专辑或文件名',
       suffixIcon: IconButton(

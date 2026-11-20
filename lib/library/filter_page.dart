@@ -59,65 +59,63 @@ class FilterPage extends StatelessWidget {
       final saveError = library.filterSaveError;
       final enabled = loadError == null && !library.filterDeletingTag;
       return LayoutBuilder(
-        builder: (context, constraints) => Column(
-          children: [
-            LibraryHeader(
-              menuButton: menuButton,
-              actions: [
-                IconButton(
-                  key: const ValueKey('save-smart-playlist'),
-                  tooltip: '保存为智能歌单',
-                  onPressed: enabled
-                      ? () => editSmartPlaylist(
-                          context,
-                          library,
-                          initial: preferences,
-                        )
-                      : null,
-                  icon: const Icon(Icons.bookmark_add_outlined),
-                ),
-              ],
-            ),
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: constraints.maxHeight * .65,
+        builder: (context, constraints) => SongList(
+          header: Column(
+            children: [
+              LibraryHeader(
+                menuButton: menuButton,
+                actions: [
+                  IconButton(
+                    key: const ValueKey('save-smart-playlist'),
+                    tooltip: '保存为智能歌单',
+                    onPressed: enabled
+                        ? () => editSmartPlaylist(
+                            context,
+                            library,
+                            initial: preferences,
+                          )
+                        : null,
+                    icon: const Icon(Icons.bookmark_add_outlined),
+                  ),
+                ],
               ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-                child: RuleEditor(
-                  library: library,
-                  rule: preferences.rule,
-                  enabled: enabled,
-                  compact: true,
-                  onChanged: (rule) => library.updateFilter(rule: rule),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: constraints.maxHeight * .65,
                 ),
-              ),
-            ),
-            if (loadError != null || saveError != null)
-              ListTile(
-                dense: true,
-                title: Text(loadError ?? saveError!),
-                trailing: TextButton(
-                  onPressed: loadError != null
-                      ? () => _reset(context)
-                      : enabled
-                      ? () => library.updateFilter()
-                      : null,
-                  child: Text(loadError != null ? '重置' : '重试'),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                  child: RuleEditor(
+                    library: library,
+                    rule: preferences.rule,
+                    enabled: enabled,
+                    compact: true,
+                    onChanged: (rule) => library.updateFilter(rule: rule),
+                  ),
                 ),
               ),
-            Expanded(
-              child: SongList(
-                scope: 'filter',
-                library: library,
-                playback: playback,
-                source: library.matchingTracks(preferences),
-                rows: rows,
-                enabled: enabled,
-                emptyText: loadError == null ? '没有匹配的歌曲' : '',
-              ),
-            ),
-          ],
+              if (loadError != null || saveError != null)
+                ListTile(
+                  dense: true,
+                  title: Text(loadError ?? saveError!),
+                  trailing: TextButton(
+                    onPressed: loadError != null
+                        ? () => _reset(context)
+                        : enabled
+                        ? () => library.updateFilter()
+                        : null,
+                    child: Text(loadError != null ? '重置' : '重试'),
+                  ),
+                ),
+            ],
+          ),
+          scope: 'filter',
+          library: library,
+          playback: playback,
+          source: library.matchingTracks(preferences),
+          rows: rows,
+          enabled: enabled,
+          emptyText: loadError == null ? '没有匹配的歌曲' : '',
         ),
       );
     },

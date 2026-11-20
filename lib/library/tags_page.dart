@@ -7,6 +7,7 @@ import 'library_controller.dart';
 import '../playback/playback_controller.dart';
 import 'group_pages.dart';
 import 'song_list.dart';
+import 'tag_picker.dart';
 
 Future<void> _run(BuildContext context, Future<void> Function() action) async {
   try {
@@ -62,70 +63,41 @@ Future<void> showTagActions(
   BuildContext context,
   LibraryController library,
   Set<String> songIds,
-) => showDialog<void>(
-  context: context,
-  builder: (dialog) => CompactAlertDialog(
-    title: Text(songIds.length == 1 ? '编辑歌曲标签' : '为 ${songIds.length} 首歌曲编辑标签'),
-    content: SizedBox(
-      width: 520,
-      child: ListenableBuilder(
-        listenable: library,
-        builder: (context, _) => library.tags.isEmpty
-            ? const Text('尚无标签。请先在“标签”页创建。')
-            : ListView(
-                shrinkWrap: true,
-                padding: EdgeInsets.zero,
-                children: [
-                  for (final tag in library.tags)
-                    ListTile(
-                      dense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                      title: Text(tag.name),
-                      subtitle: Text(
-                        '已标记 ${songIds.where((id) => library.tagsForSong(id).contains(tag.id)).length} / ${songIds.length} 首',
-                      ),
-                      trailing: Wrap(
-                        spacing: 4,
-                        children: [
-                          IconButton(
-                            tooltip: '添加${tag.name}',
-                            onPressed: () => _run(
-                              dialog,
-                              () => library.changeSongTags(
-                                tag.id,
-                                songIds,
-                                add: true,
-                              ),
-                            ),
-                            icon: const Icon(Icons.add_circle_outline),
-                          ),
-                          IconButton(
-                            tooltip: '移除${tag.name}',
-                            onPressed: () => _run(
-                              dialog,
-                              () => library.changeSongTags(
-                                tag.id,
-                                songIds,
-                                add: false,
-                              ),
-                            ),
-                            icon: const Icon(Icons.remove_circle_outline),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-      ),
+) async {
+  if (songIds.isEmpty) return;
+  final totals = <String, int>{};
+  for (final songId in songIds) {
+    for (final tagId in library.tagsForSong(songId)) {
+      totals.update(tagId, (count) => count + 1, ifAbsent: () => 1);
+    }
+  }
+  final selected = {
+    for (final entry in totals.entries)
+      if (entry.value == songIds.length) entry.key,
+  };
+  final mixed = totals.keys.toSet().difference(selected);
+  final result = await showTagPicker(
+    context,
+    library,
+    title: songIds.length == 1 ? '编辑歌曲标签' : '为 ${songIds.length} 首歌曲编辑标签',
+    prefix: 'song-tags',
+    initial: selected,
+    initialMixed: mixed,
+  );
+  if (!context.mounted || result == null) return;
+  final remainingTags = library.tags.map((tag) => tag.id).toSet();
+  await _run(
+    context,
+    () => library.editSongTags(
+      songIds,
+      add: result.selected.difference(selected),
+      remove: totals.keys
+          .toSet()
+          .difference(result.selected.union(result.mixed))
+          .intersection(remainingTags),
     ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(dialog),
-        child: const Text('完成'),
-      ),
-    ],
-  ),
-);
+  );
+}
 
 class TagsPage extends StatefulWidget {
   const TagsPage({
@@ -205,52 +177,53 @@ class _TagsPageState extends State<TagsPage> {
       if (tag != null) {
         final rows = library.tracksForTag(tag.id);
         final desktop = DesktopNavigation.maybeOf(context) != null;
-        return PopScope(
-          canPop: desktop || !widget.active,
-          onPopInvokedWithResult: (didPop, _) {
-            if (!desktop && !didPop && widget.active) {
-              setState(() => openedId = null);
-            }
-          },
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  ?widget.menuButton,
-                  IconButton(
-                    tooltip: '返回标签',
-                    onPressed: () => _openTag(null, returning: true),
-                    icon: const Icon(Icons.arrow_back),
-                  ),
-                  Expanded(
-                    child: Text(
-                      tag.name,
-                      style: Theme.of(context).textTheme.titleLarge,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text('${rows.length} 首'),
-                  ),
-                ],
+        final header = Row(
+          children: [
+            ?widget.menuButton,
+            IconButton(
+              tooltip: '返回标签',
+              onPressed: () => _openTag(null, returning: true),
+              icon: const Icon(Icons.arrow_back),
+            ),
+            Expanded(
+              child: Text(
+                tag.name,
+                style: Theme.of(context).textTheme.titleLarge,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              Expanded(
-                child: widget.playback == null
-                    ? const Center(child: Text('播放器尚未就绪'))
-                    : SongList(
-                        key: ValueKey('tag-songs-${tag.id}'),
-                        library: library,
-                        playback: widget.playback!,
-                        source: rows,
-                        rows: rows,
-                        scope: 'tag',
-                        emptyText: '尚无关联歌曲',
-                      ),
-              ),
-            ],
-          ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('${rows.length} 首'),
+            ),
+          ],
+        );
+        final playback = widget.playback;
+        if (playback == null) {
+          return PopScope(
+            canPop: desktop || !widget.active,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!desktop && !didPop && widget.active) _openTag(null);
+            },
+            child: Column(
+              children: [
+                header,
+                const Expanded(child: Center(child: Text('播放器尚未就绪'))),
+              ],
+            ),
+          );
+        }
+        return SongList(
+          key: ValueKey('tag-songs-${tag.id}'),
+          library: library,
+          playback: playback,
+          source: rows,
+          rows: rows,
+          scope: 'tag',
+          emptyText: '尚无关联歌曲',
+          header: header,
+          onBack: desktop || !widget.active ? null : () => _openTag(null),
         );
       }
       final tags = [...library.tags]

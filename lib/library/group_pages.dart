@@ -25,19 +25,25 @@ Future<void> openArtistTracks(
   context,
   () => MaterialPageRoute<void>(
     builder: (_) => Scaffold(
-      appBar: AppBar(
-        title: Text(artist, maxLines: 1, overflow: TextOverflow.ellipsis),
-      ),
-      body: ListenableBuilder(
-        listenable: library,
-        builder: (context, _) => _GroupSongs(
-          name: artist,
-          albums: false,
-          library: library,
-          playback: playback,
-          rows: library.availableTracks
-              .where((track) => artistNames(track.song.artist).contains(artist))
-              .toList(),
+      body: SafeArea(
+        bottom: false,
+        child: ListenableBuilder(
+          listenable: library,
+          builder: (context, _) => _GroupSongs(
+            header: AppBar(
+              primary: false,
+              title: Text(artist, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+            name: artist,
+            albums: false,
+            library: library,
+            playback: playback,
+            rows: library.availableTracks
+                .where(
+                  (track) => artistNames(track.song.artist).contains(artist),
+                )
+                .toList(),
+          ),
         ),
       ),
     ),
@@ -51,6 +57,8 @@ class _GroupSongs extends StatelessWidget {
     required this.library,
     required this.playback,
     required this.rows,
+    this.header,
+    this.onBack,
   });
 
   final String? name;
@@ -58,6 +66,8 @@ class _GroupSongs extends StatelessWidget {
   final LibraryController library;
   final PlaybackController playback;
   final List<LibraryTrack> rows;
+  final Widget? header;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) => SongList(
@@ -68,6 +78,8 @@ class _GroupSongs extends StatelessWidget {
     rows: rows,
     scope: albums ? 'album' : 'artist',
     emptyText: '没有歌曲',
+    header: header,
+    onBack: onBack,
   );
 }
 
@@ -237,49 +249,37 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
       if (opened) {
         final rows = groups[selected] ?? <LibraryTrack>[];
         final desktop = DesktopNavigation.maybeOf(context) != null;
-        return PopScope(
-          canPop: desktop || !widget.active,
-          onPopInvokedWithResult: (didPop, _) {
-            if (!desktop && !didPop && widget.active) {
-              setState(() => opened = false);
-            }
-          },
-          child: Column(
+        return _GroupSongs(
+          header: Row(
             children: [
-              Row(
-                children: [
-                  ?widget.menuButton,
-                  IconButton(
-                    tooltip: '返回分组',
-                    onPressed: () =>
-                        _viewGroup(false, selected, returning: true),
-                    icon: const Icon(Icons.arrow_back),
-                  ),
-                  Expanded(
-                    child: Text(
-                      selected ?? unknown,
-                      style: Theme.of(context).textTheme.titleLarge,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text('${rows.length} 首'),
-                  ),
-                ],
+              ?widget.menuButton,
+              IconButton(
+                tooltip: '返回分组',
+                onPressed: () => _viewGroup(false, selected, returning: true),
+                icon: const Icon(Icons.arrow_back),
               ),
               Expanded(
-                child: _GroupSongs(
-                  name: selected,
-                  albums: widget.albums,
-                  library: widget.library,
-                  playback: widget.playback,
-                  rows: rows,
+                child: Text(
+                  selected ?? unknown,
+                  style: Theme.of(context).textTheme.titleLarge,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text('${rows.length} 首'),
               ),
             ],
           ),
+          onBack: desktop || !widget.active
+              ? null
+              : () => _viewGroup(false, selected),
+          name: selected,
+          albums: widget.albums,
+          library: widget.library,
+          playback: widget.playback,
+          rows: rows,
         );
       }
       final keys = groups.keys.toList()

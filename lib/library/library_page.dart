@@ -70,66 +70,66 @@ class LibraryPage extends StatelessWidget {
     listenable: library,
     builder: (context, _) {
       final rows = library.visible;
-      return Column(
-        children: [
-          Row(
-            children: [
-              ?menuButton,
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  '歌曲',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ),
-              IconButton(
-                key: const ValueKey('open-library-search'),
-                tooltip: '搜索全曲库',
-                onPressed: () => pushAppPage(
-                  context,
-                  () => MaterialPageRoute<void>(
-                    builder: (_) =>
-                        LibrarySearchPage(library: library, playback: playback),
+      return SongList(
+        header: Column(
+          children: [
+            Row(
+              children: [
+                ?menuButton,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    '歌曲',
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
-                icon: const Icon(Icons.search),
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              IconButton(
-                tooltip: '歌曲排序',
-                onPressed: () => _sort(context),
-                icon: const Icon(Icons.sort),
-              ),
-              IconButton(
-                tooltip: '刷新所有目录',
-                onPressed: library.directoryBusy || library.roots.isEmpty
-                    ? null
-                    : () => library.scan(),
-                icon: const Icon(Icons.refresh),
-              ),
-              const Spacer(),
-              Text('${rows.length}首'),
-              const SizedBox(width: 16),
-            ],
-          ),
-          LibraryStatus(library: library),
-          Expanded(
-            child: SongList(
-              emptyText: library.roots.isEmpty ? '添加音乐文件夹，建立本机曲库' : '没有匹配的歌曲',
-              library: library,
-              playback: playback,
-              source: library.searchTracks(
-                '',
-                order: library.sort,
-                descending: library.descending,
-              ),
-              rows: rows,
+                IconButton(
+                  key: const ValueKey('open-library-search'),
+                  tooltip: '搜索全曲库',
+                  onPressed: () => pushAppPage(
+                    context,
+                    () => MaterialPageRoute<void>(
+                      builder: (_) => LibrarySearchPage(
+                        library: library,
+                        playback: playback,
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.search),
+                ),
+              ],
             ),
-          ),
-        ],
+            Row(
+              children: [
+                IconButton(
+                  tooltip: '歌曲排序',
+                  onPressed: () => _sort(context),
+                  icon: const Icon(Icons.sort),
+                ),
+                IconButton(
+                  tooltip: '刷新所有目录',
+                  onPressed: library.directoryBusy || library.roots.isEmpty
+                      ? null
+                      : () => library.scan(),
+                  icon: const Icon(Icons.refresh),
+                ),
+                const Spacer(),
+                Text('${rows.length}首'),
+                const SizedBox(width: 16),
+              ],
+            ),
+            LibraryStatus(library: library),
+          ],
+        ),
+        emptyText: library.roots.isEmpty ? '添加音乐文件夹，建立本机曲库' : '没有匹配的歌曲',
+        library: library,
+        playback: playback,
+        source: library.searchTracks(
+          '',
+          order: library.sort,
+          descending: library.descending,
+        ),
+        rows: rows,
       );
     },
   );

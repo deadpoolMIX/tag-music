@@ -13,7 +13,7 @@ Future<void> pushAppPage(
   return navigator.push<void>(create());
 }
 
-class DesktopNavigation extends NavigatorObserver {
+class DesktopNavigation extends RouteObserver<PageRoute<dynamic>> {
   final _activeRoute = ValueNotifier<Route<dynamic>?>(null);
   ValueListenable<Route<dynamic>?> get activeRoute => _activeRoute;
   Route<dynamic>? top;
@@ -91,11 +91,13 @@ class DesktopNavigation extends NavigatorObserver {
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
     if (route is PageRoute && !_replaying) _forward.clear();
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPop(route, previousRoute);
     final page = _pages[route];
     final parentId = _pageId(previousRoute);
     final activeNavigator = navigator;
@@ -125,6 +127,24 @@ class DesktopNavigation extends NavigatorObserver {
     _disposed = true;
     _activeRoute.dispose();
   }
+}
+
+class PageNavigationScope extends InheritedWidget {
+  const PageNavigationScope({
+    required this.observer,
+    required super.child,
+    super.key,
+  });
+
+  final RouteObserver<PageRoute<dynamic>> observer;
+
+  static RouteObserver<PageRoute<dynamic>>? of(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<PageNavigationScope>()
+      ?.observer;
+
+  @override
+  bool updateShouldNotify(PageNavigationScope oldWidget) =>
+      observer != oldWidget.observer;
 }
 
 class DesktopNavigationScope extends InheritedWidget {

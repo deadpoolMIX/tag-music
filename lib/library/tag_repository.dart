@@ -99,21 +99,35 @@ class TagRepository {
     String tagId,
     Iterable<String> songIds, {
     required bool add,
+  }) => editSongs(
+    songIds,
+    add: add ? {tagId} : const {},
+    remove: add ? const {} : {tagId},
+  );
+
+  Future<void> editSongs(
+    Iterable<String> songIds, {
+    required Set<String> add,
+    required Set<String> remove,
   }) async {
     final ids = songIds.toSet();
     if (ids.isEmpty) return;
     await db.transaction(() async {
-      final tag = await (db.select(
+      final changed = add.union(remove);
+      final existing = await (db.select(
         db.tags,
-      )..where((t) => t.id.equals(tagId))).getSingleOrNull();
-      if (tag == null) throw StateError('标签不存在');
-      for (final songId in ids) {
-        if (add) {
+      )..where((tag) => tag.id.isIn(changed))).get();
+      if (existing.length != changed.length) throw StateError('标签不存在');
+      for (final tagId in add) {
+        for (final songId in ids) {
           await db.customStatement(
             'INSERT OR IGNORE INTO song_tags (song_id, tag_id) VALUES (?, ?)',
             [songId, tagId],
           );
-        } else {
+        }
+      }
+      for (final tagId in remove) {
+        for (final songId in ids) {
           await db.customStatement(
             'DELETE FROM song_tags WHERE song_id = ? AND tag_id = ?',
             [songId, tagId],
