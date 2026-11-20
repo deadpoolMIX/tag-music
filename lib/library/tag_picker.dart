@@ -92,11 +92,10 @@ class _TagPickerState extends State<_TagPicker> {
         content: SizedBox(
           width: 600,
           child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: (availableHeight * .36).clamp(0.0, 360.0),
+            constraints: BoxConstraints.tightFor(
+              height: (availableHeight * .36).clamp(160.0, 360.0),
             ),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (chosen.isNotEmpty) ...[
@@ -195,9 +194,8 @@ class _TagPickerState extends State<_TagPicker> {
                     ),
                   )
                 else
-                  Flexible(
+                  Expanded(
                     child: ListView.builder(
-                      shrinkWrap: true,
                       padding: EdgeInsets.zero,
                       itemCount: (choices.length + 1) ~/ 2,
                       itemBuilder: (context, row) => Row(

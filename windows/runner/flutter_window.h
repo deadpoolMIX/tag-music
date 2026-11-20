@@ -26,6 +26,8 @@ class FlutterWindow : public Win32Window {
 
  private:
   void RegisterWindowControls();
+  void ShowTrayMenu(HWND window);
+  void RestoreFromTray(HWND window);
 
   // The project to run.
   flutter::DartProject project_;
@@ -34,6 +36,10 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       window_controls_;
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
+      tray_controls_;
+  UINT taskbar_created_ = 0;
+  bool tray_icon_added_ = false;
   bool maximized_ = false;
 };
 

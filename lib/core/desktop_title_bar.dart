@@ -99,7 +99,7 @@ class _DesktopTitleBarState extends State<DesktopTitleBar> {
               'toggleMaximize',
             ),
             _windowButton(
-              '关闭',
+              '关闭到托盘',
               Icons.close_rounded,
               'close',
               closeColor: colors.error,

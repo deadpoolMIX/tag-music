@@ -665,20 +665,13 @@ class _PlayerBody extends StatelessWidget {
             const SizedBox(height: 12),
             const Text('从曲库选择歌曲后，会在这里显示封面和播放控制。', textAlign: TextAlign.center),
             const SizedBox(height: 20),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () =>
-                      showPlaybackQueue(context, playback, library),
-                  icon: const Icon(Icons.queue_music),
-                  label: const Text('查看播放队列'),
-                ),
-              ],
-            ),
-            if (playback.sleep.active) ...[
+            if (!simple)
+              OutlinedButton.icon(
+                onPressed: () => showPlaybackQueue(context, playback, library),
+                icon: const Icon(Icons.queue_music),
+                label: const Text('查看播放队列'),
+              ),
+            if (!simple && playback.sleep.active) ...[
               const SizedBox(height: 16),
               SleepTimerStatus(playback: playback),
             ],
@@ -716,7 +709,16 @@ class _PlayerBody extends StatelessWidget {
         const SizedBox(height: 10),
         Row(
           children: [
-            for (final action in [mode, timer, queue])
+            for (final action in [
+              mode,
+              timer,
+              queue,
+              PlaybackTagButton(
+                playback: playback,
+                library: library,
+                foreground: controlColor,
+              ),
+            ])
               Expanded(
                 child: Center(
                   child: _StandardPlayerControl(
@@ -725,15 +727,6 @@ class _PlayerBody extends StatelessWidget {
                   ),
                 ),
               ),
-            Expanded(
-              child: Center(
-                child: PlaybackTagButton(
-                  playback: playback,
-                  library: library,
-                  foreground: controlColor,
-                ),
-              ),
-            ),
           ],
         ),
         if (playback.sleep.active)

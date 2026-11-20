@@ -291,7 +291,7 @@ void main() {
     final secondItems = items.where((i) => i?.id == 'test://second').toList();
     expect(secondItems, hasLength(1));
     expect(secondItems.single?.title, '第二首完整标题');
-    expect(secondItems.single?.displaySubtitle, '第二首歌手');
+    expect(secondItems.single?.artist, '第二首歌手');
     expect(handler.playbackState.value.playing, isTrue);
     await handler.pause();
     expect(handler.playbackState.value.playing, isFalse);

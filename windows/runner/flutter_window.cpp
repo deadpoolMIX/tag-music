@@ -1,10 +1,57 @@
 #include "flutter_window.h"
 
 #include <flutter/standard_method_codec.h>
+#include <shellapi.h>
+#include <strsafe.h>
 
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "resource.h"
+
+namespace {
+constexpr UINT kTrayCallback = WM_APP + 1;
+constexpr UINT kTrayIcon = 1;
+
+enum TrayCommand : UINT {
+  kShowWindow = 1,
+  kPreviousTrack,
+  kTogglePlayback,
+  kNextTrack,
+  kExit,
+};
+
+NOTIFYICONDATAW TrayIconData(HWND window) {
+  NOTIFYICONDATAW icon = {};
+  icon.cbSize = sizeof(icon);
+  icon.hWnd = window;
+  icon.uID = kTrayIcon;
+  return icon;
+}
+
+bool AddTrayIcon(HWND window) {
+  auto icon = TrayIconData(window);
+  icon.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP;
+  icon.uCallbackMessage = kTrayCallback;
+  icon.hIcon =
+      LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(IDI_APP_ICON));
+  StringCchCopyW(icon.szTip, ARRAYSIZE(icon.szTip), L"Tag Music");
+  if (!icon.hIcon || !Shell_NotifyIconW(NIM_ADD, &icon)) {
+    return false;
+  }
+  icon.uVersion = NOTIFYICON_VERSION_4;
+  if (Shell_NotifyIconW(NIM_SETVERSION, &icon)) {
+    return true;
+  }
+  Shell_NotifyIconW(NIM_DELETE, &icon);
+  return false;
+}
+
+void RemoveTrayIcon(HWND window) {
+  auto icon = TrayIconData(window);
+  Shell_NotifyIconW(NIM_DELETE, &icon);
+}
+}  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -28,6 +75,12 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   RegisterWindowControls();
+  tray_controls_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "tag_music/tray",
+          &flutter::StandardMethodCodec::GetInstance());
+  taskbar_created_ = RegisterWindowMessageW(L"TaskbarCreated");
+  tray_icon_added_ = AddTrayIcon(GetHandle());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -90,6 +143,7 @@ void FlutterWindow::OnDestroy() {
     window_controls_->SetMethodCallHandler(nullptr);
     window_controls_.reset();
   }
+  tray_controls_.reset();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -97,10 +151,104 @@ void FlutterWindow::OnDestroy() {
   Win32Window::OnDestroy();
 }
 
+void FlutterWindow::RestoreFromTray(HWND window) {
+  ShowWindow(window, IsIconic(window) ? SW_RESTORE : SW_SHOW);
+  SetForegroundWindow(window);
+}
+
+void FlutterWindow::ShowTrayMenu(HWND window) {
+  const HMENU menu = CreatePopupMenu();
+  if (!menu) {
+    return;
+  }
+  AppendMenuW(menu, MF_STRING, kShowWindow, L"打开 Tag Music");
+  SetMenuDefaultItem(menu, kShowWindow, FALSE);
+  AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+  AppendMenuW(menu, MF_STRING, kPreviousTrack, L"上一首");
+  AppendMenuW(menu, MF_STRING, kTogglePlayback, L"播放 / 暂停");
+  AppendMenuW(menu, MF_STRING, kNextTrack, L"下一首");
+  AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+  AppendMenuW(menu, MF_STRING, kExit, L"退出");
+
+  NOTIFYICONIDENTIFIER icon = {};
+  icon.cbSize = sizeof(icon);
+  icon.hWnd = window;
+  icon.uID = kTrayIcon;
+  RECT bounds = {};
+  POINT anchor = {};
+  if (SUCCEEDED(Shell_NotifyIconGetRect(&icon, &bounds))) {
+    anchor = {bounds.left, bounds.top};
+  } else {
+    GetCursorPos(&anchor);
+  }
+  SetForegroundWindow(window);
+  const UINT flags = TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON;
+  const auto command =
+      TrackPopupMenu(menu, flags, anchor.x, anchor.y, 0, window, nullptr);
+  DestroyMenu(menu);
+  if (!tray_controls_) {
+    return;
+  }
+  PostMessageW(window, WM_NULL, 0, 0);
+
+  switch (command) {
+    case kShowWindow:
+      RestoreFromTray(window);
+      return;
+    case kPreviousTrack:
+      tray_controls_->InvokeMethod("previous", nullptr);
+      break;
+    case kTogglePlayback:
+      tray_controls_->InvokeMethod("togglePlayback", nullptr);
+      break;
+    case kNextTrack:
+      tray_controls_->InvokeMethod("next", nullptr);
+      break;
+    case kExit:
+      DestroyWindow(window);
+      return;
+  }
+  auto icon_data = TrayIconData(window);
+  Shell_NotifyIconW(NIM_SETFOCUS, &icon_data);
+}
+
 LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (taskbar_created_ && message == taskbar_created_) {
+    if (tray_icon_added_) {
+      RemoveTrayIcon(hwnd);
+    }
+    tray_icon_added_ = AddTrayIcon(hwnd);
+    return 0;
+  }
+  switch (message) {
+    case WM_CLOSE:
+      if (!tray_icon_added_) {
+        tray_icon_added_ = AddTrayIcon(hwnd);
+      }
+      ShowWindow(hwnd, tray_icon_added_ ? SW_HIDE : SW_MINIMIZE);
+      return 0;
+    case kTrayCallback:
+      switch (LOWORD(lparam)) {
+        case WM_LBUTTONUP:
+        case NIN_SELECT:
+        case NIN_KEYSELECT:
+          RestoreFromTray(hwnd);
+          break;
+        case WM_CONTEXTMENU:
+          ShowTrayMenu(hwnd);
+          break;
+      }
+      return 0;
+    case WM_DESTROY:
+      if (tray_icon_added_) {
+        RemoveTrayIcon(hwnd);
+        tray_icon_added_ = false;
+      }
+      break;
+  }
   if (message == WM_SIZE && wparam != SIZE_MINIMIZED && window_controls_) {
     const bool maximized = IsZoomed(hwnd) != FALSE;
     if (maximized != maximized_) {

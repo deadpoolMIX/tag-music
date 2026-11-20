@@ -40,6 +40,16 @@ Future<PlaybackController> initializePlayback({
     );
   }
   await controller.initialize();
+  if (Platform.isWindows) {
+    const MethodChannel('tag_music/tray').setMethodCallHandler((call) {
+      return switch (call.method) {
+        'previous' => controller.previous(),
+        'togglePlayback' => controller.togglePlayPause(),
+        'next' => controller.next(),
+        _ => throw MissingPluginException(call.method),
+      };
+    });
+  }
   return controller;
 }
 
