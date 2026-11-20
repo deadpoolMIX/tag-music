@@ -6,7 +6,7 @@
 
 | 任务 | 最小入口；扩大读取的条件 |
 |---|---|
-| 继续R6 | [R6当前计划](rounds/R6.md)的进度、当批安排与缺口；只读其指向的本批规格小节 |
+| 回查 R6 | [实现进度](rounds/R6.md)及[验收结论和保留版本](rounds/R6-ACCEPTANCE.md) |
 | 新阶段/产品行为决策 | [PLAN](PLAN.md)对应阶段/产品语义；需要操作Goal才读[细则](WORKFLOW.md#goal-状态) |
 | 定位实现/改公共接口 | [模块定位](ARCHITECTURE.md#架构与代码定位)，涉及持久/播放语义才补[长期接口](ARCHITECTURE.md#长期有效的接口与约束)及调用方 |
 | 检查/构建/排错 | [命令参考](VERIFICATION.md)对应入口；环境问题读[TOOLCHAIN](TOOLCHAIN.md)，依赖/许可变化读[THIRD_PARTY](THIRD_PARTY.md) |

@@ -8,9 +8,9 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 
 | 职责 | 代码入口 / 符号 | 相关验证 |
 |---|---|---|
-| 初始化、导航、设置 | [main.dart](../lib/main.dart)、[app.dart](../lib/app.dart)、[core/](../lib/core/)；R6七入口壳层与稳定页面状态仍在阶段实现中 | `app_test`、`settings_test`、集成 `smoke_test`；当前R6进度见[当轮计划](rounds/R6.md) |
+| 初始化、导航、设置 | [main.dart](../lib/main.dart)、[app.dart](../lib/app.dart)、[core/](../lib/core/)；R6 已实现七入口壳层与页面状态保留 | `app_test`、`settings_test`、集成 `smoke_test`；当前R6进度见[当轮计划](rounds/R6.md) |
 | 数据表、连接、迁移 | [database.dart](../lib/library/database.dart) / `LibraryDatabase`；`database.g.dart` 为生成文件 | `library_test`、`tag_test`、`playlist_test`、[schema v4 DDL](database-schema/v4.json) |
-| 扫描事务、增量/失联、搜索排序 | [library_controller.dart](../lib/library/library_controller.dart) / `LibraryController`；R6工作区新增独立全库搜索和修改时间排序，兼容要求见[R6 §2B/2C](rounds/R6-SPEC.md#2b公共排序与持久兼容) | 单元/集成 `library_test`、`r6_library_sort_test`、`library_search_test`；R6状态见[当轮计划](rounds/R6.md) |
+| 扫描事务、增量/失联、搜索排序 | [library_controller.dart](../lib/library/library_controller.dart) / `LibraryController`；R6 新增独立全库搜索和修改时间排序，兼容要求见[R6 §2B/2C](rounds/R6-SPEC.md#2b公共排序与持久兼容) | 单元/集成 `library_test`、`r6_library_sort_test`、`library_search_test`；R6状态见[当轮计划](rounds/R6.md) |
 | 曲库 UI、共享歌曲行、封面、输入连接 | [library_page.dart](../lib/library/library_page.dart)、[song_list.dart](../lib/library/song_list.dart)、[library_search_page.dart](../lib/library/library_search_page.dart)、[library_search.dart](../lib/library/library_search.dart)、[track_cover.dart](../lib/library/track_cover.dart)；R6顺序2仍未验收 | `test/library_page_test.dart`、`r6_song_list_test`、`library_search_test`；真机输入另需当批授权 |
 | 标签关系与管理、多选操作 | [tag_repository.dart](../lib/library/tag_repository.dart)、[tags_page.dart](../lib/library/tags_page.dart)；曲库controller共用DB及状态 | `tag_test`、`tags_page_test`、设备 `tag_benchmark_test` |
 | 三框组合筛选、当前规则保留 | [filter_rule.dart](../lib/library/filter_rule.dart)、[filter_repository.dart](../lib/library/filter_repository.dart)、[filter_page.dart](../lib/library/filter_page.dart)；LibraryController复用曲库/标签数据 | `filter_test`、`filter_page_test`、双端 `filter_benchmark_test` |

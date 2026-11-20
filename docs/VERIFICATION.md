@@ -4,7 +4,7 @@
 
 ## 验证入口与维护
 
-- `& ./scripts/check.ps1 -Round R6`（PowerShell 7）：依赖恢复、格式、analyze、全套单元/widget及R6工具/报告审计测试；准备固定曲库/封面/LRC样本并输出既有曲库/标签/筛选/队列主机基准。这是可选完整入口，按具体批次需要选用，不是体验候选前置条件。R6应用变更的当前计划与未测范围见[当轮计划](rounds/R6.md)；不含原生集成、双端构建、手机验收，不代表真实万首文件或设备Release性能。
+- `& ./scripts/check.ps1 -Round R6`（PowerShell 7）：依赖恢复、格式、analyze、全套单元/widget及R6工具/报告审计测试；准备固定曲库/封面/LRC样本并输出既有曲库/标签/筛选/队列主机基准。这是可选完整入口，按具体批次需要选用，不是体验候选前置条件。R6 的实测与未测范围见[验收记录](rounds/R6-ACCEPTANCE.md)；不含原生集成、双端构建、手机验收，不代表真实万首文件或设备Release性能。
 - 候选参数：`scripts/build.ps1 -Target all -BuildNumber <新构建号> -Round <当前阶段>`；`verify-apk.ps1` 显式传 `-Version/-BuildNumbers/-Round`；`verify-packages.py` 传 `--version/--build/--round`，当前音频基线另传 `--native-reference-round R1`。隔离性能包用同一审计入口另传`--android-archive <APK> --windows-archive <ZIP> --output <新审计.json>`；报告拒绝覆盖，SQLite剥离复核文件按构建号区分。须在下一次Android构建覆盖merged原生输入前审计本批包。示意值须取实际 pubspec/交接。
 - 手动 Flutter 先 `. ./scripts/env.ps1`，再 `& ./scripts/restore.ps1 -Round R6`。所有 Flutter 检查/测试/构建串行，避免共享注册文件互改。按功能批次交付前集中必要检查，不默认全量回归或完整 check；具体范围见 [PLAN §4](PLAN.md#4-验证与质量门禁)。
 - check在R1～R6按阶段准备样本，SQLite包审计分支在R2～R6启用；R6的固定封面/LRC、性能采样契约及未测边界见[R6测量契约](rounds/R6-SPEC.md#七固定样本与测量入口契约)。后续阶段Plan先核对覆盖，不能把skip当通过。脚本默认参数及Android播放/卡片脚本仍有R1路径/样本假设，使用前核对，显式传当前参数。

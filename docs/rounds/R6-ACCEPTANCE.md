@@ -1,6 +1,21 @@
 # R6 验收记录
 
-当前双端候选为 56 号。此前保留[25号待测清单](R6-MANUAL-CHECKLIST.md)及各批次原始证据。
+## 阶段结论
+
+**R6 已结束（2026-11-20，用户确认按日常体验收尾）。** 用户反馈实际使用已基本正常，并明确结束 R6。反馈未注明具体构建号、平台和逐项结果。下列各批当时记录的通过、失败和未测范围仍有效。
+
+- **本次验收口径** 日常使用由用户确认。逐项清单未完整执行，Windows 与 Android 的体验细项维持原记录。历史批准的批次设备操作已结束。
+- **证据缺口** 真实 Android SAF/FD、定位性能与资源、歌词与睡眠定时的后台行为缺本阶段末候选的设备证据。20 号电脑复验无逐项反馈，18 号的局部通过仅适用于原候选及原范围。历史播放器交互实验失败见[交互批证据](../../artifacts/R6/player-interaction-batch/index.md)。
+- **历史清单** 25 号人工清单未登记新结果，已从当前文档移除。原内容可在 Git 的 `e43d097` 提交中查阅。后续按实际反馈和阶段范围定位问题。
+
+## 保留版本与证据
+
+| 用途 | 版本 | 可用文件 |
+|---|---|---|
+| R6 最终保留版本 | 0.6.0+56 | [Android APK](../../artifacts/R6/tag-music-0.6.0+56.apk) · [Windows ZIP](../../artifacts/R6/tag-music-windows-0.6.0+56.zip) · [Windows EXE](../../artifacts/R6/minibar-slide-build-56/windows-56/tag_music.exe) |
+| 备用版本 | 0.6.0+55 | [Android APK](../../artifacts/R6/tag-music-0.6.0+55.apk) · [Windows ZIP](../../artifacts/R6/tag-music-windows-0.6.0+55.zip) · [Windows EXE](../../artifacts/R6/player-tag-gestures-build-55/windows-55/tag_music.exe) |
+
+两版均已构建，本次收尾核对了包哈希和 Windows EXE 版本信息。早期构建的安装包和重复解压文件已清理，下面的批次条目记录当时的情况。构建号、[历史哈希](../../artifacts/R6/SHA256SUMS.txt)、日志、截图和测试证据保留，后续构建继续使用新号。
 
 ## 标签留白、手机底部四键及整条 MiniBar 横滑（0.6.0+56）
 
@@ -244,8 +259,7 @@
 
 ### 候选产物
 
-- [Android APK](../../artifacts/R6/tag-music-0.6.0+18.apk)
-- [Windows ZIP](../../artifacts/R6/tag-music-windows-0.6.0+18.zip)
+- 历史产物为 Android APK 和 Windows ZIP，二进制已按收尾安排清理。
 - 构建退出0；SHA-256和检查/构建日志入口统一见[证据索引](../../artifacts/R6/library-group-batch/index.md)。
 
 ### 待确认的双端连续体验范围
@@ -298,7 +312,7 @@
 - 到期锁定当时队列条目，自然曲终先于循环、随机及优先待播推进而停止，保留队列；等待期间手动切歌停止，取消后正常切换。
 - 后台最小定向检查覆盖单调时钟累计、状态切换、各模式/FIFO与自然结束、取消/重设/销毁和陈旧回调；真实听感及后台行为不能由虚拟时钟证明。
 
-- 候选：[Android APK](../../artifacts/R6/tag-music-0.6.0+20.apk)、[Windows ZIP](../../artifacts/R6/tag-music-windows-0.6.0+20.zip)。构建退出0，哈希及完整构建入口统一见[睡眠批证据索引](../../artifacts/R6/sleep-timer-batch/index.md)。
+- 历史产物为 Android APK 和 Windows ZIP，二进制已按收尾安排清理。构建退出0，哈希及完整构建入口统一见[睡眠批证据索引](../../artifacts/R6/sleep-timer-batch/index.md)。
 
 ### 20号候选电脑人工复验范围（已启动，待反馈）
 
