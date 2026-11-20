@@ -14,6 +14,7 @@ import 'playback/playback_controller.dart';
 import 'library/library_controller.dart';
 import 'library/tags_page.dart';
 import 'library/group_pages.dart';
+import 'library/library_header.dart';
 
 class TagMusicApp extends ConsumerStatefulWidget {
   const TagMusicApp({super.key});
@@ -314,7 +315,7 @@ class _AppShellState extends ConsumerState<AppShell>
                     active: _selected == AppDestination.tags,
                     menuButton: menuButton,
                   ),
-          AppDestination.settings => const SettingsPage(),
+          AppDestination.settings => SettingsPage(menuButton: menuButton),
           AppDestination.albums || AppDestination.artists =>
             library == null || playback == null
                 ? unavailable()
@@ -360,8 +361,8 @@ class _AppShellState extends ConsumerState<AppShell>
                         child: Column(
                           children: [
                             if (!desktop &&
-                                (_selected == AppDestination.settings ||
-                                    !libraryReady))
+                                _selected != AppDestination.settings &&
+                                !libraryReady)
                               Align(
                                 alignment: Alignment.centerLeft,
                                 child: menuButton,
@@ -437,7 +438,8 @@ class _AppShellState extends ConsumerState<AppShell>
 }
 
 class SettingsPage extends ConsumerStatefulWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({this.menuButton, super.key});
+  final Widget? menuButton;
 
   @override
   ConsumerState<SettingsPage> createState() => _SettingsPageState();
@@ -465,120 +467,164 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final mode = ref.watch(themeProvider);
     final package = ref.watch(packageInfoProvider);
     final playback = ref.watch(playbackProvider);
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760),
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            Text('设置', style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: 24),
-            Text('外观', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              runSpacing: 8,
-              children: [
-                for (final option in [
-                  (ThemeMode.system, '跟随系统', Icons.brightness_auto),
-                  (ThemeMode.light, '浅色', Icons.light_mode_outlined),
-                  (ThemeMode.dark, '深色', Icons.dark_mode_outlined),
-                ])
-                  ChoiceChip(
-                    key: ValueKey('theme-${option.$1.name}'),
-                    avatar: Icon(option.$3, size: 18),
-                    label: Text(option.$2),
-                    selected: mode == option.$1,
-                    onSelected: _saving ? null : (_) => _select(option.$1),
-                  ),
-              ],
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LibraryHeader(
+          menuButton: widget.menuButton,
+          heading: Padding(
+            padding: EdgeInsetsDirectional.only(
+              start: widget.menuButton == null ? 0 : 8,
             ),
-            const SizedBox(height: 8),
-            const Text('主题会在下次启动和覆盖安装后保留。'),
-            if (playback?.documents.android == true) ...[
-              const SizedBox(height: 24),
-              TextButton.icon(
-                onPressed: playback!.openNotificationSettings,
-                icon: const Icon(Icons.notifications_outlined),
-                label: const Text('播放通知设置'),
-              ),
-            ],
-            if (ref.watch(libraryProvider) case final library?) ...[
-              const SizedBox(height: 24),
-              DirectorySettings(library: library),
-            ],
-            const SizedBox(height: 32),
-            Text('关于', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            Card(
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: package.when(
-                  loading: () => const Text('正在读取版本信息…'),
-                  error: (error, stack) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('版本信息读取失败'),
-                      TextButton(
-                        onPressed: () => ref.invalidate(packageInfoProvider),
-                        child: const Text('重试'),
-                      ),
-                    ],
-                  ),
-                  data: (info) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Tag Music'),
-                      const SizedBox(height: 8),
-                      SelectableText('版本 ${info.version}+${info.buildNumber}'),
-                      const SizedBox(height: 8),
-                      const Text('R5 · 歌单与队列'),
-                      const SizedBox(height: 12),
-                      TextButton.icon(
-                        key: const ValueKey('copy-diagnostics'),
-                        icon: const Icon(Icons.copy_outlined),
-                        label: const Text('复制诊断信息'),
-                        onPressed: () async {
-                          try {
-                            await Clipboard.setData(
-                              ClipboardData(text: diagnosticReport(info)),
-                            );
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('诊断信息已复制')),
-                              );
-                            }
-                          } catch (_) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('复制失败，请重试。')),
-                              );
-                            }
-                          }
-                        },
-                      ),
-                      TextButton(
-                        onPressed: () => showLicensePage(
-                          context: context,
-                          applicationName: 'Tag Music',
-                          applicationVersion:
-                              '${info.version}+${info.buildNumber}',
-                          applicationLegalese: '原创代码采用 MIT 许可；第三方组件保留各自许可。',
-                        ),
-                        child: const Text('开源许可'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text('音乐文件由你保管，管理数据保存在本机。'),
-          ],
+            child: Text('设置', style: theme.textTheme.titleLarge),
+          ),
         ),
-      ),
+        Expanded(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+                children: [
+                  Text('外观', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 400),
+                      child: SegmentedButton<ThemeMode>(
+                        expandedInsets: EdgeInsets.zero,
+                        showSelectedIcon: false,
+                        style: SegmentedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        segments: [
+                          for (final option in [
+                            (ThemeMode.system, '跟随系统', Icons.brightness_auto),
+                            (ThemeMode.light, '浅色', Icons.light_mode_outlined),
+                            (ThemeMode.dark, '深色', Icons.dark_mode_outlined),
+                          ])
+                            ButtonSegment(
+                              value: option.$1,
+                              icon: Icon(option.$3, size: 16),
+                              label: Text(
+                                option.$2,
+                                key: ValueKey('theme-${option.$1.name}'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                        selected: {mode},
+                        onSelectionChanged: _saving
+                            ? null
+                            : (selected) => _select(selected.single),
+                      ),
+                    ),
+                  ),
+                  if (playback?.documents.android == true) ...[
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton.icon(
+                        onPressed: playback!.openNotificationSettings,
+                        icon: const Icon(Icons.notifications_outlined),
+                        label: const Text('播放通知设置'),
+                      ),
+                    ),
+                  ],
+                  if (ref.watch(libraryProvider) case final library?) ...[
+                    const SizedBox(height: 4),
+                    DirectorySettings(library: library),
+                  ],
+                  const SizedBox(height: 12),
+                  Text('关于', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  Card(
+                    margin: EdgeInsets.zero,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      child: package.when(
+                        loading: () => const Text('正在读取版本信息…'),
+                        error: (error, stack) => Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('版本信息读取失败'),
+                            TextButton(
+                              onPressed: () =>
+                                  ref.invalidate(packageInfoProvider),
+                              child: const Text('重试'),
+                            ),
+                          ],
+                        ),
+                        data: (info) => Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SelectableText(
+                              'Tag Music · ${info.version}+${info.buildNumber}',
+                            ),
+                            Wrap(
+                              children: [
+                                TextButton.icon(
+                                  key: const ValueKey('copy-diagnostics'),
+                                  icon: const Icon(Icons.copy_outlined),
+                                  label: const Text('复制诊断信息'),
+                                  onPressed: () async {
+                                    try {
+                                      await Clipboard.setData(
+                                        ClipboardData(
+                                          text: diagnosticReport(info),
+                                        ),
+                                      );
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                              const SnackBar(
+                                                content: Text('诊断信息已复制'),
+                                              ),
+                                            );
+                                      }
+                                    } catch (_) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                              const SnackBar(
+                                                content: Text('复制失败，请重试。'),
+                                              ),
+                                            );
+                                      }
+                                    }
+                                  },
+                                ),
+                                TextButton(
+                                  onPressed: () => showLicensePage(
+                                    context: context,
+                                    applicationName: 'Tag Music',
+                                    applicationVersion:
+                                        '${info.version}+${info.buildNumber}',
+                                    applicationLegalese:
+                                        '原创代码采用 MIT 许可；第三方组件保留各自许可。',
+                                  ),
+                                  child: const Text('开源许可'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

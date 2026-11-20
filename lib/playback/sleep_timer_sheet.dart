@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -43,28 +44,32 @@ class SleepTimerStatus extends StatelessWidget {
 Future<void> showSleepTimer(
   BuildContext context,
   PlaybackController playback,
-) => showModalBottomSheet<void>(
+) => showDialog<void>(
   context: context,
-  isScrollControlled: true,
-  showDragHandle: true,
-  builder: (_) => _SleepTimerPanel(playback: playback),
+  builder: (_) => _SleepDialDialog(playback: playback),
 );
 
-class _SleepTimerPanel extends StatefulWidget {
-  const _SleepTimerPanel({required this.playback});
+class _SleepDialDialog extends StatefulWidget {
+  const _SleepDialDialog({required this.playback});
   final PlaybackController playback;
+
   @override
-  State<_SleepTimerPanel> createState() => _SleepTimerPanelState();
+  State<_SleepDialDialog> createState() => _SleepDialDialogState();
 }
 
-class _SleepTimerPanelState extends State<_SleepTimerPanel> {
-  bool _submitting = false, _choosing = false;
+class _SleepDialDialogState extends State<_SleepDialDialog> {
+  final _dialFocus = FocusNode(debugLabel: 'sleep-time-dial');
+  int _hours = 0, _minutes = 15;
+  bool _hourDial = false, _showFocus = false, _submitting = false;
   String? _error;
-  Duration _customDraft = const Duration(minutes: 15);
-  bool get _busy => _submitting || _choosing;
+
+  int get _count => _hourDial ? 13 : 60;
+  int get _value => _hourDial ? _hours : _minutes;
+  String get _unit => _hourDial ? '小时' : '分钟';
+  Duration get _duration => Duration(hours: _hours, minutes: _minutes);
 
   Future<void> _apply(Duration? duration) async {
-    if (_busy) return;
+    if (_submitting) return;
     final playback = widget.playback;
     final generation = playback.sleep.generation;
     setState(() {
@@ -78,8 +83,6 @@ class _SleepTimerPanelState extends State<_SleepTimerPanel> {
         await playback.setSleepTimer(duration);
       }
       if (!mounted) return;
-      // The controller serial lane reports errors without throwing. An unchanged
-      // generation also covers a request ignored by a disposed controller.
       if (playback.sleep.generation == generation) {
         setState(() => _error = playback.error ?? '定时尚未更新，请稍后重试。');
       } else if (ModalRoute.of(context)?.isCurrent == true) {
@@ -92,184 +95,15 @@ class _SleepTimerPanelState extends State<_SleepTimerPanel> {
     }
   }
 
-  Future<void> _custom() async {
-    if (_busy) return;
-    setState(() => _choosing = true);
-    Duration? duration;
-    try {
-      duration = await showDialog<Duration>(
-        context: context,
-        builder: (_) => _SleepDialDialog(
-          initial: _customDraft,
-          onDraftChanged: (value) => _customDraft = value,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _choosing = false);
-    }
-    if (!mounted || duration == null) return;
-    await _apply(duration);
-  }
-
-  @override
-  Widget build(BuildContext context) => SafeArea(
-    child: SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: ListenableBuilder(
-          listenable: widget.playback,
-          builder: (context, _) {
-            final sleep = widget.playback.sleep;
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('睡眠定时', style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 6),
-                Text(
-                  sleep.waitingForEnd
-                      ? '已到时间，将在当前歌曲结束后停止。切换歌曲会停止播放；取消定时后可继续切换。'
-                      : sleep.active
-                      ? sleepTimerProgressLabel(widget.playback)
-                      : '按实际播放时间计时，暂停或缓冲时不计。到时间后播完当前歌曲再停止。',
-                ),
-                if (sleep.active && !sleep.waitingForEnd) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.playback.sleepCounting
-                        ? '正在按实际播放时间累计。选择新时长会重新开始计时；暂停和缓冲时不计时。'
-                        : '当前未累计，恢复实际播放后继续。选择新时长会重新开始计时；暂停和缓冲时不计时。',
-                  ),
-                ],
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final minutes in [15, 30, 45, 60])
-                      FilledButton.tonal(
-                        onPressed: _busy
-                            ? null
-                            : () => _apply(Duration(minutes: minutes)),
-                        child: Text('$minutes 分钟'),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                OutlinedButton(
-                  onPressed: _busy ? null : _custom,
-                  child: const Text('自定义时间'),
-                ),
-                if (sleep.active)
-                  TextButton(
-                    onPressed: _busy ? null : () => _apply(null),
-                    child: const Text('取消定时'),
-                  ),
-                if (_submitting)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Semantics(
-                      liveRegion: true,
-                      child: const Text('正在更新定时…', textAlign: TextAlign.center),
-                    ),
-                  ),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Semantics(
-                      liveRegion: true,
-                      child: Text(
-                        _error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
-      ),
-    ),
-  );
-}
-
-class _SleepDialDialog extends StatefulWidget {
-  const _SleepDialDialog({required this.initial, required this.onDraftChanged});
-  final Duration initial;
-  final ValueChanged<Duration> onDraftChanged;
-  @override
-  State<_SleepDialDialog> createState() => _SleepDialDialogState();
-}
-
-class _SleepDialDialogState extends State<_SleepDialDialog> {
-  final _dialFocus = FocusNode(debugLabel: 'sleep-time-dial');
-  late final TextEditingController _hoursInput, _minutesInput;
-  late int _hours, _minutes;
-  bool _hourDial = false, _showFocus = false;
-  int get _count => _hourDial ? 13 : 60;
-  int get _value => _hourDial ? _hours : _minutes;
-  String get _unit => _hourDial ? '小时' : '分钟';
-
-  @override
-  void initState() {
-    super.initState();
-    _hours = widget.initial.inHours;
-    _minutes = widget.initial.inMinutes % 60;
-    _hoursInput = TextEditingController(text: '$_hours');
-    _minutesInput = TextEditingController(text: '$_minutes');
-  }
-
-  String? _inputError(bool hours) {
-    final value = int.tryParse((hours ? _hoursInput : _minutesInput).text);
-    if (value == null) return '请输入${hours ? '小时' : '分钟'}';
-    if (value < 0 || value > (hours ? 12 : 59)) {
-      return hours ? '小时应为0～12' : '分钟应为0～59';
-    }
-    return null;
-  }
-
-  bool get _valid => _inputError(true) == null && _inputError(false) == null;
-  Duration get _duration => Duration(hours: _hours, minutes: _minutes);
-
-  void _edited(bool hours, String text) {
-    setState(() {
-      final value = int.tryParse(text) ?? 0;
-      if (hours) {
-        _hours = value.clamp(0, 12);
-        _hourDial = true;
-      } else {
-        _minutes = value.clamp(0, 59);
-        _hourDial = false;
-      }
-    });
-    if (_valid) widget.onDraftChanged(_duration);
-  }
-
-  void _submit() {
-    if (_valid && _duration > Duration.zero) Navigator.pop(context, _duration);
-  }
-
-  @override
-  void dispose() {
-    _dialFocus.dispose();
-    _hoursInput.dispose();
-    _minutesInput.dispose();
-    super.dispose();
-  }
-
   void _set(int value) {
+    if (_submitting) return;
     setState(() {
       if (_hourDial) {
         _hours = value.clamp(0, 12);
-        _hoursInput.text = '$_hours';
       } else {
         _minutes = value.clamp(0, 59);
-        _minutesInput.text = '$_minutes';
       }
     });
-    if (_valid) widget.onDraftChanged(_duration);
   }
 
   void _point(Offset point, double side) {
@@ -280,189 +114,174 @@ class _SleepDialDialogState extends State<_SleepDialDialog> {
     _set((angle * _count / (2 * math.pi)).round() % _count);
   }
 
-  @override
-  Widget build(BuildContext context) => CompactAlertDialog(
-    title: const Text('自定义睡眠时间'),
-    content: SizedBox(
-      width: 300,
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _valid ? '$_hours 小时 $_minutes 分钟' : '请填写有效的小时与分钟',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium,
+  Widget _dial(BuildContext context, double side) => Semantics(
+    label: '${_unit}圆盘',
+    value: '$_value $_unit',
+    increasedValue: _value < _count - 1 ? '${_value + 1} $_unit' : null,
+    decreasedValue: _value > 0 ? '${_value - 1} $_unit' : null,
+    onIncrease: _value < _count - 1 ? () => _set(_value + 1) : null,
+    onDecrease: _value > 0 ? () => _set(_value - 1) : null,
+    child: CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
+            _set(_value + 1),
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+            _set(_value + 1),
+        const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
+            _set(_value - 1),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+            _set(_value - 1),
+        const SingleActivator(LogicalKeyboardKey.home): () => _set(0),
+        const SingleActivator(LogicalKeyboardKey.end): () => _set(_count - 1),
+      },
+      child: FocusableActionDetector(
+        focusNode: _dialFocus,
+        onShowFocusHighlight: (value) => setState(() => _showFocus = value),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          dragStartBehavior: DragStartBehavior.down,
+          onTapUp: (event) {
+            _dialFocus.requestFocus();
+            _point(event.localPosition, side);
+          },
+          onPanStart: (event) {
+            _dialFocus.requestFocus();
+            _point(event.localPosition, side);
+          },
+          onPanUpdate: (event) => _point(event.localPosition, side),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: _showFocus
+                  ? Border.all(color: Theme.of(context).colorScheme.primary)
+                  : null,
             ),
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final hours in [true, false]) ...[
-                  if (!hours) const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      key: ValueKey(
-                        hours ? 'sleep-hours-input' : 'sleep-minutes-input',
-                      ),
-                      controller: hours ? _hoursInput : _minutesInput,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(2),
-                      ],
-                      textInputAction: hours
-                          ? TextInputAction.next
-                          : TextInputAction.done,
-                      onChanged: (value) => _edited(hours, value),
-                      onSubmitted: hours ? null : (_) => _submit(),
-                      decoration: InputDecoration(
-                        labelText: hours ? '小时' : '分钟',
-                        helperText: hours ? '0～12' : '0～59',
-                        errorText: _inputError(hours),
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+            child: CustomPaint(
+              size: Size.square(side),
+              painter: _SleepDialPainter(
+                count: _count,
+                selected: _value,
+                scheme: Theme.of(context).colorScheme,
+                textScaler: MediaQuery.textScalerOf(context),
+              ),
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                ChoiceChip(
-                  label: const Text('选择小时'),
-                  selected: _hourDial,
-                  onSelected: (_) => setState(() => _hourDial = true),
-                ),
-                ChoiceChip(
-                  label: const Text('选择分钟'),
-                  selected: !_hourDial,
-                  onSelected: (_) => setState(() => _hourDial = false),
-                ),
-              ],
-            ),
-            Text(_hourDial ? '小时 · 0～12' : '分钟 · 0～59'),
-            const SizedBox(height: 8),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final side = math.min(280.0, constraints.maxWidth);
-                return Semantics(
-                  label: _hourDial ? '小时圆盘' : '分钟圆盘',
-                  value: '$_value $_unit',
-                  increasedValue: _value < _count - 1
-                      ? '${_value + 1} $_unit'
-                      : null,
-                  decreasedValue: _value > 0 ? '${_value - 1} $_unit' : null,
-                  onIncrease: _value < _count - 1
-                      ? () => _set(_value + 1)
-                      : null,
-                  onDecrease: _value > 0 ? () => _set(_value - 1) : null,
-                  child: CallbackShortcuts(
-                    bindings: {
-                      const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
-                          _set(_value + 1),
-                      const SingleActivator(
-                        LogicalKeyboardKey.arrowRight,
-                      ): () =>
-                          _set(_value + 1),
-                      const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
-                          _set(_value - 1),
-                      const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-                          _set(_value - 1),
-                      const SingleActivator(LogicalKeyboardKey.home): () =>
-                          _set(0),
-                      const SingleActivator(LogicalKeyboardKey.end): () =>
-                          _set(_count - 1),
-                    },
-                    child: FocusableActionDetector(
-                      autofocus: true,
-                      focusNode: _dialFocus,
-                      onShowFocusHighlight: (value) =>
-                          setState(() => _showFocus = value),
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTapDown: (event) {
-                          _dialFocus.requestFocus();
-                          _point(event.localPosition, side);
-                        },
-                        onPanStart: (event) {
-                          _dialFocus.requestFocus();
-                          _point(event.localPosition, side);
-                        },
-                        onPanUpdate: (event) =>
-                            _point(event.localPosition, side),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              width: 2,
-                              color: _showFocus
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Colors.transparent,
-                            ),
-                          ),
-                          child: CustomPaint(
-                            size: Size.square(side),
-                            painter: _SleepDialPainter(
-                              count: _count,
-                              selected: _value,
-                              scheme: Theme.of(context).colorScheme,
-                              textScaler: MediaQuery.textScalerOf(context),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                IconButton.outlined(
-                  tooltip: '减少1$_unit',
-                  onPressed: _value == 0 ? null : () => _set(_value - 1),
-                  icon: const Icon(Icons.remove),
-                ),
-                Expanded(
-                  child: Text('$_value $_unit', textAlign: TextAlign.center),
-                ),
-                IconButton.outlined(
-                  tooltip: '增加1$_unit',
-                  onPressed: _value == _count - 1
-                      ? null
-                      : () => _set(_value + 1),
-                  icon: const Icon(Icons.add),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _valid && _duration == Duration.zero
-                  ? '时长必须大于0。请填写时间或转动圆盘。'
-                  : '可直接输入或转动圆盘。切换单位保留选择，最长12小时59分钟。',
-              textAlign: TextAlign.center,
-            ),
-          ],
+          ),
         ),
       ),
     ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('返回'),
-      ),
-      FilledButton(
-        onPressed: !_valid || _duration == Duration.zero ? null : _submit,
-        child: const Text('开始计时'),
-      ),
-    ],
   );
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: widget.playback,
+    builder: (context, _) {
+      final playback = widget.playback;
+      return CompactAlertDialog(
+        title: const Text('睡眠定时'),
+        scrollable: true,
+        content: SizedBox(
+          width: 264,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 6,
+                children: [
+                  for (final minutes in [15, 30, 45, 60])
+                    Tooltip(
+                      message: '$minutes 分钟',
+                      child: FilledButton.tonal(
+                        style: FilledButton.styleFrom(
+                          shape: const CircleBorder(),
+                          minimumSize: const Size.square(44),
+                          padding: const EdgeInsets.all(6),
+                        ),
+                        onPressed: _submitting
+                            ? null
+                            : () => _apply(Duration(minutes: minutes)),
+                        child: Text('$minutes'),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _hours == 0 ? '$_minutes 分钟' : '$_hours 小时 $_minutes 分钟',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              LayoutBuilder(
+                builder: (context, constraints) => Stack(
+                  alignment: Alignment.topCenter,
+                  fit: StackFit.passthrough,
+                  children: [
+                    Center(
+                      child: _dial(
+                        context,
+                        math.min(216, constraints.maxWidth),
+                      ),
+                    ),
+                    PositionedDirectional(
+                      top: 0,
+                      end: 0,
+                      child: IconButton.filledTonal(
+                        tooltip: _hourDial ? '切换到分钟' : '切换到小时',
+                        onPressed: _submitting
+                            ? null
+                            : () => setState(() => _hourDial = !_hourDial),
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size.square(36),
+                          padding: EdgeInsets.zero,
+                        ),
+                        icon: Text(_hourDial ? 'H' : 'S'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (playback.sleep.active)
+                Text(sleepTimerProgressLabel(playback)),
+              if (_submitting) const LinearProgressIndicator(),
+              if (_error case final error?)
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    error,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          if (playback.sleep.active)
+            TextButton(
+              onPressed: _submitting ? null : () => _apply(null),
+              child: const Text('取消定时'),
+            )
+          else
+            TextButton(
+              onPressed: _submitting ? null : () => Navigator.pop(context),
+              child: const Text('关闭'),
+            ),
+          FilledButton(
+            onPressed: _submitting || _duration == Duration.zero
+                ? null
+                : () => _apply(_duration),
+            child: const Text('开始计时'),
+          ),
+        ],
+      );
+    },
+  );
+
+  @override
+  void dispose() {
+    _dialFocus.dispose();
+    super.dispose();
+  }
 }
 
 class _SleepDialPainter extends CustomPainter {
@@ -489,7 +308,10 @@ class _SleepDialPainter extends CustomPainter {
           Offset(math.cos(angle), math.sin(angle)) * (radius * fraction);
     }
 
-    final selectedPoint = point(selected, .78);
+    final selectedPoint = point(
+      selected,
+      count == 60 && selected % 5 != 0 ? .47 : .78,
+    );
     canvas.drawLine(
       center,
       selectedPoint,
@@ -497,18 +319,10 @@ class _SleepDialPainter extends CustomPainter {
         ..color = scheme.primary
         ..strokeWidth = 2,
     );
-    canvas.drawCircle(selectedPoint, 19, Paint()..color = scheme.primary);
-    canvas.drawCircle(center, 4, Paint()..color = scheme.primary);
+    canvas.drawCircle(selectedPoint, 15, Paint()..color = scheme.primary);
+    canvas.drawCircle(center, 3, Paint()..color = scheme.primary);
     for (var i = 0; i < count; i++) {
-      final labelled = count == 13 || i % 5 == 0 || i == selected;
-      if (!labelled) {
-        canvas.drawCircle(
-          point(i, .78),
-          1,
-          Paint()..color = scheme.onSurfaceVariant,
-        );
-        continue;
-      }
+      if (count == 60 && i % 5 != 0 && i != selected) continue;
       final label = TextPainter(
         text: TextSpan(
           text: '$i',
@@ -522,7 +336,8 @@ class _SleepDialPainter extends CustomPainter {
       )..layout();
       label.paint(
         canvas,
-        point(i, .78) - Offset(label.width / 2, label.height / 2),
+        (i == selected ? selectedPoint : point(i, .78)) -
+            Offset(label.width / 2, label.height / 2),
       );
       label.dispose();
     }

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/gestures.dart' show PointerEvent;
+import 'package:flutter/gestures.dart' show PointerDeviceKind, PointerEvent;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -231,7 +231,6 @@ class FullPlayer extends ConsumerWidget {
         final actions = PlayerActions(
           playback: playback,
           library: library,
-          toggleLayout: playback.toggleLayout,
           openLyrics: () => Navigator.push<void>(
             context,
             MaterialPageRoute(
@@ -240,7 +239,6 @@ class FullPlayer extends ConsumerWidget {
             ),
           ),
         );
-        Widget more() => PlayerActionsButton(actions: actions);
         return CallbackShortcuts(
           bindings: {
             const SingleActivator(LogicalKeyboardKey.escape): () =>
@@ -252,8 +250,11 @@ class FullPlayer extends ConsumerWidget {
               extendBodyBehindAppBar: true,
               appBar: AppBar(
                 backgroundColor: Colors.transparent,
-                title: simple ? null : const Text('正在播放'),
-                actions: [more()],
+                titleSpacing: 4,
+                title: playback.current == null
+                    ? null
+                    : _PlayerHeading(playback: playback),
+                actions: [PlayerActionsButton(actions: actions)],
               ),
               body: GestureDetector(
                 onSecondaryTapUp: (details) => unawaited(
@@ -269,7 +270,6 @@ class FullPlayer extends ConsumerWidget {
                       playback: playback,
                       library: library,
                       simple: simple,
-                      more: more(),
                     ),
                   ),
                 ),
@@ -282,17 +282,53 @@ class FullPlayer extends ConsumerWidget {
   }
 }
 
+class _PlayerHeading extends StatelessWidget {
+  const _PlayerHeading({required this.playback});
+  final PlaybackController playback;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(
+        scrollbars: false,
+        dragDevices: {
+          ...ScrollConfiguration.of(context).dragDevices,
+          PointerDeviceKind.mouse,
+        },
+      ),
+      child: SingleChildScrollView(
+        key: ValueKey(playback.queue.current?.entryId),
+        scrollDirection: Axis.horizontal,
+        child: Text.rich(
+          TextSpan(
+            text: playbackTitle(playback),
+            children: [
+              TextSpan(
+                text: '  ·  ${playbackArtist(playback)}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          maxLines: 1,
+          style: theme.textTheme.titleMedium,
+        ),
+      ),
+    );
+  }
+}
+
 class _PlayerBody extends StatelessWidget {
   const _PlayerBody({
     required this.playback,
     required this.library,
     required this.simple,
-    required this.more,
   });
   final PlaybackController playback;
   final LibraryController? library;
   final bool simple;
-  final Widget more;
 
   Widget _artwork(BuildContext context, double size) {
     final current = playback.current;
@@ -331,32 +367,6 @@ class _PlayerBody extends StatelessWidget {
       ),
     );
   }
-
-  Widget _heading(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Tooltip(
-        message: playbackTitle(playback),
-        child: Text(
-          playbackTitle(playback),
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
-      ),
-      const SizedBox(height: 6),
-      Tooltip(
-        message: playbackArtist(playback),
-        child: Text(
-          playbackArtist(playback),
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-    ],
-  );
 
   Widget _empty(BuildContext context) => Center(
     child: SingleChildScrollView(
@@ -409,23 +419,13 @@ class _PlayerBody extends StatelessWidget {
   Widget _controls(BuildContext context) => Column(
     mainAxisSize: MainAxisSize.min,
     children: [
-      if (!simple) ...[
-        PlaybackActivity(playback: playback),
-        PlayerSeek(playback: playback),
-      ],
+      if (!simple) PlayerSeek(playback: playback),
       PlaybackControls(
         playback: playback,
         onToggleLayout: playback.toggleLayout,
-      ),
-      if (!simple) ...[
-        const SizedBox(height: 16),
-        Wrap(
-          alignment: WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 8,
-          runSpacing: 4,
-          children: [
-            PlaybackModeButton(playback: playback),
+        leading: simple ? null : PlaybackModeButton(playback: playback),
+        trailing: [
+          if (!simple) ...[
             IconButton(
               tooltip: playback.sleep.active ? '睡眠定时已开启' : '睡眠定时',
               icon: Icon(
@@ -438,9 +438,10 @@ class _PlayerBody extends StatelessWidget {
               icon: const Icon(Icons.queue_music),
               onPressed: () => showPlaybackQueue(context, playback, library),
             ),
-            more,
           ],
-        ),
+        ],
+      ),
+      if (!simple) ...[
         if (playback.sleep.active) SleepTimerStatus(playback: playback),
         PlaybackFeedback(playback: playback),
       ],
@@ -451,15 +452,15 @@ class _PlayerBody extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       if (playback.current == null) return _empty(context);
-      final horizontalPadding = constraints.maxWidth < 360 ? 16.0 : 32.0;
+      final horizontalPadding = constraints.maxWidth < 360 ? 12.0 : 16.0;
       final width = math.max(0.0, constraints.maxWidth - horizontalPadding * 2);
       final wide = !simple && width >= 760;
       final target = wide
-          ? math.min(width * .44, constraints.maxHeight - 48)
-          : constraints.maxHeight * (simple ? .62 : .45);
+          ? math.min(width * .44, constraints.maxHeight - 20)
+          : constraints.maxHeight - (simple ? 70 : 138);
       final coverSize = math.min(
         width,
-        math.min(440.0, math.max(96.0, target)),
+        math.min(500.0, math.max(96.0, target)),
       );
       final artwork = _artwork(context, coverSize);
       final controls = _controls(context);
@@ -469,7 +470,7 @@ class _PlayerBody extends StatelessWidget {
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: horizontalPadding,
-              vertical: 24,
+              vertical: 8,
             ),
             child: Center(
               child: ConstrainedBox(
@@ -479,29 +480,16 @@ class _PlayerBody extends StatelessWidget {
                         key: const ValueKey('player-wide-layout'),
                         children: [
                           Expanded(child: Center(child: artwork)),
-                          const SizedBox(width: 32),
-                          Expanded(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _heading(context),
-                                const SizedBox(height: 24),
-                                controls,
-                              ],
-                            ),
-                          ),
+                          const SizedBox(width: 24),
+                          Expanded(child: controls),
                         ],
                       )
                     : Column(
                         key: const ValueKey('player-stacked-layout'),
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (!simple) ...[
-                            _heading(context),
-                            const SizedBox(height: 24),
-                          ],
                           artwork,
-                          const SizedBox(height: 28),
+                          const SizedBox(height: 8),
                           controls,
                         ],
                       ),
@@ -536,15 +524,17 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
   TextDirection? _direction;
   Locale? _locale;
   bool _boldText = false;
+  static const _linePadding = EdgeInsets.symmetric(horizontal: 8, vertical: 8);
+  static const _translationGap = 3.0;
   static const _original = TextStyle(
-    fontSize: 26,
-    fontWeight: FontWeight.w300,
-    height: 1.5,
+    fontSize: 20,
+    fontWeight: FontWeight.w600,
+    height: 1.28,
   );
   static const _translation = TextStyle(
-    fontSize: 18,
-    fontWeight: FontWeight.w300,
-    height: 1.5,
+    fontSize: 15,
+    fontWeight: FontWeight.w500,
+    height: 1.3,
   );
   @override
   void initState() {
@@ -637,7 +627,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
     _heights = [];
     var offset = 0.0;
     for (final line in lyrics.lines) {
-      var height = 32.0;
+      var height = _linePadding.vertical;
       for (var i = 0; i < line.texts.length; i++) {
         final painter = TextPainter(
           text: TextSpan(text: line.texts[i], style: _lineStyle(i)),
@@ -646,7 +636,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
           locale: locale,
           textHeightBehavior: const ui.TextHeightBehavior(),
         )..layout(maxWidth: width);
-        height += painter.height + (i == 0 ? 0 : 6);
+        height += painter.height + (i == 0 ? 0 : _translationGap);
         painter.dispose();
       }
       _offsets.add(offset);
@@ -667,12 +657,15 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
     final entryId = playback.queue.current?.entryId;
     final seekEnabled = entryId != null && playback.canSeek;
     final active = lyrics.indexAt(playback.player.state.position);
-    final padding = math.max(24.0, (constraints.maxWidth - 720) / 2);
+    final padding = math.max(12.0, (constraints.maxWidth - 720) / 2);
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
     _metrics(
       context,
       lyrics,
-      math.max(0.0, constraints.maxWidth - padding * 2),
+      math.max(
+        0.0,
+        constraints.maxWidth - padding * 2 - _linePadding.horizontal,
+      ),
       MediaQuery.textScalerOf(context),
     );
     if (_viewportHeight != constraints.maxHeight) {
@@ -720,7 +713,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
           Colors.black,
           Colors.transparent,
         ],
-        stops: [0, .12, .83, 1],
+        stops: [0, .06, .91, 1],
       ).createShader(rect),
       child: NotificationListener<ScrollStartNotification>(
         onNotification: (notice) {
@@ -737,7 +730,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
               controller: _scroll,
               padding: EdgeInsets.fromLTRB(
                 padding,
-                constraints.maxHeight * .30,
+                constraints.maxHeight * .25,
                 padding,
                 constraints.maxHeight * .65,
               ),
@@ -776,36 +769,42 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
                   label:
                       '${line.texts.join('，')}，${formatPosition(Duration(milliseconds: line.milliseconds))}',
                   child: ExcludeSemantics(
-                    child: InkWell(
-                      onTap: seekEnabled ? seekLine : null,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: AnimatedOpacity(
-                          duration: reducedMotion
-                              ? Duration.zero
-                              : const Duration(milliseconds: 250),
-                          opacity: alpha,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              for (var i = 0; i < line.texts.length; i++)
-                                Padding(
-                                  padding: EdgeInsets.only(top: i == 0 ? 0 : 6),
-                                  child: Text(
-                                    line.texts[i],
-                                    locale: _locale,
-                                    textAlign: TextAlign.start,
-                                    textHeightBehavior:
-                                        const ui.TextHeightBehavior(),
-                                    style: _lineStyle(i).copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurface,
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: seekEnabled ? seekLine : null,
+                        child: Padding(
+                          padding: _linePadding,
+                          child: AnimatedOpacity(
+                            duration: reducedMotion
+                                ? Duration.zero
+                                : const Duration(milliseconds: 250),
+                            opacity: alpha,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                for (var i = 0; i < line.texts.length; i++)
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      top: i == 0 ? 0 : _translationGap,
+                                    ),
+                                    child: Text(
+                                      line.texts[i],
+                                      locale: _locale,
+                                      textAlign: TextAlign.start,
+                                      textHeightBehavior:
+                                          const ui.TextHeightBehavior(),
+                                      style: _lineStyle(i).copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
+                                      ),
                                     ),
                                   ),
-                                ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),

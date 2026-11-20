@@ -17,50 +17,25 @@ const playbackModeNames = {
   PlaybackMode.shuffle: '随机播放',
 };
 
-/// A full-size choice surface for places without a dedicated mode button.
-Future<void> showPlaybackModeChooser(
-  BuildContext context,
-  PlaybackController playback,
-) async {
-  final mode = await showDialog<PlaybackMode>(
-    context: context,
-    builder: (dialogContext) => SimpleDialog(
-      title: const Text('播放模式'),
-      titlePadding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      contentPadding: const EdgeInsets.only(bottom: 4),
-      children: [
-        for (final mode in PlaybackMode.values)
-          ListenableBuilder(
-            listenable: playback,
-            builder: (_, _) => ListTile(
-              dense: true,
-              title: Text(playbackModeNames[mode]!),
-              selected: mode == playback.queue.mode,
-              trailing: mode == playback.queue.mode
-                  ? const Icon(Icons.check)
-                  : null,
-              onTap: () => Navigator.pop(dialogContext, mode),
-            ),
-          ),
-      ],
-    ),
-  );
-  if (mode != null) await playback.setMode(mode);
-}
-
 class PlaybackControls extends StatelessWidget {
   const PlaybackControls({
     required this.playback,
     this.onToggleLayout,
+    this.leading,
+    this.trailing = const [],
     super.key,
   });
   final PlaybackController playback;
   final VoidCallback? onToggleLayout;
+  final Widget? leading;
+  final List<Widget> trailing;
 
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisAlignment: MainAxisAlignment.center,
+  Widget build(BuildContext context) => Wrap(
+    alignment: WrapAlignment.center,
+    crossAxisAlignment: WrapCrossAlignment.center,
     children: [
+      ?leading,
       IconButton(
         tooltip: '上一首',
         onPressed: playback.canPrevious ? playback.previous : null,
@@ -72,6 +47,7 @@ class PlaybackControls extends StatelessWidget {
         onPressed: playback.canNext ? playback.next : null,
         icon: const Icon(Icons.skip_next),
       ),
+      ...trailing,
     ],
   );
 }
@@ -81,37 +57,47 @@ class PlaybackModeButton extends StatelessWidget {
   final PlaybackController playback;
 
   @override
-  Widget build(BuildContext context) => PopupMenuButton<PlaybackMode>(
-    key: const ValueKey('playback-mode'),
-    tooltip: '播放模式',
-    initialValue: playback.queue.mode,
-    onSelected: playback.setMode,
-    itemBuilder: (_) => [
-      for (final mode in PlaybackMode.values)
-        CheckedPopupMenuItem(
-          key: ValueKey('playback-mode-${mode.name}'),
-          value: mode,
-          checked: mode == playback.queue.mode,
-          child: Text(playbackModeNames[mode]!),
-        ),
-    ],
-    child: Padding(
-      padding: const EdgeInsets.all(12),
-      child: Text(playbackModeNames[playback.queue.mode]!),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final mode = playback.queue.mode;
+    return IconButton(
+      key: const ValueKey('playback-mode'),
+      tooltip: playbackModeNames[mode],
+      icon: Icon(switch (mode) {
+        PlaybackMode.sequential => Icons.format_list_numbered,
+        PlaybackMode.repeatAll => Icons.repeat,
+        PlaybackMode.repeatOne => Icons.repeat_one,
+        PlaybackMode.shuffle => Icons.shuffle,
+      }),
+      onPressed: () {
+        final modes = PlaybackMode.values;
+        playback.setMode(modes[(playback.queue.mode.index + 1) % modes.length]);
+      },
+    );
+  }
 }
 
 Future<void> showPlaybackQueue(
   BuildContext context,
   PlaybackController playback,
   LibraryController? library,
-) => showDialog<void>(
+) => showGeneralDialog<void>(
   context: context,
-  builder: (_) => Dialog.fullscreen(
+  transitionDuration: MediaQuery.disableAnimationsOf(context)
+      ? Duration.zero
+      : const Duration(milliseconds: 260),
+  pageBuilder: (_, _, _) => Dialog.fullscreen(
     child: SafeArea(
       child: QueuePage(playback: playback, library: library),
     ),
+  ),
+  transitionBuilder: (_, animation, _, child) => SlideTransition(
+    position: animation.drive(
+      Tween(
+        begin: const Offset(0, 1),
+        end: Offset.zero,
+      ).chain(CurveTween(curve: Curves.easeOutCubic)),
+    ),
+    child: child,
   ),
 );
 

@@ -103,10 +103,7 @@ class LibraryPage extends StatelessWidget {
               ),
               IconButton(
                 tooltip: '刷新所有目录',
-                onPressed:
-                    library.scanning ||
-                        library.choosing ||
-                        library.roots.isEmpty
+                onPressed: library.directoryBusy || library.roots.isEmpty
                     ? null
                     : () => library.scan(),
                 icon: const Icon(Icons.refresh),
@@ -180,9 +177,7 @@ class DirectorySettings extends StatelessWidget {
           children: [
             FilledButton.icon(
               key: const ValueKey('choose-directory'),
-              onPressed: library.scanning || library.choosing
-                  ? null
-                  : library.chooseDirectory,
+              onPressed: library.directoryBusy ? null : library.chooseDirectory,
               icon: const Icon(Icons.create_new_folder_outlined),
               label: const Text('添加文件夹'),
             ),
@@ -205,9 +200,18 @@ Future<void> showDirectoryManager(
 ) => showDialog<void>(
   context: context,
   builder: (context) => CompactAlertDialog(
-    title: const Text('音乐目录'),
+    title: Row(
+      children: [
+        const Expanded(child: Text('音乐目录')),
+        IconButton(
+          tooltip: '关闭',
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.close),
+        ),
+      ],
+    ),
     content: SizedBox(
-      width: 520,
+      width: 380,
       child: ListenableBuilder(
         listenable: library,
         builder: (context, _) => library.roots.isEmpty
@@ -217,32 +221,94 @@ Future<void> showDirectoryManager(
                 padding: EdgeInsets.zero,
                 children: [
                   for (final root in library.roots)
-                    ListTile(
-                      dense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                      title: Text(
-                        root.location,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(root.status),
-                      trailing: IconButton(
-                        tooltip: '刷新该目录',
-                        onPressed: library.scanning || library.choosing
-                            ? null
-                            : () => library.scan([root.location]),
-                        icon: const Icon(Icons.refresh),
-                      ),
+                    _DirectoryRow(
+                      key: ValueKey(root.location),
+                      library: library,
+                      location: root.location,
+                      status: root.accessible ? root.status : '目录不可访问',
                     ),
                 ],
               ),
       ),
     ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('关闭'),
-      ),
-    ],
   ),
 );
+
+class _DirectoryRow extends StatefulWidget {
+  const _DirectoryRow({
+    required this.library,
+    required this.location,
+    required this.status,
+    super.key,
+  });
+  final LibraryController library;
+  final String location, status;
+
+  @override
+  State<_DirectoryRow> createState() => _DirectoryRowState();
+}
+
+class _DirectoryRowState extends State<_DirectoryRow> {
+  late final _name = widget.library.documents.directoryName(widget.location);
+
+  Future<void> _confirmRemoval(String name) async {
+    final remove = await showDialog<bool>(
+      context: context,
+      builder: (context) => CompactAlertDialog(
+        title: const Text('移除音乐目录？'),
+        content: Text('将「$name」从曲库移除。音乐文件、标签和歌单记录会保留。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('移除'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || remove != true) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (!await widget.library.removeDirectory(widget.location)) {
+      messenger?.showSnackBar(const SnackBar(content: Text('目录未能移除，请稍后重试。')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder(
+    future: _name,
+    builder: (context, snapshot) {
+      final name = snapshot.data ?? (snapshot.hasError ? '无法读取名称' : '正在读取名称…');
+      final enabled = !widget.library.directoryBusy;
+      return ListTile(
+        dense: true,
+        contentPadding: EdgeInsets.zero,
+        title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text(
+          widget.status,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: '刷新该目录',
+              onPressed: enabled
+                  ? () => widget.library.scan([widget.location])
+                  : null,
+              icon: const Icon(Icons.refresh, size: 20),
+            ),
+            IconButton(
+              tooltip: '移除该目录',
+              onPressed: enabled ? () => _confirmRemoval(name) : null,
+              icon: const Icon(Icons.delete_outline, size: 20),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}

@@ -156,6 +156,27 @@ class DocumentAccess {
     return root;
   }
 
+  Future<void> forgetDirectory(String root) async {
+    final saved = await roots();
+    if (saved.contains(root)) {
+      await _preferences.setStringList(
+        _rootsKey,
+        saved.where((location) => location != root).toList(),
+      );
+    }
+  }
+
+  Future<String> directoryName(String root) async {
+    if (!android) {
+      final name = p.basename(p.normalize(root));
+      return name.isEmpty ? '磁盘根目录' : name;
+    }
+    final name = await channel.invokeMethod<String>('directoryName', {
+      'uri': root,
+    });
+    return name?.trim().isNotEmpty == true ? name! : '无法读取名称';
+  }
+
   Future<List<ProbeTrack>> list(String root) async {
     if (android) {
       final rows = await channel.invokeListMethod<Map<Object?, Object?>>(

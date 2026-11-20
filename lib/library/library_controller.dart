@@ -146,6 +146,7 @@ class LibraryController extends ChangeNotifier {
   bool showMissing = true;
   bool scanning = false;
   bool choosing = false;
+  bool get directoryBusy => scanning || choosing || _removeTask != null;
   bool _cancelled = false;
   bool _closed = false;
   int discovered = 0;
@@ -153,6 +154,7 @@ class LibraryController extends ChangeNotifier {
   String? scanningRoot;
   String? message;
   Future<void>? _scanTask;
+  Future<bool>? _removeTask;
   List<LibraryTrack>? _visibleCache;
 
   List<LibraryTrack> get visible {
@@ -265,7 +267,7 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> initialize() async {
-    // Import R1 directory bookmarks once; no audio is opened at startup.
+    // Import legacy directory bookmarks; no audio is opened at startup.
     for (final root in await documents.roots()) {
       await _addRoot(root);
     }
@@ -526,7 +528,7 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> chooseDirectory() async {
-    if (scanning || choosing) return;
+    if (_closed || directoryBusy) return;
     choosing = true;
     _publish();
     String? root;
@@ -545,6 +547,43 @@ class LibraryController extends ChangeNotifier {
     if (root != null) await scan([root]);
   }
 
+  Future<bool> removeDirectory(String root) {
+    if (_closed ||
+        directoryBusy ||
+        !roots.any((directory) => directory.location == root)) {
+      return Future.value(false);
+    }
+    final task = _removeDirectory(root);
+    _removeTask = task;
+    _publish();
+    return task;
+  }
+
+  Future<bool> _removeDirectory(String root) async {
+    try {
+      // Clear the legacy bookmark first so initialization cannot reimport it.
+      // The database still holds the directory if the transaction fails.
+      await documents.forgetDirectory(root);
+      await db.transaction(() async {
+        await (db.delete(
+          db.songLocations,
+        )..where((row) => row.root.equals(root))).go();
+        await (db.delete(
+          db.libraryRoots,
+        )..where((row) => row.location.equals(root))).go();
+      });
+      message = null;
+      await reload();
+      return true;
+    } catch (_) {
+      message = '目录列表更新失败，请重试。';
+      return false;
+    } finally {
+      _removeTask = null;
+      _publish();
+    }
+  }
+
   void cancelScan() {
     if (scanning) {
       _cancelled = true;
@@ -554,7 +593,7 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> scan([List<String>? selected]) {
-    if (scanning || choosing) return Future.value();
+    if (_closed || directoryBusy) return Future.value();
     return _scanTask = _scan(selected ?? roots.map((r) => r.location).toList());
   }
 
@@ -678,13 +717,13 @@ class LibraryController extends ChangeNotifier {
     } catch (e) {
       message = '扫描失败，已保留原曲库：$e';
     } finally {
-      scanning = false;
       scanningRoot = null;
       try {
         await reload();
       } catch (e) {
         message = '曲库读取失败，扫描已停止：$e';
       }
+      scanning = false;
       _publish();
     }
   }
@@ -693,6 +732,7 @@ class LibraryController extends ChangeNotifier {
     _closed = true;
     _cancelled = true;
     await _scanTask;
+    await _removeTask;
     await _filterWrites;
     await db.close();
     super.dispose();

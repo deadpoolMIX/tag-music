@@ -77,6 +77,7 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                             }
                             "nextScan" -> requireNotNull(scans[call.argument<Int>("token")]).next()
                             "endScan" -> { scans.remove(call.argument<Int>("token"))?.close(); null }
+                            "directoryName" -> directoryName(Uri.parse(requireNotNull(call.argument<String>("uri"))))
                             "list" -> list(Uri.parse(requireNotNull(call.argument<String>("uri"))))
                             "findLyrics" -> findLyrics(Uri.parse(requireNotNull(call.argument<String>("uri"))), lyricRequest)?.toString()
                             "readLyrics" -> {
@@ -148,6 +149,16 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
             pending.error("permission", e.message, null)
         }
         return true
+    }
+
+    private fun directoryName(tree: Uri): String? {
+        require(tree.scheme == "content" && DocumentsContract.isTreeUri(tree))
+        val document = DocumentsContract.buildDocumentUriUsingTree(
+            tree, DocumentsContract.getTreeDocumentId(tree)
+        )
+        val projection = arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+        return activity.contentResolver.query(document, projection, null, null, null)
+            ?.use { if (it.moveToFirst()) it.getString(0) else null }
     }
 
     private fun list(tree: Uri): List<Map<String, String>> {

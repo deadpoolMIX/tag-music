@@ -9,27 +9,14 @@ import 'playback_controller.dart';
 import 'queue_page.dart';
 import 'sleep_timer_sheet.dart';
 
-/// The same operations are available from either player layout and lyrics.
-/// Callers supply navigation specific to their page, not another player route.
 class PlayerActions {
-  const PlayerActions({
-    required this.playback,
-    this.library,
-    this.openLyrics,
-    this.toggleLayout,
-  });
+  const PlayerActions({required this.playback, this.library, this.openLyrics});
 
   final PlaybackController playback;
   final LibraryController? library;
   final Future<void> Function()? openLyrics;
-  final VoidCallback? toggleLayout;
 
   List<PopupMenuEntry<String>> _items() => [
-    if (toggleLayout != null)
-      PopupMenuItem(
-        value: 'layout',
-        child: Text(playback.simpleLayout ? '切换标准布局' : '切换简洁布局'),
-      ),
     if (openLyrics != null)
       PopupMenuItem(
         value: 'lyrics',
@@ -37,10 +24,6 @@ class PlayerActions {
         child: const Text('沉浸歌词'),
       ),
     const PopupMenuItem(value: 'queue', child: Text('播放队列')),
-    PopupMenuItem(
-      value: 'mode',
-      child: Text('播放模式 · ${playbackModeNames[playback.queue.mode]}'),
-    ),
     PopupMenuItem(
       value: 'sleep',
       child: Text(playback.sleep.active ? '管理睡眠定时' : '睡眠定时'),
@@ -74,14 +57,10 @@ class PlayerActions {
       return;
     }
     switch (choice) {
-      case 'layout':
-        toggleLayout?.call();
       case 'lyrics':
         if (playback.current != null) await openLyrics?.call();
       case 'queue':
         await showPlaybackQueue(context, playback, library);
-      case 'mode':
-        await showPlaybackModeChooser(context, playback);
       case 'sleep':
         await showSleepTimer(context, playback);
       case 'stop':

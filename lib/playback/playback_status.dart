@@ -27,25 +27,6 @@ String playbackActivityLabel(PlaybackController playback) {
   return playback.playing ? '正在播放' : '已暂停';
 }
 
-/// Feedback only; the backend remains the source of playback and buffering state.
-class PlaybackActivity extends StatelessWidget {
-  const PlaybackActivity({required this.playback, super.key});
-  final PlaybackController playback;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    liveRegion: true,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Text(
-        playbackActivityLabel(playback),
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.bodySmall,
-      ),
-    ),
-  );
-}
-
 /// One transport button across the minibar, full player, lyrics and queue.
 class PlaybackToggleButton extends StatelessWidget {
   const PlaybackToggleButton({
@@ -97,7 +78,7 @@ class PlaybackToggleButton extends StatelessWidget {
       value: playbackActivityLabel(playback),
       customSemanticsActions: onToggleLayout == null
           ? null
-          : {const CustomSemanticsAction(label: '切换标准或简洁布局'): onToggleLayout!},
+          : {const CustomSemanticsAction(label: '切换沉浸模式'): onToggleLayout!},
       child: GestureDetector(onLongPress: onToggleLayout, child: button),
     );
   }
