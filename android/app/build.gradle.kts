@@ -25,7 +25,7 @@ android {
 
     defaultConfig {
         val benchmark = System.getenv("TAG_MUSIC_BENCHMARK") == "1"
-        val originPlayerTrial = System.getenv("TAG_MUSIC_ORIGIN_PLAYER_TRIAL") == "1"
+        val originPlayerTrial = !benchmark && System.getenv("TAG_MUSIC_ORIGIN_PLAYER_TRIAL") == "1"
         applicationId = when {
             benchmark -> "app.tagmusic.player.benchmark"
             originPlayerTrial -> "com.luna.music"
@@ -36,6 +36,7 @@ android {
             originPlayerTrial -> "Tag Music 随身听试用版"
             else -> "Tag Music"
         }
+        manifestPlaceholders["originPlayerTrial"] = originPlayerTrial
         minSdk = 29
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION

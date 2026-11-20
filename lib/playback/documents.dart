@@ -363,6 +363,13 @@ class DocumentAccess {
     );
   }
 
+  Future<Uri?> publishSessionArtwork(Uint8List png) async {
+    final uri = await channel.invokeMethod<String>('publishSessionArtwork', {
+      'bytes': png,
+    });
+    return uri == null ? null : Uri.parse(uri);
+  }
+
   Future<Uint8List?> lyrics(ProbeTrack track) async {
     if (android) {
       final uri = await channel.invokeMethod<String>('findLyrics', {

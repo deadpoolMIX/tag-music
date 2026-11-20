@@ -30,7 +30,10 @@ Future<PlaybackController> initializePlayback({
   );
   if (Platform.isAndroid) {
     await AudioService.init(
-      builder: () => TagAudioHandler(controller),
+      builder: () => TagAudioHandler(
+        controller,
+        includeArtwork: const bool.fromEnvironment('ORIGIN_PLAYER_TRIAL'),
+      ),
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'app.tagmusic.player.audio',
         androidNotificationChannelName: '音乐播放',

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../core/settings.dart';
+import 'cover_cache.dart';
 import 'documents.dart';
 import 'lyrics.dart';
 import 'sleep_countdown.dart';
@@ -717,13 +718,38 @@ class PlaybackController extends ChangeNotifier {
 }
 
 class TagAudioHandler extends BaseAudioHandler {
-  TagAudioHandler(this.controller) {
+  TagAudioHandler(this.controller, {this.includeArtwork = false}) {
     controller.addListener(_broadcast);
     _broadcast();
   }
   final PlaybackController controller;
+  final bool includeArtwork;
   MediaItem? _lastMediaItem;
   bool _sentState = false;
+  int? _artworkSelection;
+  Uri? _artworkUri;
+
+  Future<void> _loadArtwork(ProbeTrack track, int selection) async {
+    bool isCurrent() =>
+        !controller._closed && controller._selection == selection;
+
+    try {
+      final documents = controller.documents;
+      final png = await documents.cachedCover(
+        track,
+        targetSize: 384,
+        priority: () =>
+            isCurrent() ? CoverPriority.current : CoverPriority.stale,
+      );
+      if (png == null || !isCurrent()) return;
+      final uri = await documents.publishSessionArtwork(png);
+      if (uri == null || !isCurrent()) return;
+      _artworkUri = uri;
+      _broadcast();
+    } catch (error) {
+      debugPrint('无法发布媒体会话封面：$error');
+    }
+  }
 
   void _broadcast() {
     final current = controller.current;
@@ -734,6 +760,18 @@ class TagAudioHandler extends BaseAudioHandler {
     // a filename-only item here makes the native card change its text layout.
     if (!controller.changingTrack && current != null) {
       final title = controller.metadata?.title ?? current.name;
+      Uri? artwork;
+      if (includeArtwork &&
+          controller.error == null &&
+          state.playlist.medias.isNotEmpty) {
+        final selection = controller._selection;
+        if (_artworkSelection != selection) {
+          _artworkSelection = selection;
+          _artworkUri = null;
+          unawaited(_loadArtwork(current, selection));
+        }
+        artwork = _artworkUri;
+      }
       final item = MediaItem(
         id: controller.currentSongId ?? current.location,
         title: title,
@@ -742,6 +780,15 @@ class TagAudioHandler extends BaseAudioHandler {
         // Keep artist and album in the session metadata. The notification's
         // display description needs only the title and the transport controls.
         displayTitle: title,
+        artUri: artwork,
+        extras: artwork == null
+            ? null
+            : {
+                'android.media.metadata.ALBUM_ART_URI': artwork.toString(),
+                'android.media.metadata.ART_URI': artwork.toString(),
+                // The plugin uses ContentResolver.loadThumbnail for this URI.
+                'loadThumbnailUri': artwork.toString(),
+              },
         duration: state.duration > Duration.zero
             ? state.duration
             : controller.metadata?.duration,
@@ -750,6 +797,7 @@ class TagAudioHandler extends BaseAudioHandler {
           _lastMediaItem?.title != item.title ||
           _lastMediaItem?.artist != item.artist ||
           _lastMediaItem?.album != item.album ||
+          _lastMediaItem?.artUri != item.artUri ||
           _lastMediaItem?.duration != item.duration) {
         _lastMediaItem = item;
         mediaItem.add(item);

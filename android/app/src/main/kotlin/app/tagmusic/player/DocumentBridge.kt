@@ -86,6 +86,10 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                                 requireNotNull(call.argument<String>("mimeType")),
                                 requireNotNull(call.argument<ByteArray>("bytes"))
                             )
+                            "publishSessionArtwork" -> SessionArtworkProvider.publish(
+                                activity.applicationContext,
+                                requireNotNull(call.argument<ByteArray>("bytes"))
+                            ).toString()
                             "list" -> list(Uri.parse(requireNotNull(call.argument<String>("uri"))))
                             "findLyrics" -> findLyrics(Uri.parse(requireNotNull(call.argument<String>("uri"))), lyricRequest)?.toString()
                             "readLyrics" -> {
