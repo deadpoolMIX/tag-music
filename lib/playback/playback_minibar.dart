@@ -44,6 +44,7 @@ class PlaybackMinibar extends ConsumerWidget {
                                 documents: playback.documents,
                                 track: current,
                                 size: 44,
+                                currentArtwork: true,
                               ),
                             ),
                             const SizedBox(width: 12),

@@ -23,6 +23,8 @@ class _AudioFocusDenied implements Exception {
   String toString() => '系统未授予音频焦点，请稍后重试';
 }
 
+enum _DecoderRecovery { idle, recovering, exhausted }
+
 class PlaybackController extends ChangeNotifier {
   PlaybackController(
     this.player,
@@ -62,6 +64,7 @@ class PlaybackController extends ChangeNotifier {
       }),
       player.stream.error.listen((message) {
         _playbackFailed = true;
+        _decoderRecovery = _DecoderRecovery.recovering;
         error = '播放失败：$message。可选择其他歌曲重试。';
         final failedSelection = _selection;
         final failedEntry = queue.current?.entryId;
@@ -75,16 +78,24 @@ class PlaybackController extends ChangeNotifier {
         unawaited(
           _serial(() async {
             if (_selection != failedSelection || !_playbackFailed) return;
-            if (await _sleepBlocksSwitch()) return;
-            if (failedEntry != null) _failedEntries.add(failedEntry);
-            playbackNotice = error;
-            await _unload();
-            await session?.setActive(false);
-            final nextEntry = queue.next(excluded: _failedEntries);
-            if (nextEntry != null) {
-              await _openCurrent(play: _playIntent, resetFailures: false);
-            } else {
-              _playIntent = false;
+            try {
+              if (await _sleepBlocksSwitch()) return;
+              if (failedEntry != null) _failedEntries.add(failedEntry);
+              playbackNotice = error;
+              await _unload();
+              await session?.setActive(false);
+              final nextEntry = queue.next(excluded: _failedEntries);
+              if (nextEntry != null) {
+                await _openCurrent(play: _playIntent, resetFailures: false);
+              } else {
+                _playIntent = false;
+                _decoderRecovery = _DecoderRecovery.exhausted;
+              }
+            } finally {
+              if (_selection == failedSelection &&
+                  _decoderRecovery == _DecoderRecovery.recovering) {
+                _decoderRecovery = _DecoderRecovery.idle;
+              }
             }
           }),
         );
@@ -144,7 +155,7 @@ class PlaybackController extends ChangeNotifier {
     sleep.cancel();
     _sleepDeadlineQueued = null;
     await _stopPlayback();
-    playbackNotice = '睡眠定时已结束';
+    playbackNotice = _sleepEndedNotice;
   }
 
   Future<bool> _sleepBlocksSwitch() async {
@@ -194,6 +205,23 @@ class PlaybackController extends ChangeNotifier {
   String? error;
   String? metadataWarning;
   String? playbackNotice;
+  static const _sleepEndedNotice = '睡眠定时已结束';
+  _DecoderRecovery _decoderRecovery = _DecoderRecovery.idle;
+
+  String? get operationError =>
+      changingTrack || _decoderRecovery != _DecoderRecovery.idle ? null : error;
+
+  String? get playerFeedback {
+    if (changingTrack || _decoderRecovery == _DecoderRecovery.recovering) {
+      return null;
+    }
+    if (_decoderRecovery == _DecoderRecovery.exhausted) {
+      return '队列中没有可继续播放的歌曲';
+    }
+    return error ??
+        (playbackNotice == _sleepEndedNotice ? playbackNotice : null);
+  }
+
   bool busy = false;
   bool changingTrack = false;
   bool notificationsEnabled = true;
@@ -414,6 +442,7 @@ class PlaybackController extends ChangeNotifier {
     _selection++;
     _playIntent = false;
     _playbackFailed = false;
+    _decoderRecovery = _DecoderRecovery.idle;
     await _unload();
     await session?.setActive(false);
     _resolvedTrack = null;
@@ -446,11 +475,13 @@ class PlaybackController extends ChangeNotifier {
     try {
       while (queue.current != null) {
         final entry = queue.current!;
-        lyrics.clear();
         _selection++;
         _playbackFailed = false;
+        _decoderRecovery = _DecoderRecovery.idle;
         error = null;
         metadataWarning = null;
+        lyrics.clear();
+        _publish();
         try {
           await _unload();
           metadata = null;
@@ -497,12 +528,14 @@ class PlaybackController extends ChangeNotifier {
           _failedEntries.add(entry.entryId);
           error = '播放失败：$e';
           playbackNotice = '已跳过不可播放歌曲：${entry.song.track.name}。$e';
+          debugPrint(playbackNotice);
           await _unload();
           await session?.setActive(false);
           if (await _sleepBlocksSwitch()) return;
           if (queue.next(excluded: _failedEntries) == null) {
             _selection++; // Invalidate queued decoder cleanup for this attempt.
             _playbackFailed = true;
+            _decoderRecovery = _DecoderRecovery.exhausted;
             _playIntent = false;
             error = '$error。没有可继续播放的歌曲，可修复后重试。';
             return;
@@ -579,6 +612,7 @@ class PlaybackController extends ChangeNotifier {
   Future<void> _stopPlayback() async {
     _selection++;
     _playbackFailed = false;
+    _decoderRecovery = _DecoderRecovery.idle;
     error = null;
     _playIntent = false;
     await _unload();

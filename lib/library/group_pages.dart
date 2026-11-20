@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../playback/cover_cache.dart';
 import '../playback/playback_controller.dart';
 import 'library_controller.dart';
 import 'library_header.dart';
@@ -79,6 +80,7 @@ class GroupList extends StatelessWidget {
     this.menuButton,
     this.heading,
     this.trailing,
+    this.coverCache,
     super.key,
   });
   final String storageKey;
@@ -90,6 +92,7 @@ class GroupList extends StatelessWidget {
   final Widget? menuButton;
   final Widget? heading;
   final Widget? trailing;
+  final CoverCache? coverCache;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -117,18 +120,20 @@ class GroupList extends StatelessWidget {
                   child: Text(emptyText, textAlign: TextAlign.center),
                 ),
               )
-            : ListTileTheme(
-                dense: true,
-                minVerticalPadding: 8,
-                child: ListView.builder(
-                  key: PageStorageKey(storageKey),
-                  itemCount: itemCount,
-                  itemBuilder: itemBuilder,
-                ),
-              ),
+            : ListTileTheme(dense: true, minVerticalPadding: 8, child: _list()),
       ),
     ],
   );
+
+  Widget _list() {
+    final list = ListView.builder(
+      key: PageStorageKey(storageKey),
+      itemCount: itemCount,
+      itemBuilder: itemBuilder,
+    );
+    final cache = coverCache;
+    return cache == null ? list : CoverScrollRegion(cache: cache, child: list);
+  }
 }
 
 class MetadataGroupsPage extends StatefulWidget {
@@ -242,6 +247,7 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
           overflow: TextOverflow.ellipsis,
         ),
         storageKey: widget.albums ? 'albums-overview' : 'artists-overview',
+        coverCache: widget.albums ? widget.library.documents.coverCache : null,
         descending: descending,
         onSort: () => setState(() => descending = !descending),
         itemCount: keys.length,

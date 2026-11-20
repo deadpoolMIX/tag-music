@@ -36,6 +36,18 @@ class PlayerSeek extends StatefulWidget {
   const PlayerSeek({required this.playback, this.onSeek, super.key});
   final PlaybackController playback;
   final VoidCallback? onSeek;
+
+  static const _sliderHeight = 44.0;
+  static const _timeStyle = TextStyle(fontSize: 12, height: 1.25);
+
+  static double _timeHeight(BuildContext context) =>
+      (MediaQuery.textScalerOf(context).scale(_timeStyle.fontSize!) *
+              _timeStyle.height!)
+          .ceilToDouble();
+
+  static double heightOf(BuildContext context) =>
+      _sliderHeight + _timeHeight(context);
+
   @override
   State<PlayerSeek> createState() => _PlayerSeekState();
 }
@@ -96,36 +108,41 @@ class _PlayerSeekState extends State<PlayerSeek> {
           key: ValueKey(enabled),
           child: Semantics(
             label: enabled ? '播放进度' : '播放进度暂不可用',
-            child: Slider(
-              key: const ValueKey('playback-seek'),
-              semanticFormatterCallback: (value) =>
-                  '${formatPosition(Duration(milliseconds: value.round()))}，总长 ${formatPosition(state.duration)}',
-              label: formatPosition(position),
-              value: position.inMilliseconds.toDouble().clamp(0, max),
-              max: max,
-              secondaryTrackValue: enabled
-                  ? state.buffer.inMilliseconds.toDouble().clamp(0.0, max)
-                  : null,
-              onChangeStart: enabled
-                  ? (value) => setState(() {
-                      _entryId = playback.queue.current?.entryId;
-                      _preview = value;
-                    })
-                  : null,
-              onChanged: enabled
-                  ? (value) => setState(() => _preview = value)
-                  : null,
-              onChangeEnd: enabled ? _commit : null,
+            child: SizedBox(
+              height: PlayerSeek._sliderHeight,
+              child: Slider(
+                padding: EdgeInsets.zero,
+                key: const ValueKey('playback-seek'),
+                semanticFormatterCallback: (value) =>
+                    '${formatPosition(Duration(milliseconds: value.round()))}，总长 ${formatPosition(state.duration)}',
+                label: formatPosition(position),
+                value: position.inMilliseconds.toDouble().clamp(0, max),
+                max: max,
+                secondaryTrackValue: enabled
+                    ? state.buffer.inMilliseconds.toDouble().clamp(0.0, max)
+                    : null,
+                onChangeStart: enabled
+                    ? (value) => setState(() {
+                        _entryId = playback.queue.current?.entryId;
+                        _preview = value;
+                      })
+                    : null,
+                onChanged: enabled
+                    ? (value) => setState(() => _preview = value)
+                    : null,
+                onChangeEnd: enabled ? _commit : null,
+              ),
             ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+        SizedBox(
+          height: PlayerSeek._timeHeight(context),
           child: Row(
             children: [
               Expanded(
                 child: Text(
                   enabled ? formatPosition(position) : '--:--',
+                  style: PlayerSeek._timeStyle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -134,6 +151,7 @@ class _PlayerSeekState extends State<PlayerSeek> {
               Expanded(
                 child: Text(
                   enabled ? formatPosition(state.duration) : '--:--',
+                  style: PlayerSeek._timeStyle,
                   textAlign: TextAlign.end,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -526,6 +544,7 @@ class _PlayerBody extends StatelessWidget {
                       documents: playback.documents,
                       track: current,
                       size: size,
+                      currentArtwork: true,
                     ),
             ),
           ),
@@ -579,10 +598,6 @@ class _PlayerBody extends StatelessWidget {
   Widget _controls(BuildContext context) => Column(
     mainAxisSize: MainAxisSize.min,
     children: [
-      if (!simple) ...[
-        PlayerSeek(playback: playback),
-        const SizedBox(height: 8),
-      ],
       PlaybackControls(
         playback: playback,
         onToggleLayout: playback.toggleLayout,
@@ -610,8 +625,8 @@ class _PlayerBody extends StatelessWidget {
           ],
         ),
         if (playback.sleep.active) SleepTimerStatus(playback: playback),
-        PlaybackFeedback(playback: playback),
       ],
+      PlaybackFeedback(playback: playback, color: controlColor),
     ],
   );
 
@@ -622,6 +637,32 @@ class _PlayerBody extends StatelessWidget {
         math.min(500.0, constraints.biggest.shortestSide),
       ),
     ),
+  );
+
+  Widget _seekBar(double width) => SizedBox(
+    width: width,
+    child: PlayerSeek(playback: playback),
+  );
+
+  Widget _coverWithSeek() => LayoutBuilder(
+    builder: (context, constraints) {
+      const gap = 8.0;
+      final seekHeight = PlayerSeek.heightOf(context);
+      final size = math.min(
+        500.0,
+        math.min(
+          constraints.maxWidth,
+          math.max(0.0, constraints.maxHeight - seekHeight - gap),
+        ),
+      );
+      return Column(
+        children: [
+          Expanded(child: Center(child: _artwork(context, size))),
+          const SizedBox(height: gap),
+          _seekBar(size),
+        ],
+      );
+    },
   );
 
   @override
@@ -644,20 +685,28 @@ class _PlayerBody extends StatelessWidget {
           spacing: 32,
           children: [
             Expanded(child: _coverArea(context)),
-            Expanded(child: controls),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  PlayerSeek(playback: playback),
+                  const SizedBox(height: 8),
+                  controls,
+                ],
+              ),
+            ),
           ],
         );
       } else if (short) {
+        final coverSize = math.min(width, (height * .62).clamp(92.0, 440.0));
         content = SingleChildScrollView(
           padding: const EdgeInsets.only(top: 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             spacing: 10,
             children: [
-              _artwork(
-                context,
-                math.min(width, (height * .62).clamp(92.0, 440.0)),
-              ),
+              _artwork(context, coverSize),
+              if (!simple) _seekBar(coverSize),
               controls,
             ],
           ),
@@ -666,7 +715,7 @@ class _PlayerBody extends StatelessWidget {
         content = Column(
           key: const ValueKey('player-stacked-layout'),
           children: [
-            Expanded(child: _coverArea(context)),
+            Expanded(child: simple ? _coverArea(context) : _coverWithSeek()),
             SizedBox(height: simple ? 20 : 8),
             controls,
           ],
@@ -701,7 +750,7 @@ class ImmersiveLyrics extends ConsumerStatefulWidget {
 }
 
 class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
-  final _scroll = ScrollController();
+  final _scroll = ScrollController(keepScrollOffset: false);
   final _pageFocus = FocusNode(debugLabel: 'lyrics-page');
   final _lyricsFocus = FocusNode(debugLabel: 'lyrics-lines');
   bool _follow = true;
@@ -865,9 +914,18 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
       _last = -2;
       _followGeneration++;
     }
+    if (lyrics.lines.isEmpty) {
+      return _lyricsStatus(lyrics);
+    }
+    final center = constraints.maxHeight / 2;
+    final headSpace = math.max(0.0, center - _heights.first / 2);
+    final tailSpace = math.max(0.0, center - _heights.last / 2);
     if (_follow && _pointers == 0 && active != _last) {
+      final reanchor = _last == -2;
       _last = active;
-      final target = active < 0 ? 0.0 : _offsets[active];
+      final target = active < 0
+          ? 0.0
+          : headSpace + _offsets[active] + _heights[active] / 2 - center;
       final generation = ++_followGeneration;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted ||
@@ -878,7 +936,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
           return;
         }
         final offset = target.clamp(0.0, _scroll.position.maxScrollExtent);
-        if (reducedMotion) {
+        if (reducedMotion || reanchor) {
           _scroll.jumpTo(offset);
         } else {
           unawaited(
@@ -890,9 +948,6 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
           );
         }
       });
-    }
-    if (lyrics.lines.isEmpty) {
-      return _lyricsStatus(lyrics);
     }
     return ShaderMask(
       blendMode: BlendMode.dstIn,
@@ -922,9 +977,9 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
               controller: _scroll,
               padding: EdgeInsets.fromLTRB(
                 padding,
-                constraints.maxHeight * .18,
+                headSpace,
                 padding,
-                constraints.maxHeight * .72,
+                tailSpace,
               ),
               itemCount: lyrics.lines.length,
               itemExtentBuilder: (index, _) => _heights[index],

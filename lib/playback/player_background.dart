@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'cover_cache.dart';
 import 'playback_controller.dart';
 
 class PlayerBackground extends StatefulWidget {
@@ -30,18 +31,33 @@ class PlayerBackground extends StatefulWidget {
 
 class _PlayerBackgroundState extends State<PlayerBackground> {
   (String, int?, int?)? _coverKey;
-  Future<_BlurredCover?>? _cover;
+  Future<((String, int?, int?), _BlurredCover?)?>? _cover;
+
+  (String, int?, int?)? get _currentKey {
+    final track = widget.immersive ? widget.playback.current : null;
+    return track == null ? null : (track.location, track.size, track.modified);
+  }
 
   void _updateCover() {
-    final track = widget.playback.current;
-    final key = track == null
-        ? null
-        : (track.location, track.size, track.modified);
+    final key = _currentKey;
     if (key == _coverKey) return;
     _coverKey = key;
-    _cover = track == null
-        ? null
-        : widget.playback.documents.cachedCover(track).then(_BlurredCover.load);
+    _cover = key == null ? null : _loadCover(key);
+  }
+
+  Future<((String, int?, int?), _BlurredCover?)?> _loadCover(
+    (String, int?, int?) key,
+  ) async {
+    final track = widget.playback.current!;
+    final bytes = await widget.playback.documents.cachedCover(
+      track,
+      priority: () => mounted && _currentKey == key
+          ? CoverPriority.current
+          : CoverPriority.stale,
+    );
+    if (!mounted || _currentKey != key) return null;
+    final blurred = await _BlurredCover.load(bytes);
+    return mounted && _currentKey == key ? (key, blurred) : null;
   }
 
   @override
@@ -51,11 +67,13 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
     final immersive = widget.immersive;
     final lyrics = immersive && widget.lyricsVisible;
     final surfaceIsDark = scheme.brightness == Brightness.dark;
-    return FutureBuilder<_BlurredCover?>(
+    return FutureBuilder(
       future: _cover,
       builder: (context, snapshot) {
-        final cover = snapshot.connectionState == ConnectionState.done
-            ? snapshot.data
+        final cover =
+            snapshot.connectionState == ConnectionState.done &&
+                snapshot.data?.$1 == _currentKey
+            ? snapshot.data?.$2
             : null;
         final lyricsDarkInk = cover == null ? !surfaceIsDark : cover.bright;
         final lyricsInk = lyricsDarkInk
@@ -76,25 +94,28 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
               RepaintBoundary(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        scheme.secondaryContainer,
-                        scheme.surface,
-                        scheme.primaryContainer,
-                      ],
-                    ),
+                    color: surfaceIsDark
+                        ? const Color(0xFF161616)
+                        : Colors.white,
+                    gradient: !immersive
+                        ? null
+                        : LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              scheme.secondaryContainer,
+                              scheme.surface,
+                              scheme.primaryContainer,
+                            ],
+                          ),
                   ),
                   child: cover == null
                       ? const SizedBox.expand()
                       : ExcludeSemantics(
                           child: Image.memory(
                             cover.bytes,
+                            key: ValueKey(_coverKey),
                             fit: BoxFit.fill,
-                            opacity: immersive
-                                ? null
-                                : const AlwaysStoppedAnimation(.25),
                           ),
                         ),
                 ),
@@ -107,9 +128,7 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
                     ? (lyricsDarkInk ? Colors.white : Colors.black).withValues(
                         alpha: .55,
                       )
-                    : immersive
-                    ? Colors.transparent
-                    : scheme.surface.withValues(alpha: .55),
+                    : Colors.transparent,
               ),
               widget.builder(
                 context,

@@ -32,7 +32,7 @@ class PlayerActions {
     const PopupMenuItem(value: 'stop', child: Text('停止播放')),
     if (library?.tracks.any((t) => t.song.id == playback.currentSongId) == true)
       const PopupMenuItem(value: 'info', child: Text('歌曲信息')),
-    if (playback.error != null || playback.playbackNotice != null)
+    if (playback.playerFeedback != null)
       const PopupMenuItem(value: 'status', child: Text('查看播放提示')),
     const PopupMenuItem(value: 'close', child: Text('关闭播放页')),
   ];
@@ -110,14 +110,7 @@ Future<void> showPlaybackFeedback(
   builder: (dialogContext) => CompactAlertDialog(
     title: const Text('播放提示'),
     content: SingleChildScrollView(
-      child: SelectableText(
-        [
-          ?playback.error,
-          ?playback.playbackNotice,
-          if (playback.error == null && playback.playbackNotice == null)
-            '当前没有播放提示。',
-        ].join('\n\n'),
-      ),
+      child: SelectableText(playback.playerFeedback ?? '当前没有播放提示。'),
     ),
     actions: [
       TextButton(
@@ -129,17 +122,26 @@ Future<void> showPlaybackFeedback(
 );
 
 class PlaybackFeedback extends StatelessWidget {
-  const PlaybackFeedback({required this.playback, this.onOpen, super.key});
+  const PlaybackFeedback({
+    required this.playback,
+    this.onOpen,
+    this.color,
+    super.key,
+  });
   final PlaybackController playback;
   final VoidCallback? onOpen;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
-    final message = playback.error ?? playback.playbackNotice;
+    final message = playback.playerFeedback;
     if (message == null) return const SizedBox.shrink();
     return Semantics(
       liveRegion: true,
       child: TextButton.icon(
+        style: color == null
+            ? null
+            : TextButton.styleFrom(foregroundColor: color),
         onPressed: onOpen ?? () => showPlaybackFeedback(context, playback),
         icon: Icon(
           playback.error == null ? Icons.info_outline : Icons.error_outline,

@@ -413,55 +413,63 @@ class _SongListState extends State<SongList> {
                           if (widget.rows.isEmpty)
                             Center(child: Text(widget.emptyText))
                           else
-                            RawScrollbar(
-                              controller: _scroll,
-                              thumbVisibility: longList,
-                              trackVisibility: longList,
-                              interactive: longList,
-                              notificationPredicate: (notification) =>
-                                  longList && notification.depth == 0,
-                              scrollbarOrientation: ScrollbarOrientation.right,
-                              thickness: 6,
-                              radius: const Radius.circular(3),
-                              trackRadius: const Radius.circular(3),
-                              thumbColor: scheme.primary.withValues(alpha: .75),
-                              trackColor: scheme.outlineVariant.withValues(
-                                alpha: .38,
-                              ),
-                              trackBorderColor: Colors.transparent,
-                              minThumbLength: 36,
-                              crossAxisMargin: 7,
-                              mainAxisMargin: 6,
-                              padding: EdgeInsets.zero,
-                              child: ScrollConfiguration(
-                                behavior: ScrollConfiguration.of(context)
-                                    .copyWith(scrollbars: false),
-                                child: reordering
-                                    ? ReorderableListView.builder(
-                                        key: scrollKey,
-                                        scrollController: _scroll,
-                                        keyboardDismissBehavior:
-                                            widget.keyboardDismissBehavior,
-                                        itemExtent: extent,
-                                        buildDefaultDragHandles: false,
-                                        itemCount: widget.rows.length,
-                                        padding: EdgeInsets.only(right: gutter),
-                                        itemBuilder: row,
-                                        onReorderItem: widget.onReorder!,
-                                      )
-                                    : ListView.builder(
-                                        key: scrollKey,
-                                        controller: _scroll,
-                                        keyboardDismissBehavior:
-                                            widget.keyboardDismissBehavior,
-                                        itemExtent: extent,
-                                        itemCount: widget.rows.length,
-                                        padding: EdgeInsets.only(
-                                          right: gutter,
-                                          bottom: 64,
+                            CoverScrollRegion(
+                              cache: widget.playback.documents.coverCache,
+                              child: RawScrollbar(
+                                controller: _scroll,
+                                thumbVisibility: longList,
+                                trackVisibility: longList,
+                                interactive: longList,
+                                notificationPredicate: (notification) =>
+                                    longList && notification.depth == 0,
+                                scrollbarOrientation:
+                                    ScrollbarOrientation.right,
+                                thickness: 6,
+                                radius: const Radius.circular(3),
+                                trackRadius: const Radius.circular(3),
+                                thumbColor: scheme.primary.withValues(
+                                  alpha: .75,
+                                ),
+                                trackColor: scheme.outlineVariant.withValues(
+                                  alpha: .38,
+                                ),
+                                trackBorderColor: Colors.transparent,
+                                minThumbLength: 36,
+                                crossAxisMargin: 7,
+                                mainAxisMargin: 6,
+                                padding: EdgeInsets.zero,
+                                child: ScrollConfiguration(
+                                  behavior: ScrollConfiguration.of(context)
+                                      .copyWith(scrollbars: false),
+                                  child: reordering
+                                      ? ReorderableListView.builder(
+                                          key: scrollKey,
+                                          scrollController: _scroll,
+                                          keyboardDismissBehavior:
+                                              widget.keyboardDismissBehavior,
+                                          itemExtent: extent,
+                                          buildDefaultDragHandles: false,
+                                          itemCount: widget.rows.length,
+                                          padding: EdgeInsets.only(
+                                            right: gutter,
+                                          ),
+                                          itemBuilder: row,
+                                          onReorderItem: widget.onReorder!,
+                                        )
+                                      : ListView.builder(
+                                          key: scrollKey,
+                                          controller: _scroll,
+                                          keyboardDismissBehavior:
+                                              widget.keyboardDismissBehavior,
+                                          itemExtent: extent,
+                                          itemCount: widget.rows.length,
+                                          padding: EdgeInsets.only(
+                                            right: gutter,
+                                            bottom: 64,
+                                          ),
+                                          itemBuilder: row,
                                         ),
-                                        itemBuilder: row,
-                                      ),
+                                ),
                               ),
                             ),
                           Positioned(

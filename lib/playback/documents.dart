@@ -3,8 +3,10 @@ import 'dart:isolate';
 import 'dart:convert';
 
 import 'package:audio_metadata_reader/audio_metadata_reader.dart';
+import 'package:crypto/crypto.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path/path.dart' as p;
 
@@ -281,11 +283,29 @@ class DocumentAccess {
     }
   });
 
-  final coverCache = CoverCache();
-  Future<Uint8List?> cachedCover(ProbeTrack track, {int targetSize = 96}) {
+  final coverCache = CoverCache(cacheDirectory: getApplicationCacheDirectory);
+  Future<Uint8List?> cachedCover(
+    ProbeTrack track, {
+    int targetSize = CoverCache.thumbnailSize,
+    CoverPriority Function()? priority,
+  }) {
     final size = targetSize.clamp(32, 1024);
     final key = (track.location, track.size, track.modified, size);
-    return coverCache.get(key, size, () => cover(track));
+    final stableThumbnail =
+        size == CoverCache.thumbnailSize &&
+        track.size != null &&
+        track.modified != null &&
+        track.modified! > 0;
+    final diskKey = stableThumbnail
+        ? '${sha256.convert(utf8.encode(jsonEncode([key.$1, key.$2, key.$3, key.$4])))}.png'
+        : null;
+    return coverCache.get(
+      key,
+      size,
+      () => cover(track),
+      diskKey: diskKey,
+      priority: priority,
+    );
   }
 
   Future<Uint8List?> lyrics(ProbeTrack track) async {

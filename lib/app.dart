@@ -243,54 +243,61 @@ class _AppShellState extends ConsumerState<AppShell>
 
   Widget _navigation(bool compact, ValueChanged<AppDestination> onSelect) =>
       SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              children: [
-                for (final destination in AppDestination.values) ...[
-                  if (destination == AppDestination.settings)
-                    const Divider(height: 28),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Material(
-                      color: destination == _selected
-                          ? Theme.of(context).colorScheme.secondaryContainer
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(14),
-                      child: Tooltip(
-                        message: _destinations[destination.index].$2,
-                        child: InkWell(
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            reverse: true,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    for (final destination in AppDestination.values) ...[
+                      if (destination == AppDestination.settings)
+                        const Divider(height: 28),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Material(
+                          color: destination == _selected
+                              ? Theme.of(context).colorScheme.secondaryContainer
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(14),
-                          onTap: () => onSelect(destination),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  _destinations[destination.index].$1,
-                                  semanticLabel: compact
-                                      ? _destinations[destination.index].$2
-                                      : null,
-                                ),
-                                if (!compact) ...[
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Text(
-                                      _destinations[destination.index].$2,
+                          child: Tooltip(
+                            message: _destinations[destination.index].$2,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(14),
+                              onTap: () => onSelect(destination),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      _destinations[destination.index].$1,
+                                      semanticLabel: compact
+                                          ? _destinations[destination.index].$2
+                                          : null,
                                     ),
-                                  ),
-                                ],
-                              ],
+                                    if (!compact) ...[
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Text(
+                                          _destinations[destination.index].$2,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                ],
-              ],
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -419,15 +426,6 @@ class _AppShellState extends ConsumerState<AppShell>
                                 builder: (_, _) => Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    if (playback.error != null ||
-                                        playback.playbackNotice != null)
-                                      Text(
-                                        playback.error ??
-                                            playback.playbackNotice!,
-                                        key: const ValueKey('playback-error'),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
                                     if (!playback.notificationsEnabled)
                                       Text(
                                         playback.notificationMessage ??

@@ -368,7 +368,7 @@ class _QueuePageState extends State<QueuePage> {
                 ],
               ),
             ),
-            if (playback.error case final error?)
+            if (playback.operationError case final error?)
               Text(
                 error,
                 key: const ValueKey('queue-error'),

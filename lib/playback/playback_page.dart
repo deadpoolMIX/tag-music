@@ -56,21 +56,11 @@ class PlaybackPage extends ConsumerWidget {
         final content = Column(
           mainAxisSize: controlsOnly ? MainAxisSize.min : MainAxisSize.max,
           children: [
-            if (controller.playbackNotice != null && controller.error == null)
+            if ((filtering || playlists) && controller.operationError != null)
               Padding(
                 padding: const EdgeInsets.all(8),
                 child: Text(
-                  controller.playbackNotice!,
-                  key: const ValueKey('playback-notice'),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            if ((filtering || playlists) && controller.error != null)
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(
-                  controller.error!,
+                  controller.operationError!,
                   key: const ValueKey('playback-error'),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
@@ -153,9 +143,9 @@ class PlaybackPage extends ConsumerWidget {
                       ),
                     ],
                     if (controller.busy) const LinearProgressIndicator(),
-                    if (controller.error != null)
+                    if (controller.operationError != null)
                       Text(
-                        controller.error!,
+                        controller.operationError!,
                         key: const ValueKey('playback-error'),
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.error,
