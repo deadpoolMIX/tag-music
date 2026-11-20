@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/diagnostics.dart';
 import 'core/settings.dart';
 import 'playback/cover_viewer.dart' show coverViewerRouteName;
-import 'playback/full_player.dart' show fullPlayerRouteName;
+import 'playback/full_player.dart' show fullPlayerRouteName, openFullPlayer;
 import 'playback/playback_minibar.dart';
 import 'playback/queue_page.dart' show playbackQueueRouteName;
 import 'library/library_page.dart';
@@ -39,6 +39,22 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
       route.settings.name != coverViewerRouteName &&
       route.settings.name != playbackQueueRouteName;
 
+  void _handleMouseNavigation(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.mouse) return;
+    final navigator = _appNavigator.currentState;
+    final top = _routes.top;
+    if (navigator == null || top == null) return;
+    if (event.buttons == kBackMouseButton &&
+        top.settings.name == fullPlayerRouteName) {
+      final showingLyrics = top.willHandlePopInternally;
+      navigator.pop();
+      if (showingLyrics && top.isCurrent) navigator.pop();
+    } else if (event.buttons == kForwardMouseButton &&
+        identical(top, _routes.playerForwardFrom)) {
+      openFullPlayer(navigator.context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final color = ref.watch(themeColorProvider);
@@ -53,7 +69,11 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
                 _appNavigator.currentState?.maybePop(),
           },
           child: desktop
-              ? child!
+              ? Listener(
+                  behavior: HitTestBehavior.translucent,
+                  onPointerDown: _handleMouseNavigation,
+                  child: child,
+                )
               : RawGestureDetector(
                   behavior: HitTestBehavior.translucent,
                   excludeFromSemantics: true,
@@ -162,6 +182,21 @@ class _NavigationSwipeRecognizer extends HorizontalDragGestureRecognizer {
 
 class _TopRouteObserver extends NavigatorObserver {
   Route<dynamic>? top;
+  Route<dynamic>? playerForwardFrom;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (route is PageRoute) playerForwardFrom = null;
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (route.settings.name == fullPlayerRouteName) {
+      playerForwardFrom = previousRoute;
+    } else if (identical(route, playerForwardFrom)) {
+      playerForwardFrom = null;
+    }
+  }
 
   @override
   void didChangeTop(Route<dynamic> topRoute, Route<dynamic>? previousTopRoute) {

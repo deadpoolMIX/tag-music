@@ -33,7 +33,7 @@ Future<void> openArtistTracks(
           albums: false,
           library: library,
           playback: playback,
-          rows: library.tracks
+          rows: library.availableTracks
               .where((track) => artistNames(track.song.artist).contains(artist))
               .toList(),
         ),
@@ -202,7 +202,7 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
     listenable: widget.library,
     builder: (context, _) {
       final groups = <String?, List<LibraryTrack>>{};
-      for (final track in widget.library.tracks) {
+      for (final track in widget.library.availableTracks) {
         for (final name in groupNames(track)) {
           groups.putIfAbsent(name, () => []).add(track);
         }

@@ -139,15 +139,41 @@ class _QueuePageState extends State<QueuePage> {
     return route is SlideDismissRoute ? route : null;
   }
 
+  List<QueueEntry> _visibleEntries(Iterable<QueueEntry> entries) {
+    final library = widget.library;
+    return [
+      for (final entry in entries)
+        if (library == null ||
+            library.availableTrack(entry.song.songId) != null)
+          entry,
+    ];
+  }
+
+  Future<void> _reorderEntries(
+    List<QueueEntry> all,
+    List<QueueEntry> visible,
+    int from,
+    int to,
+  ) {
+    final ordered = visible.map((entry) => entry.entryId).toList();
+    final visibleIds = ordered.toSet();
+    ordered.insert(to, ordered.removeAt(from));
+    var index = 0;
+    return widget.playback.reorderQueue([
+      for (final entry in all)
+        visibleIds.contains(entry.entryId) ? ordered[index++] : entry.entryId,
+    ]);
+  }
+
   Future<void> _move(String entryId, int delta) => _change(() async {
     // Resolve identities after a menu closes; the queue may have advanced or
     // changed while the user was choosing an operation.
-    final ids = widget.playback.queue.entries.map((e) => e.entryId).toList();
-    final index = ids.indexOf(entryId);
+    final all = widget.playback.queue.entries.toList();
+    final visible = _visibleEntries(all);
+    final index = visible.indexWhere((entry) => entry.entryId == entryId);
     final target = index + delta;
-    if (index < 0 || target < 0 || target >= ids.length) return;
-    ids.insert(target, ids.removeAt(index));
-    await widget.playback.reorderQueue(ids);
+    if (index < 0 || target < 0 || target >= visible.length) return;
+    await _reorderEntries(all, visible, index, target);
   });
 
   @override
@@ -239,10 +265,7 @@ class _QueuePageState extends State<QueuePage> {
             enabled: index + 1 < count,
             child: const Text('下移一项'),
           ),
-          if (widget.library?.tracks.any(
-                (t) => t.song.id == entry.song.songId,
-              ) ==
-              true)
+          if (widget.library?.availableTrack(entry.song.songId) != null)
             const PopupMenuItem(value: 'info', child: Text('歌曲信息')),
         ],
         onSelected: (choice) async {
@@ -250,9 +273,7 @@ class _QueuePageState extends State<QueuePage> {
           if (choice == 'up' || choice == 'down') {
             await _move(entry.entryId, choice == 'up' ? -1 : 1);
           } else {
-            final track = widget.library?.tracks
-                .where((t) => t.song.id == entry.song.songId)
-                .firstOrNull;
+            final track = widget.library?.availableTrack(entry.song.songId);
             if (track != null) await showSongInformation(context, track);
           }
         },
@@ -287,10 +308,11 @@ class _QueuePageState extends State<QueuePage> {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: widget.playback,
+    listenable: Listenable.merge([widget.playback, widget.library]),
     builder: (context, _) {
       final playback = widget.playback;
-      final entries = playback.queue.entries.toList();
+      final all = playback.queue.entries.toList();
+      final entries = _visibleEntries(all);
       final scaler = MediaQuery.textScalerOf(context);
       final route = _dismissRoute;
       final height = MediaQuery.sizeOf(context).height;
@@ -302,7 +324,9 @@ class _QueuePageState extends State<QueuePage> {
         _positioned = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || !_scroll.hasClients) return;
-          final index = widget.playback.queue.index;
+          final queue = widget.playback.queue;
+          final index = _visibleEntries(queue.entries)
+              .indexWhere((entry) => entry.entryId == queue.current?.entryId);
           if (index < 0) return;
           final position = _scroll.position;
           final offset =
@@ -311,8 +335,10 @@ class _QueuePageState extends State<QueuePage> {
           _scroll.jumpTo(offset.clamp(0.0, position.maxScrollExtent));
         });
       }
+      final visibleIds = entries.map((entry) => entry.entryId).toSet();
       final priority = {
-        for (final (index, id) in playback.queue.priorityIds.indexed)
+        for (final (index, id)
+            in playback.queue.priorityIds.where(visibleIds.contains).indexed)
           id: index + 1,
       };
       final theme = Theme.of(context);
@@ -351,19 +377,19 @@ class _QueuePageState extends State<QueuePage> {
                     IconButton(
                       key: const ValueKey('save-full-queue'),
                       tooltip: '保存完整队列为歌单',
-                      onPressed: entries.isEmpty || busy
+                      onPressed: all.isEmpty || busy
                           ? null
                           : () => savePlaylist(
                               context,
                               library,
-                              entries.map((e) => e.song.songId),
+                              all.map((e) => e.song.songId),
                             ),
                       icon: const Icon(Icons.playlist_add),
                     ),
                   IconButton(
                     key: const ValueKey('clear-playback-queue'),
                     tooltip: '清空队列',
-                    onPressed: entries.isEmpty || busy ? null : _clear,
+                    onPressed: all.isEmpty || busy ? null : _clear,
                     icon: const Icon(Icons.delete_outline),
                   ),
                 ],
@@ -409,11 +435,14 @@ class _QueuePageState extends State<QueuePage> {
                                 ),
                               ),
                           itemCount: entries.length,
-                          onReorderItem: (oldIndex, newIndex) {
-                            final ids = entries.map((e) => e.entryId).toList();
-                            ids.insert(newIndex, ids.removeAt(oldIndex));
-                            _change(() => playback.reorderQueue(ids));
-                          },
+                          onReorderItem: (oldIndex, newIndex) => _change(
+                            () => _reorderEntries(
+                              all,
+                              entries,
+                              oldIndex,
+                              newIndex,
+                            ),
+                          ),
                           itemBuilder: (context, index) => _entryTile(
                             context,
                             entries[index],

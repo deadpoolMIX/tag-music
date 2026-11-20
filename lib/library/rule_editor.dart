@@ -58,16 +58,20 @@ class RuleEditor extends StatelessWidget {
 
   Widget _compactBox(BuildContext context, int box) {
     final ids = _ids(rule, box);
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final desktop = theme.platform == TargetPlatform.windows;
     return Tooltip(
       message: _titles[box],
       excludeFromSemantics: true,
       child: OutlinedButton(
         key: ValueKey('$prefix-pick-$box'),
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(0, 48),
+          minimumSize: Size(0, desktop ? 72 : 48),
           alignment: AlignmentDirectional.topStart,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          padding: desktop
+              ? const EdgeInsets.symmetric(horizontal: 10, vertical: 9)
+              : const EdgeInsets.all(6),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         onPressed: enabled ? () => _pickTags(context, box) : null,
@@ -80,6 +84,7 @@ class RuleEditor extends StatelessWidget {
               semanticsLabel: _titles[box],
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
+            if (desktop && ids.isNotEmpty) const SizedBox(height: 4),
             Wrap(
               spacing: 4,
               runSpacing: 4,
@@ -170,16 +175,35 @@ class RuleEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => compact
-      ? IntrinsicHeight(
-          child: Row(
-            spacing: 6,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < 3; i++)
-                Expanded(child: _compactBox(context, i)),
-            ],
-          ),
-        )
+      ? Theme.of(context).platform == TargetPlatform.windows
+            ? Table(
+                defaultVerticalAlignment:
+                    TableCellVerticalAlignment.intrinsicHeight,
+                columnWidths: const {
+                  1: FixedColumnWidth(6),
+                  3: FixedColumnWidth(6),
+                },
+                children: [
+                  TableRow(
+                    children: [
+                      for (var i = 0; i < 3; i++) ...[
+                        if (i > 0) const SizedBox.shrink(),
+                        _compactBox(context, i),
+                      ],
+                    ],
+                  ),
+                ],
+              )
+            : IntrinsicHeight(
+                child: Row(
+                  spacing: 6,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < 3; i++)
+                      Expanded(child: _compactBox(context, i)),
+                  ],
+                ),
+              )
       : LayoutBuilder(
           builder: (context, constraints) {
             final boxes = [for (var i = 0; i < 3; i++) _box(context, i)];

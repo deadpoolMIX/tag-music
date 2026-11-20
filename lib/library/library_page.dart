@@ -116,7 +116,7 @@ class LibraryPage extends StatelessWidget {
           LibraryStatus(library: library),
           Expanded(
             child: SongList(
-              emptyText: library.tracks.isEmpty ? '添加音乐文件夹，建立本机曲库' : '没有匹配的歌曲',
+              emptyText: library.roots.isEmpty ? '添加音乐文件夹，建立本机曲库' : '没有匹配的歌曲',
               library: library,
               playback: playback,
               source: library.searchTracks(

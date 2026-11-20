@@ -30,7 +30,10 @@ class PlayerActions {
     ),
     const PopupMenuDivider(),
     const PopupMenuItem(value: 'stop', child: Text('停止播放')),
-    if (library?.tracks.any((t) => t.song.id == playback.currentSongId) == true)
+    if (library?.availableTracks.any(
+          (t) => t.song.id == playback.currentSongId,
+        ) ==
+        true)
       const PopupMenuItem(value: 'info', child: Text('歌曲信息')),
     if (playback.playerFeedback != null)
       const PopupMenuItem(value: 'status', child: Text('查看播放提示')),
@@ -69,7 +72,7 @@ class PlayerActions {
       case 'info':
         // Resolve the current track after the menu closes: playback may have
         // advanced while the menu was open.
-        final matches = library?.tracks.where(
+        final matches = library?.availableTracks.where(
           (t) => t.song.id == playback.currentSongId,
         );
         if (matches?.isNotEmpty == true) {

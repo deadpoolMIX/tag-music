@@ -19,6 +19,7 @@ import 'playback_page.dart' show formatPosition;
 import 'queue_page.dart';
 import 'player_actions.dart';
 import 'playback_status.dart';
+import 'player_volume.dart';
 import 'lyrics.dart';
 import 'sleep_timer_sheet.dart';
 import 'slide_dismiss_route.dart';
@@ -634,7 +635,7 @@ class _PlayerBody extends StatelessWidget {
     ),
   );
 
-  Widget _controls(BuildContext context) => Column(
+  Widget _controls(BuildContext context, {required bool desktop}) => Column(
     mainAxisSize: MainAxisSize.min,
     children: [
       PlaybackControls(
@@ -668,6 +669,7 @@ class _PlayerBody extends StatelessWidget {
                   onPressed: () =>
                       showPlaybackQueue(context, playback, library),
                 ),
+                if (desktop && !simple) PlayerVolume(playback: playback),
               ],
             ),
             if (playback.sleep.active) SleepTimerStatus(playback: playback),
@@ -695,7 +697,7 @@ class _PlayerBody extends StatelessWidget {
     ),
   );
 
-  Widget _coverWithSeek() => LayoutBuilder(
+  Widget _coverWithSeek({required bool desktop}) => LayoutBuilder(
     builder: (context, constraints) {
       const gap = 8.0;
       final seekHeight = PlayerSeek.heightOf(context);
@@ -710,7 +712,7 @@ class _PlayerBody extends StatelessWidget {
         children: [
           Expanded(child: Center(child: _artwork(context, size))),
           const SizedBox(height: gap),
-          _seekBar(size),
+          _seekBar(desktop ? constraints.maxWidth : size),
         ],
       );
     },
@@ -720,11 +722,12 @@ class _PlayerBody extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       if (playback.current == null) return _empty(context);
+      final desktop = Theme.of(context).platform == TargetPlatform.windows;
       final horizontal = constraints.maxWidth < 360 ? 14.0 : 22.0;
       final width = math.max(0.0, constraints.maxWidth - horizontal * 2);
       final height = constraints.maxHeight;
-      final controls = _controls(context);
-      final wide = width >= 760 && height >= 320;
+      final controls = _controls(context, desktop: desktop);
+      final wide = !desktop && width >= 760 && height >= 320;
       final short =
           height < 355 || MediaQuery.textScalerOf(context).scale(16) > 26;
       final Widget content;
@@ -751,7 +754,7 @@ class _PlayerBody extends StatelessWidget {
             spacing: 10,
             children: [
               _artwork(context, coverSize),
-              _seekBar(coverSize),
+              _seekBar(desktop ? width : coverSize),
               controls,
             ],
           ),
@@ -760,7 +763,7 @@ class _PlayerBody extends StatelessWidget {
         content = Column(
           key: const ValueKey('player-stacked-layout'),
           children: [
-            Expanded(child: _coverWithSeek()),
+            Expanded(child: _coverWithSeek(desktop: desktop)),
             const SizedBox(height: 8),
             controls,
           ],
@@ -770,7 +773,13 @@ class _PlayerBody extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(horizontal, 8, horizontal, 10),
         child: Center(
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: wide ? 1080 : 560),
+            constraints: BoxConstraints(
+              maxWidth: desktop
+                  ? width
+                  : wide
+                  ? 1080
+                  : 560,
+            ),
             child: content,
           ),
         ),

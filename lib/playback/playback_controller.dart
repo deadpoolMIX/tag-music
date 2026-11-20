@@ -284,6 +284,11 @@ class PlaybackController extends ChangeNotifier {
   }
 
   Future<void> initialize() async {
+    if (player.platform case final NativePlayer native
+        when Platform.isWindows) {
+      // Tag Music reads LRC itself. Keep sidecar subtitles out of mpv's open path.
+      await native.setProperty('options/sub-auto', 'no');
+    }
     if (Platform.isAndroid) {
       session = await AudioSession.instance;
       await session!.configure(const AudioSessionConfiguration.music());
@@ -300,6 +305,13 @@ class PlaybackController extends ChangeNotifier {
     await refreshNotificationPermission();
     _publish();
   }
+
+  Future<void> setVolume(double volume) =>
+      _serial(() => player.setVolume(volume.clamp(0.0, 100.0)));
+
+  Future<void> adjustVolume(double delta) => _serial(
+    () => player.setVolume((player.state.volume + delta).clamp(0.0, 100.0)),
+  );
 
   Future<void> refreshNotificationPermission() async {
     if (!documents.android || _closed) return;

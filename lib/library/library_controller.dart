@@ -60,12 +60,10 @@ class LibraryController extends ChangeNotifier {
   List<LibraryTrack> get filterMatches => _matchedCache ??= List.unmodifiable(
     filterLoadError != null
         ? <LibraryTrack>[]
-        : tracks.where(
-            (t) =>
-                t.available &&
-                filterPreferences.rule.matches(
-                  tagIdsBySong[t.song.id] ?? const {},
-                ),
+        : availableTracks.where(
+            (t) => filterPreferences.rule.matches(
+              tagIdsBySong[t.song.id] ?? const {},
+            ),
           ),
   );
 
@@ -136,6 +134,20 @@ class LibraryController extends ChangeNotifier {
   }
 
   List<LibraryTrack> tracks = [];
+  List<LibraryTrack>? _availabilitySource;
+  Map<String, LibraryTrack> _availableById = const {};
+  Map<String, LibraryTrack> get _availableTracksById {
+    if (!identical(_availabilitySource, tracks)) {
+      _availabilitySource = tracks;
+      _availableById = {
+        for (final track in tracks)
+          if (track.available) track.song.id: track,
+      };
+    }
+    return _availableById;
+  }
+
+  Iterable<LibraryTrack> get availableTracks => _availableTracksById.values;
   List<LibraryRoot> roots = [];
   List<Tag> tags = [];
   Map<String, Set<String>> tagIdsBySong = {};
@@ -143,7 +155,7 @@ class LibraryController extends ChangeNotifier {
   String query = '';
   LibrarySort sort = LibrarySort.modified;
   bool descending = true;
-  bool showMissing = true;
+  bool showMissing = false;
   bool scanning = false;
   bool choosing = false;
   bool get directoryBusy => scanning || choosing || _removeTask != null;
@@ -173,17 +185,16 @@ class LibraryController extends ChangeNotifier {
   List<LibraryTrack> get visible {
     if (_visibleCache != null) return _visibleCache!;
     final needle = query.trim().toLowerCase();
-    final rows = tracks
+    final rows = (showMissing ? tracks : availableTracks)
         .where(
           (t) =>
-              (showMissing || t.available) &&
-              (needle.isEmpty ||
-                  [
-                    t.title,
-                    t.song.name,
-                    t.song.artist ?? '',
-                    t.song.album ?? '',
-                  ].any((v) => v.toLowerCase().contains(needle))),
+              needle.isEmpty ||
+              [
+                t.title,
+                t.song.name,
+                t.song.artist ?? '',
+                t.song.album ?? '',
+              ].any((v) => v.toLowerCase().contains(needle)),
         )
         .toList();
     _sortTracks(rows, sort, descending);
@@ -191,7 +202,7 @@ class LibraryController extends ChangeNotifier {
   }
 
   List<LibraryTrack> selectedTracks(Set<String> ids) {
-    final rows = tracks.where((t) => ids.contains(t.song.id)).toList();
+    final rows = availableTracks.where((t) => ids.contains(t.song.id)).toList();
     _sortTracks(rows, sort, descending);
     return rows;
   }
@@ -213,7 +224,7 @@ class LibraryController extends ChangeNotifier {
     }
     final key = (needle, order, descending);
     if (_searchResults[key] case final cached?) return cached;
-    final rows = tracks
+    final rows = availableTracks
         .where(
           (t) =>
               needle.isEmpty ||
@@ -303,17 +314,16 @@ class LibraryController extends ChangeNotifier {
   Set<String> tagsForSong(String songId) =>
       Set.unmodifiable(tagIdsBySong[songId] ?? const <String>{});
 
-  ProbeTrack? resolveSong(String songId) {
-    final track = tracks.where((t) => t.song.id == songId).firstOrNull;
-    return track?.available == true ? track!.probe : null;
-  }
+  LibraryTrack? availableTrack(String songId) => _availableTracksById[songId];
+
+  ProbeTrack? resolveSong(String songId) => availableTrack(songId)?.probe;
 
   List<LibraryTrack> playlistTracks(String id) {
     final list = playlists.where((p) => p.id == id).firstOrNull;
     if (list?.kind == 'smart') {
       return matchingTracks(smartPreferences(list!));
     }
-    final byId = {for (final track in tracks) track.song.id: track};
+    final byId = _availableTracksById;
     return List.unmodifiable([
       for (final songId in playlistSongIds[id] ?? const <String>[])
         ?byId[songId],
@@ -332,11 +342,9 @@ class LibraryController extends ChangeNotifier {
   }
 
   List<LibraryTrack> matchingTracks(FilterPreferences preferences) {
-    final rows = tracks
+    final rows = availableTracks
         .where(
-          (t) =>
-              t.available &&
-              preferences.rule.matches(tagIdsBySong[t.song.id] ?? const {}),
+          (t) => preferences.rule.matches(tagIdsBySong[t.song.id] ?? const {}),
         )
         .toList();
     _sortTracks(rows, preferences.sort, preferences.descending);
@@ -380,7 +388,7 @@ class LibraryController extends ChangeNotifier {
     final next = rule.without(id);
     var before = 0;
     var after = 0;
-    for (final track in tracks.where((t) => t.available)) {
+    for (final track in availableTracks) {
       final tags = tagIdsBySong[track.song.id] ?? const <String>{};
       if (rule.matches(tags)) before++;
       if (next.matches({...tags}..remove(id))) after++;
@@ -427,14 +435,24 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> reorderPlaylist(String id, List<String> ordered) async {
-    await playlistsStore.reorder(id, ordered);
+    final saved = playlistSongIds[id] ?? const <String>[];
+    final moved = ordered.toSet();
+    if (moved.length != ordered.length || !saved.toSet().containsAll(moved)) {
+      throw ArgumentError('歌曲列表已变化，请重新排序');
+    }
+    // Keep hidden songs in their saved slots so they reappear in the playlist.
+    var index = 0;
+    await playlistsStore.reorder(id, [
+      for (final songId in saved)
+        moved.contains(songId) ? ordered[index++] : songId,
+    ]);
     await reloadPlaylists();
   }
 
   int countForTag(String tagId) => tagCounts[tagId] ?? 0;
 
   List<LibraryTrack> tracksForTag(String tagId) => List.unmodifiable(
-    tracks.where(
+    availableTracks.where(
       (track) => tagIdsBySong[track.song.id]?.contains(tagId) == true,
     ),
   );
@@ -532,8 +550,8 @@ class LibraryController extends ChangeNotifier {
 
   Map<String, int> _countTags(Map<String, Set<String>> bySong) {
     final counts = <String, int>{};
-    for (final ids in bySong.values) {
-      for (final id in ids) {
+    for (final songId in _availableTracksById.keys) {
+      for (final id in bySong[songId] ?? const <String>{}) {
         counts.update(id, (value) => value + 1, ifAbsent: () => 1);
       }
     }

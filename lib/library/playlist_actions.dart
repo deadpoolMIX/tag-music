@@ -174,7 +174,7 @@ Future<void> pickPlaylistSongs(
   LibraryController library,
   String id,
 ) async {
-  final rows = library.tracks.toList()
+  final rows = library.availableTracks.toList()
     ..sort((a, b) {
       final title = a.title.toLowerCase().compareTo(b.title.toLowerCase());
       return title == 0 ? a.song.id.compareTo(b.song.id) : title;
@@ -240,11 +240,7 @@ Future<void> pickPlaylistSongs(
                           overflow: TextOverflow.ellipsis,
                         ),
                         subtitle: Text(
-                          existing.contains(t.song.id)
-                              ? '已在歌单'
-                              : t.available
-                              ? t.song.name
-                              : '文件失联 · 仍可添加记录',
+                          existing.contains(t.song.id) ? '已在歌单' : t.song.name,
                         ),
                         value: selected.contains(t.song.id),
                         onChanged: existing.contains(t.song.id)
