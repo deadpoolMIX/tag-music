@@ -29,9 +29,7 @@ if ($Target -in 'all','android') {
     $previousOriginPlayerTrial = $env:TAG_MUSIC_ORIGIN_PLAYER_TRIAL
     try {
         $env:TAG_MUSIC_ORIGIN_PLAYER_TRIAL = if ($OriginPlayerTrial) { '1' }
-        $androidArgs = @('build','apk','--release',"--build-number=$BuildNumber","--dart-define=GIT_REVISION=$revision")
-        if ($OriginPlayerTrial) { $androidArgs += '--dart-define=ORIGIN_PLAYER_TRIAL=true' }
-        Invoke-Checked $Flutter $androidArgs "$report/build-android-$BuildNumber.log"
+        Invoke-Checked $Flutter @('build','apk','--release',"--build-number=$BuildNumber","--dart-define=GIT_REVISION=$revision") "$report/build-android-$BuildNumber.log"
         Copy-Item build/app/outputs/flutter-apk/app-release.apk "$report/$androidApk"
     } finally {
         $env:TAG_MUSIC_ORIGIN_PLAYER_TRIAL = $previousOriginPlayerTrial

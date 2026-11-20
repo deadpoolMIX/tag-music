@@ -43,7 +43,6 @@
         <provider
             android:name=".SessionArtworkProvider"
             android:authorities="${applicationId}.session-artwork"
-            android:enabled="${originPlayerTrial}"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data

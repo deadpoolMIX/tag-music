@@ -36,7 +36,6 @@ android {
             originPlayerTrial -> "Tag Music 随身听试用版"
             else -> "Tag Music"
         }
-        manifestPlaceholders["originPlayerTrial"] = originPlayerTrial
         minSdk = 29
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION

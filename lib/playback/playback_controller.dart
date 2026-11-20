@@ -777,9 +777,9 @@ class TagAudioHandler extends BaseAudioHandler {
         title: title,
         artist: controller.metadata?.artist,
         album: controller.metadata?.album,
-        // Keep artist and album in the session metadata. The notification's
-        // display description needs only the title and the transport controls.
         displayTitle: title,
+        displaySubtitle: controller.metadata?.artist,
+        displayDescription: controller.metadata?.album,
         artUri: artwork,
         extras: artwork == null
             ? null
@@ -850,10 +850,11 @@ class TagAudioHandler extends BaseAudioHandler {
           (playing ? MediaControl.pause : MediaControl.play).copyWith(
             action: MediaAction.playPause,
           ),
+          MediaControl.stop,
           MediaControl.skipToNext,
         ],
-        systemActions: const {MediaAction.seek, MediaAction.stop},
-        androidCompactActionIndices: const [0, 1, 2],
+        systemActions: const {MediaAction.seek},
+        androidCompactActionIndices: const [0, 1, 3],
         processingState: processing,
         playing: playing,
         updatePosition: state.position,
