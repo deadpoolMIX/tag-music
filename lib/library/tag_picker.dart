@@ -155,7 +155,7 @@ class _TagPickerState extends State<_TagPicker> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 9),
                 ],
                 TextField(
                   key: ValueKey('${widget.prefix}-tag-search'),

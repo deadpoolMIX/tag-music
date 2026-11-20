@@ -667,11 +667,25 @@ class PlaybackController extends ChangeNotifier {
     }
   }
 
-  Future<void> next() => _serial(() => _advance());
-  Future<void> previous() => _serial(() async {
-    if (await _sleepBlocksSwitch()) return;
-    if (queue.previous() != null) await _openCurrent(play: true);
-  });
+  bool _matchesManualStep(
+    ({QueueEntry from, QueueEntry to})? expected,
+    int direction,
+  ) =>
+      expected == null ||
+      (identical(queue.current, expected.from) &&
+          identical(queue.manualNeighbor(direction), expected.to));
+
+  Future<void> next({({QueueEntry from, QueueEntry to})? expected}) =>
+      _serial(() async {
+        if (_matchesManualStep(expected, 1)) await _advance();
+      });
+
+  Future<void> previous({({QueueEntry from, QueueEntry to})? expected}) =>
+      _serial(() async {
+        if (!_matchesManualStep(expected, -1) || await _sleepBlocksSwitch())
+          return;
+        if (queue.previous() != null) await _openCurrent(play: true);
+      });
   Future<void> seek(Duration position, {String? expectedEntryId}) =>
       _serial(() async {
         if (expectedEntryId != null &&

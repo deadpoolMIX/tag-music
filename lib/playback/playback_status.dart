@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
+import '../library/library_controller.dart';
+import 'documents.dart' show ProbeTrack;
 import 'playback_controller.dart';
+import 'playback_queue.dart' show QueueEntry;
 
 String? _nonBlank(String? value) {
   final text = value?.trim();
@@ -16,6 +19,36 @@ String playbackTitle(PlaybackController playback) =>
 String playbackArtist(PlaybackController playback) => playback.changingTrack
     ? '正在读取歌曲信息'
     : _nonBlank(playback.metadata?.artist) ?? '未知歌手';
+
+({ProbeTrack? track, String title, String subtitle}) playbackBarTrack(
+  PlaybackController? playback,
+  LibraryController? library,
+  QueueEntry? preview,
+) {
+  if (preview != null) {
+    final track = library?.availableTrack(preview.song.songId);
+    return (
+      track: track?.probe ?? preview.song.track,
+      title: track?.title ?? preview.song.track.name,
+      subtitle: _nonBlank(track?.song.artist) ?? '未知歌手',
+    );
+  }
+  final current = playback?.current;
+  if (playback == null || current == null) {
+    return (track: null, title: '未播放', subtitle: '选择歌曲开始播放');
+  }
+  final songId = playback.currentSongId;
+  final saved = songId == null ? null : library?.availableTrack(songId);
+  return (
+    track: current,
+    title: playback.changingTrack
+        ? saved?.title ?? current.name
+        : playbackTitle(playback),
+    subtitle: playback.changingTrack
+        ? '正在装载歌曲'
+        : playback.currentLyric ?? playbackArtist(playback),
+  );
+}
 
 String playbackActivityLabel(PlaybackController playback) {
   if (playback.changingTrack) return '正在装载歌曲';

@@ -174,10 +174,12 @@ class PlaybackQueue {
 
   QueueEntry? previous() => _step(-1);
 
+  QueueEntry? manualNeighbor(int direction) =>
+      _entries.isEmpty ? null : _entries[(index + direction) % _entries.length];
+
   QueueEntry? _step(int direction) {
-    if (_entries.isEmpty) return null;
-    final target = (index + direction) % _entries.length;
-    return _choose(_entries[target].entryId, base: true);
+    final target = manualNeighbor(direction);
+    return target == null ? null : _choose(target.entryId, base: true);
   }
 
   void reorder(List<String> orderedIds) {

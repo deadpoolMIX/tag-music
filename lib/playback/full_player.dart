@@ -43,11 +43,13 @@ class PlayerSeek extends StatefulWidget {
     required this.playback,
     this.onSeek,
     this.inlineTimes = false,
+    this.preview = false,
     super.key,
   });
   final PlaybackController playback;
   final VoidCallback? onSeek;
   final bool inlineTimes;
+  final bool preview;
 
   static const _sliderHeight = 44.0;
   static const _timeStyle = TextStyle(fontSize: 12, height: 1.25);
@@ -105,7 +107,7 @@ class _PlayerSeekState extends State<PlayerSeek> {
   Widget build(BuildContext context) {
     final playback = widget.playback;
     final state = playback.player.state;
-    final enabled = playback.canSeek;
+    final enabled = !widget.preview && playback.canSeek;
     final max = enabled ? state.duration.inMilliseconds.toDouble() : 1.0;
     final position = Duration(
       milliseconds:
@@ -144,7 +146,11 @@ class _PlayerSeekState extends State<PlayerSeek> {
         ),
       ),
     );
-    final elapsedLabel = enabled ? formatPosition(position) : '--:--';
+    final elapsedLabel = enabled
+        ? formatPosition(position)
+        : widget.preview
+        ? '0:00'
+        : '--:--';
     final totalLabel = enabled ? formatPosition(state.duration) : '--:--';
     final timeStyle = widget.inlineTimes
         ? PlayerSeek._timeStyle.copyWith(
@@ -686,7 +692,6 @@ class _PlayerBody extends StatelessWidget {
   Widget _controls(BuildContext context) {
     final transport = PlaybackControls(
       playback: playback,
-      tagLibrary: library,
       onToggleLayout: playback.toggleLayout,
       large: true,
       immersiveColor: controlColor,
@@ -708,20 +713,34 @@ class _PlayerBody extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         transport,
-        _StandardPlayerControl(
-          visible: !simple,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [mode, timer, queue],
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            for (final action in [mode, timer, queue])
+              Expanded(
+                child: Center(
+                  child: _StandardPlayerControl(
+                    visible: !simple,
+                    child: action,
+                  ),
+                ),
               ),
-              if (playback.sleep.active) SleepTimerStatus(playback: playback),
-            ],
-          ),
+            Expanded(
+              child: Center(
+                child: PlaybackTagButton(
+                  playback: playback,
+                  library: library,
+                  foreground: controlColor,
+                ),
+              ),
+            ),
+          ],
         ),
+        if (playback.sleep.active)
+          _StandardPlayerControl(
+            visible: !simple,
+            child: SleepTimerStatus(playback: playback),
+          ),
         PlaybackFeedback(playback: playback, color: controlColor),
       ],
     );

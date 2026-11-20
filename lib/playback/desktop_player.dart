@@ -12,6 +12,7 @@ import 'cover_viewer.dart';
 import 'full_player.dart' show ImmersiveLyrics, PlayerSeek;
 import 'playback_bar_gestures.dart';
 import 'playback_controller.dart';
+import 'playback_queue.dart' show QueueEntry;
 import 'playback_status.dart';
 import 'player_actions.dart';
 import 'player_background.dart';
@@ -150,8 +151,14 @@ class _DesktopPlaybackBar extends ConsumerWidget {
     );
   }
 
-  Widget _nowPlaying(BuildContext context, PlaybackController? playback) {
-    final current = playback?.current;
+  Widget _nowPlaying(
+    BuildContext context,
+    PlaybackController? playback,
+    LibraryController? library,
+    QueueEntry? preview,
+  ) {
+    final display = playbackBarTrack(playback, library, preview);
+    final current = display.track;
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -180,17 +187,13 @@ class _DesktopPlaybackBar extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  playback == null ? '未播放' : playbackTitle(playback),
+                  display.title,
                   style: theme.textTheme.titleSmall,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  current == null || playback == null
-                      ? '选择歌曲开始播放'
-                      : playback.changingTrack
-                      ? '正在装载歌曲'
-                      : playback.currentLyric ?? playbackArtist(playback),
+                  display.subtitle,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -208,8 +211,9 @@ class _DesktopPlaybackBar extends ConsumerWidget {
   Widget _transport(
     BuildContext context,
     PlaybackController? playback,
-    LibraryController? library,
-  ) => Column(
+    LibraryController? library, {
+    required bool preview,
+  }) => Column(
     mainAxisSize: MainAxisSize.min,
     children: [
       if (playback != null)
@@ -231,7 +235,11 @@ class _DesktopPlaybackBar extends ConsumerWidget {
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
             overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
           ),
-          child: PlayerSeek(playback: playback, inlineTimes: true),
+          child: PlayerSeek(
+            playback: playback,
+            inlineTimes: true,
+            preview: preview,
+          ),
         )
       else
         const SizedBox(height: 26),
@@ -276,14 +284,16 @@ class _DesktopPlaybackBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final playback = ref.watch(playbackProvider);
     final library = ref.watch(libraryProvider);
+    final toggle = playback == null ? null : () => _toggle(context);
     return Material(
       key: const ValueKey('global-minibar'),
       type: MaterialType.transparency,
-      child: Builder(
-        builder: (context) {
-          final toggle = playback == null ? null : () => _toggle(context);
+      child: PlaybackBarGestures(
+        playback: playback,
+        onOpenPlayer: expanded ? null : toggle,
+        builder: (context, preview) {
           final theme = Theme.of(context);
-          final feedback = playback?.playerFeedback;
+          final feedback = preview == null ? playback?.playerFeedback : null;
           final identity = Row(
             children: [
               Expanded(
@@ -291,7 +301,7 @@ class _DesktopPlaybackBar extends ConsumerWidget {
                   button: toggle == null ? null : true,
                   label: expanded ? '收起播放器' : '展开播放器',
                   onTap: toggle,
-                  child: _nowPlaying(context, playback),
+                  child: _nowPlaying(context, playback, library, preview),
                 ),
               ),
               if (playback != null && feedback != null)
@@ -306,23 +316,30 @@ class _DesktopPlaybackBar extends ConsumerWidget {
                 ),
             ],
           );
-          final controls = _transport(context, playback, library);
+          final controls = _transport(
+            context,
+            playback,
+            library,
+            preview: preview != null,
+          );
           final auxiliary = _auxiliary(context, playback, library);
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            excludeFromSemantics: true,
-            onTap: toggle,
-            onSecondaryTapUp: playback == null
-                ? null
-                : (details) =>
-                      PlayerActions(playback: playback, library: library).show(
-                        context,
-                        globalPosition: details.globalPosition,
-                        includeClose: false,
-                      ),
-            child: PlaybackBarGestures(
-              playback: playback,
-              onOpenPlayer: expanded ? null : toggle,
+          return Material(
+            type: MaterialType.transparency,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              excludeFromSemantics: true,
+              onTap: toggle,
+              onSecondaryTapUp: playback == null
+                  ? null
+                  : (details) =>
+                        PlayerActions(
+                          playback: playback,
+                          library: library,
+                        ).show(
+                          context,
+                          globalPosition: details.globalPosition,
+                          includeClose: false,
+                        ),
               child: SafeArea(
                 top: false,
                 child: Column(

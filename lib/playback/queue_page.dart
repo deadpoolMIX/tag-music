@@ -102,30 +102,11 @@ class PlaybackControls extends StatelessWidget {
             _buttonArea(
               SizedBox(
                 width: tagWidth,
-                child: IconButton(
-                  key: const ValueKey('player-add-tag'),
-                  tooltip: '添加标签',
-                  color: immersiveColor,
-                  disabledColor: immersiveColor?.withValues(alpha: .38),
-                  onPressed: playback.currentSongId == null
-                      ? null
-                      : () {
-                          final songId = playback.currentSongId;
-                          if (songId != null) {
-                            showTagActions(context, library, {
-                              songId,
-                            }, title: '添加标签');
-                          }
-                        },
-                  icon: Builder(
-                    builder: (context) => CustomPaint(
-                      size: Size.square(large ? 24 : 20),
-                      painter: _PlaybackTagIcon(
-                        IconTheme.of(context).color ??
-                            Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
+                child: PlaybackTagButton(
+                  playback: playback,
+                  library: library,
+                  foreground: immersiveColor,
+                  iconSize: large ? 24 : 20,
                 ),
               ),
             ),
@@ -134,6 +115,46 @@ class PlaybackControls extends StatelessWidget {
       },
     );
   }
+}
+
+class PlaybackTagButton extends StatelessWidget {
+  const PlaybackTagButton({
+    required this.playback,
+    required this.library,
+    this.foreground,
+    this.iconSize = 24,
+    super.key,
+  });
+
+  final PlaybackController playback;
+  final LibraryController? library;
+  final Color? foreground;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    key: const ValueKey('player-add-tag'),
+    tooltip: '添加标签',
+    color: foreground,
+    disabledColor: foreground?.withValues(alpha: .38),
+    onPressed: library == null || playback.currentSongId == null
+        ? null
+        : () {
+            final songId = playback.currentSongId;
+            if (songId != null) {
+              showTagActions(context, library!, {songId}, title: '添加标签');
+            }
+          },
+    icon: Builder(
+      builder: (context) => CustomPaint(
+        size: Size.square(iconSize),
+        painter: _PlaybackTagIcon(
+          IconTheme.of(context).color ??
+              Theme.of(context).colorScheme.onSurface,
+        ),
+      ),
+    ),
+  );
 }
 
 class _PlaybackTagIcon extends CustomPainter {
