@@ -57,49 +57,53 @@ class _PlayerVolumeState extends State<PlayerVolume> {
         const width = 60.0;
         final height = anchor.top.clamp(0.0, 152.0);
         if (height < 56) return const SizedBox.shrink();
-        return Positioned(
-          left: (anchor.center.dx - width / 2).clamp(
-            0.0,
-            (info.overlaySize.width - width).clamp(0.0, double.infinity),
-          ),
-          bottom: info.overlaySize.height - anchor.top,
-          width: width,
-          height: height,
-          child: MouseRegion(
-            onEnter: (_) => _show(),
-            onExit: _scheduleHide,
-            child: Listener(
-              onPointerSignal: _scroll,
-              child: Material(
-                elevation: 5,
-                color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(14),
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: RotatedBox(
-                        quarterTurns: 3,
-                        child: Semantics(
-                          label: '播放音量',
-                          child: Slider(
-                            value: volume,
-                            max: 100,
-                            semanticFormatterCallback: (value) =>
-                                '${value.round()}%',
-                            onChanged: widget.playback.setVolume,
+        return Stack(
+          children: [
+            Positioned(
+              left: (anchor.center.dx - width / 2).clamp(
+                0.0,
+                (info.overlaySize.width - width).clamp(0.0, double.infinity),
+              ),
+              bottom: info.overlaySize.height - anchor.top,
+              width: width,
+              height: height,
+              child: MouseRegion(
+                onEnter: (_) => _show(),
+                onExit: _scheduleHide,
+                child: Listener(
+                  onPointerSignal: _scroll,
+                  child: Material(
+                    elevation: 5,
+                    color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(14),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: RotatedBox(
+                            quarterTurns: 3,
+                            child: Semantics(
+                              label: '播放音量',
+                              child: Slider(
+                                value: volume,
+                                max: 100,
+                                semanticFormatterCallback: (value) =>
+                                    '${value.round()}%',
+                                onChanged: widget.playback.setVolume,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text('${volume.round()}%'),
+                        ),
+                      ],
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text('${volume.round()}%'),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
         );
       },
       child: MouseRegion(
