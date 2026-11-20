@@ -348,6 +348,10 @@ class _RuleTagPickerState extends State<_RuleTagPicker> {
                                             padding: const EdgeInsets.symmetric(
                                               horizontal: 10,
                                             ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
                                             side: BorderSide(
                                               color: scheme.outlineVariant,
                                             ),

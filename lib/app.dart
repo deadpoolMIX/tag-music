@@ -6,8 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/diagnostics.dart';
 import 'core/settings.dart';
-import 'playback/full_player.dart' show fullPlayerRouteName, lyricsRouteName;
+import 'playback/full_player.dart' show fullPlayerRouteName;
 import 'playback/playback_minibar.dart';
+import 'playback/queue_page.dart' show playbackQueueRouteName;
 import 'library/library_page.dart';
 import 'library/filter_page.dart';
 import 'library/playlists_page.dart';
@@ -61,7 +62,7 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
                         identical(route, _swipeRoute) &&
                         route is PageRoute &&
                         route.settings.name != fullPlayerRouteName &&
-                        route.settings.name != lyricsRouteName) {
+                        route.settings.name != playbackQueueRouteName) {
                       _shell.currentState?._openNavigation();
                     }
                   },

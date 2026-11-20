@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/gestures.dart' show PointerEvent;
+import 'package:flutter/gestures.dart' show DragStartBehavior, PointerEvent;
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'package:flutter/services.dart';
@@ -19,68 +19,17 @@ import 'player_actions.dart';
 import 'playback_status.dart';
 import 'lyrics.dart';
 import 'sleep_timer_sheet.dart';
+import 'slide_dismiss_route.dart';
 
 const fullPlayerRouteName = '/player';
-const lyricsRouteName = '/lyrics';
 
-Future<void> openFullPlayer(BuildContext context) => Navigator.of(
-  context,
-).push(_FullPlayerRoute(reduceMotion: MediaQuery.disableAnimationsOf(context)));
-
-class _FullPlayerRoute extends PageRouteBuilder<void> {
-  _FullPlayerRoute({required this.reduceMotion})
-    : super(
-        settings: const RouteSettings(name: fullPlayerRouteName),
-        opaque: false,
-        transitionDuration: reduceMotion
-            ? Duration.zero
-            : const Duration(milliseconds: 280),
-        reverseTransitionDuration: reduceMotion
-            ? Duration.zero
-            : const Duration(milliseconds: 240),
-        pageBuilder: (_, _, _) => const FullPlayer(),
-        transitionsBuilder: (_, animation, _, child) => SlideTransition(
-          position: animation.drive(
-            Tween(begin: const Offset(0, 1), end: Offset.zero),
-          ),
-          child: child,
-        ),
-      );
-
-  final bool reduceMotion;
-  bool _dragging = false;
-
-  void startDrag() {
-    _dragging = isCurrent && controller?.isCompleted == true;
-  }
-
-  void moveDrag(double pixels, double height) {
-    if (!_dragging || !isCurrent || height <= 0) return;
-    final movement = controller!;
-    movement.value = (movement.value - pixels / height).clamp(0.01, 1);
-  }
-
-  void finishDrag({double velocity = 0, bool cancelled = false}) {
-    if (!_dragging) return;
-    _dragging = false;
-    if (!isCurrent) return;
-    final movement = controller!;
-    if (!cancelled &&
-        (movement.value <= .78 || (movement.value < .96 && velocity >= 680))) {
-      navigator?.pop();
-    } else if (reduceMotion) {
-      movement.value = 1;
-    } else {
-      unawaited(
-        movement.animateTo(
-          1,
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-        ),
-      );
-    }
-  }
-}
+Future<void> openFullPlayer(BuildContext context) => Navigator.of(context).push(
+  SlideDismissRoute(
+    name: fullPlayerRouteName,
+    reduceMotion: MediaQuery.disableAnimationsOf(context),
+    builder: (_) => const FullPlayer(),
+  ),
+);
 
 class PlayerBackground extends StatefulWidget {
   const PlayerBackground({
@@ -291,15 +240,40 @@ class _PlayerSeekState extends State<PlayerSeek> {
   }
 }
 
-class FullPlayer extends ConsumerWidget {
+class FullPlayer extends ConsumerStatefulWidget {
   const FullPlayer({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FullPlayer> createState() => _FullPlayerState();
+}
+
+class _FullPlayerState extends ConsumerState<FullPlayer> {
+  bool _showLyrics = false;
+
+  Future<void> _openLyrics() async {
+    final route = ModalRoute.of(context);
+    if (_showLyrics || route == null || !route.isCurrent) return;
+    route.addLocalHistoryEntry(
+      LocalHistoryEntry(
+        impliesAppBarDismissal: false,
+        onRemove: () {
+          if (mounted) setState(() => _showLyrics = false);
+        },
+      ),
+    );
+    setState(() => _showLyrics = true);
+  }
+
+  void _back() => Navigator.maybePop(context);
+
+  @override
+  Widget build(BuildContext context) {
     final playback = ref.watch(playbackProvider);
     final library = ref.watch(libraryProvider);
     final route = ModalRoute.of(context);
-    final playerRoute = route is _FullPlayerRoute ? route : null;
+    final dismissRoute = !_showLyrics && route is SlideDismissRoute
+        ? route
+        : null;
     if (playback == null) {
       return const Scaffold(body: Center(child: Text('播放器尚未就绪')));
     }
@@ -307,22 +281,14 @@ class FullPlayer extends ConsumerWidget {
       listenable: playback,
       builder: (context, _) {
         final simple = playback.simpleLayout;
-        Future<void> openLyrics() => Navigator.push<void>(
-          context,
-          MaterialPageRoute(
-            settings: const RouteSettings(name: lyricsRouteName),
-            builder: (_) => ImmersiveLyrics(playback: playback),
-          ),
-        );
         final actions = PlayerActions(
           playback: playback,
           library: library,
-          openLyrics: openLyrics,
+          openLyrics: _openLyrics,
         );
-        void close() => Navigator.maybePop(context);
 
         return CallbackShortcuts(
-          bindings: {const SingleActivator(LogicalKeyboardKey.escape): close},
+          bindings: {const SingleActivator(LogicalKeyboardKey.escape): _back},
           child: Focus(
             autofocus: true,
             child: AnnotatedRegion<SystemUiOverlayStyle>(
@@ -332,28 +298,30 @@ class FullPlayer extends ConsumerWidget {
               child: Scaffold(
                 body: Semantics(
                   customSemanticsActions: {
-                    const CustomSemanticsAction(label: '关闭播放页'): close,
+                    CustomSemanticsAction(
+                      label: _showLyrics ? '返回播放器' : '关闭播放页',
+                    ): _back,
                   },
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onVerticalDragStart: playerRoute == null
+                    onVerticalDragStart: dismissRoute == null
                         ? null
-                        : (_) => playerRoute.startDrag(),
-                    onVerticalDragUpdate: playerRoute == null
+                        : (_) => dismissRoute.startDrag(),
+                    onVerticalDragUpdate: dismissRoute == null
                         ? null
-                        : (details) => playerRoute.moveDrag(
+                        : (details) => dismissRoute.moveDrag(
                             details.primaryDelta ?? 0,
                             MediaQuery.sizeOf(context).height,
                           ),
-                    onVerticalDragEnd: playerRoute == null
+                    onVerticalDragEnd: dismissRoute == null
                         ? null
-                        : (details) => playerRoute.finishDrag(
+                        : (details) => dismissRoute.finishDrag(
                             velocity: details.primaryVelocity ?? 0,
                           ),
-                    onVerticalDragCancel: playerRoute == null
+                    onVerticalDragCancel: dismissRoute == null
                         ? null
-                        : () => playerRoute.finishDrag(cancelled: true),
-                    onSecondaryTapUp: simple
+                        : () => dismissRoute.finishDrag(cancelled: true),
+                    onSecondaryTapUp: simple || _showLyrics
                         ? null
                         : (details) => unawaited(
                             actions.show(
@@ -365,34 +333,69 @@ class FullPlayer extends ConsumerWidget {
                       playback: playback,
                       immersive: simple,
                       child: SafeArea(
-                        child: Column(
-                          children: [
-                            if (!simple)
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(20, 6, 8, 0),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: playback.current == null
-                                          ? const SizedBox.shrink()
-                                          : _PlayerHeading(
-                                              playback: playback,
-                                              library: library,
-                                            ),
+                        child: AnimatedSwitcher(
+                          duration:
+                              simple && !MediaQuery.disableAnimationsOf(context)
+                              ? const Duration(milliseconds: 240)
+                              : Duration.zero,
+                          layoutBuilder: (active, previous) => Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              for (final child in [...previous, ?active])
+                                ExcludeSemantics(
+                                  key: child.key,
+                                  excluding: child != active,
+                                  child: ExcludeFocus(
+                                    excluding: child != active,
+                                    child: IgnorePointer(
+                                      ignoring: child != active,
+                                      child: child,
                                     ),
-                                    PlayerActionsButton(actions: actions),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          child: _showLyrics
+                              ? ImmersiveLyrics(
+                                  playback: playback,
+                                  onBack: _back,
+                                )
+                              : Column(
+                                  children: [
+                                    if (!simple)
+                                      Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                          20,
+                                          6,
+                                          8,
+                                          0,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: playback.current == null
+                                                  ? const SizedBox.shrink()
+                                                  : _PlayerHeading(
+                                                      playback: playback,
+                                                      library: library,
+                                                    ),
+                                            ),
+                                            PlayerActionsButton(
+                                              actions: actions,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    Expanded(
+                                      child: _PlayerBody(
+                                        playback: playback,
+                                        library: library,
+                                        simple: simple,
+                                        openLyrics: _openLyrics,
+                                      ),
+                                    ),
                                   ],
                                 ),
-                              ),
-                            Expanded(
-                              child: _PlayerBody(
-                                playback: playback,
-                                library: library,
-                                simple: simple,
-                                openLyrics: openLyrics,
-                              ),
-                            ),
-                          ],
                         ),
                       ),
                     ),
@@ -779,8 +782,14 @@ class _PlayerBody extends StatelessWidget {
 }
 
 class ImmersiveLyrics extends ConsumerStatefulWidget {
-  const ImmersiveLyrics({required this.playback, super.key});
+  const ImmersiveLyrics({
+    required this.playback,
+    required this.onBack,
+    super.key,
+  });
+
   final PlaybackController playback;
+  final VoidCallback onBack;
   @override
   ConsumerState<ImmersiveLyrics> createState() => _ImmersiveLyricsState();
 }
@@ -792,6 +801,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
   bool _follow = true;
   int _pointers = 0, _followGeneration = 0;
   int _last = -2;
+  double _swipeStartX = 0;
   Lyrics? _lyrics;
   List<double> _offsets = [], _heights = [];
   double _width = 0, _viewportHeight = 0;
@@ -1006,9 +1016,9 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
               controller: _scroll,
               padding: EdgeInsets.fromLTRB(
                 padding,
-                constraints.maxHeight * .25,
+                constraints.maxHeight * .18,
                 padding,
-                constraints.maxHeight * .65,
+                constraints.maxHeight * .72,
               ),
               itemCount: lyrics.lines.length,
               itemExtentBuilder: (index, _) => _heights[index],
@@ -1173,11 +1183,6 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
                 alignment: WrapAlignment.center,
                 spacing: 8,
                 children: [
-                  TextButton.icon(
-                    onPressed: () => Navigator.maybePop(context),
-                    icon: const Icon(Icons.arrow_back),
-                    label: const Text('返回播放器'),
-                  ),
                   if (lyrics.status == LyricsStatus.unreadable &&
                       lyrics.message != null)
                     TextButton.icon(
@@ -1209,37 +1214,26 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
   }
 
   @override
-  Widget build(BuildContext context) => CallbackShortcuts(
-    bindings: {
-      const SingleActivator(LogicalKeyboardKey.escape): () =>
-          Navigator.maybePop(context),
-    },
-    child: Focus(
-      focusNode: _pageFocus,
-      autofocus: true,
-      child: Scaffold(
-        body: PlayerBackground(
-          playback: widget.playback,
-          child: Material(
-            type: MaterialType.transparency,
-            child: Listener(
-              behavior: HitTestBehavior.opaque,
-              onPointerDown: (_) => _pointers++,
-              onPointerUp: _releasePointer,
-              onPointerCancel: _releasePointer,
-              child: SafeArea(
-                child: Column(
-                  children: [
-                    const Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: BackButton(),
-                    ),
-                    Expanded(child: LayoutBuilder(builder: _lines)),
-                  ],
-                ),
-              ),
-            ),
-          ),
+  Widget build(BuildContext context) => Focus(
+    focusNode: _pageFocus,
+    autofocus: true,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      excludeFromSemantics: true,
+      dragStartBehavior: DragStartBehavior.down,
+      onHorizontalDragStart: (details) =>
+          _swipeStartX = details.globalPosition.dx,
+      onHorizontalDragEnd: (details) {
+        if (details.globalPosition.dx - _swipeStartX >= 56) widget.onBack();
+      },
+      child: Material(
+        type: MaterialType.transparency,
+        child: Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerDown: (_) => _pointers++,
+          onPointerUp: _releasePointer,
+          onPointerCancel: _releasePointer,
+          child: LayoutBuilder(builder: _lines),
         ),
       ),
     ),
