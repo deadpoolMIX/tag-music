@@ -612,28 +612,6 @@ class _AppShellState extends ConsumerState<AppShell>
                                   ),
                                 ],
                               ),
-                            if (playback != null && !selecting)
-                              ListenableBuilder(
-                                listenable: playback,
-                                builder: (_, _) => Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (!playback.notificationsEnabled)
-                                      Text(
-                                        playback.notificationMessage ??
-                                            '允许播放通知后，可在通知栏和锁屏控制音乐。',
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    if (!playback.notificationsEnabled)
-                                      TextButton(
-                                        onPressed: playback
-                                            .requestNotificationPermission,
-                                        child: const Text('开启播放通知'),
-                                      ),
-                                  ],
-                                ),
-                              ),
                             Expanded(
                               child: IndexedStack(
                                 index: _selected.index,
