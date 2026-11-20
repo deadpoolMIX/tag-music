@@ -43,16 +43,18 @@ class RuleEditor extends StatelessWidget {
     ),
   );
 
-  void _pickTags(BuildContext context, int box) => showDialog<void>(
-    context: context,
-    builder: (_) => _RuleTagPicker(
-      library: library,
-      box: box,
-      prefix: prefix,
-      initial: _ids(rule, box),
-      onChanged: (ids) => _replace(box, ids),
-    ),
-  );
+  Future<void> _pickTags(BuildContext context, int box) async {
+    final selected = await showDialog<Set<String>>(
+      context: context,
+      builder: (_) => _RuleTagPicker(
+        library: library,
+        box: box,
+        prefix: prefix,
+        initial: _ids(rule, box),
+      ),
+    );
+    if (context.mounted && selected != null) _replace(box, selected);
+  }
 
   Widget _compactBox(BuildContext context, int box) {
     final ids = _ids(rule, box);
@@ -200,13 +202,11 @@ class _RuleTagPicker extends StatefulWidget {
     required this.box,
     required this.prefix,
     required this.initial,
-    required this.onChanged,
   });
   final LibraryController library;
   final int box;
   final String prefix;
   final Set<String> initial;
-  final ValueChanged<Set<String>> onChanged;
   @override
   State<_RuleTagPicker> createState() => _RuleTagPickerState();
 }
@@ -214,79 +214,193 @@ class _RuleTagPicker extends StatefulWidget {
 class _RuleTagPickerState extends State<_RuleTagPicker> {
   late final selected = {...widget.initial};
   String query = '';
+
   @override
-  Widget build(BuildContext context) => CompactAlertDialog(
-    title: Text(_pickerTitles[widget.box]),
-    content: SizedBox(
-      width: 520,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            key: ValueKey('${widget.prefix}-tag-search'),
-            onChanged: (value) =>
-                setState(() => query = value.trim().toLowerCase()),
-            decoration: const InputDecoration(
-              hintText: '搜索标签',
-              prefixIcon: Icon(Icons.search, size: 18),
-            ),
-          ),
-          Flexible(
-            child: ListenableBuilder(
-              listenable: widget.library,
-              builder: (context, _) {
-                final tags = widget.library.tags
-                    .where((t) => t.name.toLowerCase().contains(query))
-                    .toList();
-                return tags.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Text(
-                          widget.library.tags.isEmpty
-                              ? '尚无标签，请先在标签页创建。'
-                              : '没有匹配的标签',
-                        ),
-                      )
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        padding: EdgeInsets.zero,
-                        itemCount: tags.length,
-                        itemBuilder: (_, i) {
-                          final tag = tags[i];
-                          return CheckboxListTile(
-                            key: ValueKey('${widget.prefix}-tag-${tag.id}'),
-                            dense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 4,
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: widget.library,
+    builder: (context, _) {
+      final library = widget.library;
+      final tags = library.tags;
+      final counts = library.tagCounts;
+      final chosen = tags.where((tag) => selected.contains(tag.id)).toList();
+      final choices =
+          tags
+              .where(
+                (tag) =>
+                    !selected.contains(tag.id) &&
+                    tag.name.toLowerCase().contains(query),
+              )
+              .toList()
+            ..sort((a, b) {
+              final byCount = (counts[b.id] ?? 0).compareTo(counts[a.id] ?? 0);
+              if (byCount != 0) return byCount;
+              final byName = a.name.toLowerCase().compareTo(
+                b.name.toLowerCase(),
+              );
+              return byName != 0 ? byName : a.id.compareTo(b.id);
+            });
+      final scheme = Theme.of(context).colorScheme;
+      final enabled = !library.filterDeletingTag;
+
+      return CompactAlertDialog(
+        title: Text(_pickerTitles[widget.box]),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (chosen.isNotEmpty) ...[
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Wrap(
+                      spacing: 6,
+                      children: [
+                        for (final tag in chosen)
+                          Tooltip(
+                            message: '取消选择 ${tag.name}',
+                            child: ActionChip(
+                              label: Text(
+                                tag.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              shape: const StadiumBorder(),
+                              side: BorderSide.none,
+                              backgroundColor: scheme.primaryContainer,
+                              labelStyle: TextStyle(
+                                color: scheme.onPrimaryContainer,
+                              ),
+                              onPressed: enabled
+                                  ? () =>
+                                        setState(() => selected.remove(tag.id))
+                                  : null,
                             ),
-                            title: Text(tag.name),
-                            value: selected.contains(tag.id),
-                            onChanged: widget.library.filterDeletingTag
-                                ? null
-                                : (value) {
-                                    setState(() {
-                                      if (value == true) {
-                                        selected.add(tag.id);
-                                      } else {
-                                        selected.remove(tag.id);
-                                      }
-                                    });
-                                    widget.onChanged({...selected});
-                                  },
-                          );
-                        },
-                      );
-              },
-            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+              ],
+              TextField(
+                key: ValueKey('${widget.prefix}-tag-search'),
+                onChanged: (value) =>
+                    setState(() => query = value.trim().toLowerCase()),
+                decoration: InputDecoration(
+                  hintText: '搜索标签',
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  filled: true,
+                  fillColor: scheme.surfaceContainerLow,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (choices.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    tags.isEmpty
+                        ? '尚无标签'
+                        : query.isEmpty
+                        ? '已选中全部标签'
+                        : '没有匹配的可选标签',
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              else
+                Flexible(
+                  flex: 3,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    padding: EdgeInsets.zero,
+                    itemCount: (choices.length + 1) ~/ 2,
+                    itemBuilder: (context, row) => Row(
+                      spacing: 8,
+                      children: [
+                        for (var column = 0; column < 2; column++)
+                          Expanded(
+                            child: row * 2 + column >= choices.length
+                                ? const SizedBox.shrink()
+                                : Builder(
+                                    builder: (context) {
+                                      final tag = choices[row * 2 + column];
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 4,
+                                        ),
+                                        child: OutlinedButton(
+                                          key: ValueKey(
+                                            '${widget.prefix}-tag-${tag.id}',
+                                          ),
+                                          onPressed: enabled
+                                              ? () => setState(
+                                                  () => selected.add(tag.id),
+                                                )
+                                              : null,
+                                          style: OutlinedButton.styleFrom(
+                                            alignment: AlignmentDirectional
+                                                .centerStart,
+                                            minimumSize: const Size(0, 42),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                            ),
+                                            side: BorderSide(
+                                              color: scheme.outlineVariant,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            spacing: 4,
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  tag.name,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              Text(
+                                                '${counts[tag.id] ?? 0}',
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .labelSmall
+                                                    ?.copyWith(
+                                                      color: scheme
+                                                          .onSurfaceVariant,
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: enabled
+                ? () =>
+                      Navigator.pop(context, {for (final tag in chosen) tag.id})
+                : null,
+            child: const Text('确认'),
           ),
         ],
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('关闭'),
-      ),
-    ],
+      );
+    },
   );
 }

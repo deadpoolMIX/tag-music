@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/diagnostics.dart';
 import 'core/settings.dart';
+import 'playback/full_player.dart' show fullPlayerRouteName, lyricsRouteName;
 import 'playback/playback_minibar.dart';
 import 'library/library_page.dart';
 import 'library/filter_page.dart';
@@ -28,74 +29,102 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
   final _shell = GlobalKey<_AppShellState>();
   final _routes = _TopRouteObserver();
   double _swipeStartX = 0;
+  Route<dynamic>? _swipeRoute;
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    navigatorKey: _appNavigator,
-    navigatorObservers: [_routes],
-    builder: (context, child) {
-      final desktop = Theme.of(context).platform == TargetPlatform.windows;
-      return CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.escape): () =>
-              _appNavigator.currentState?.maybePop(),
-        },
-        child: desktop
-            ? child!
-            : GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                supportedDevices: const {PointerDeviceKind.touch},
-                excludeFromSemantics: true,
-                dragStartBehavior: DragStartBehavior.down,
-                onHorizontalDragStart: (details) =>
-                    _swipeStartX = details.globalPosition.dx,
-                onHorizontalDragEnd: (details) {
-                  if (details.globalPosition.dx - _swipeStartX >= 56 &&
-                      _routes.top is PageRoute) {
-                    _shell.currentState?._openNavigation();
-                  }
-                },
-                child: child,
-              ),
-      );
-    },
-    title: 'Tag Music',
-    debugShowCheckedModeBanner: false,
-    locale: const Locale('zh', 'CN'),
-    supportedLocales: const [Locale('zh', 'CN')],
-    localizationsDelegates: GlobalMaterialLocalizations.delegates,
-    themeMode: ref.watch(themeProvider),
-    theme: _theme(Brightness.light),
-    darkTheme: _theme(Brightness.dark),
-    home: AppShell(key: _shell),
-  );
+  Widget build(BuildContext context) {
+    final color = ref.watch(themeColorProvider);
+    return MaterialApp(
+      navigatorKey: _appNavigator,
+      navigatorObservers: [_routes],
+      builder: (context, child) {
+        final desktop = Theme.of(context).platform == TargetPlatform.windows;
+        return CallbackShortcuts(
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.escape): () =>
+                _appNavigator.currentState?.maybePop(),
+          },
+          child: desktop
+              ? child!
+              : GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  supportedDevices: const {PointerDeviceKind.touch},
+                  excludeFromSemantics: true,
+                  dragStartBehavior: DragStartBehavior.down,
+                  onHorizontalDragStart: (details) {
+                    _swipeStartX = details.globalPosition.dx;
+                    _swipeRoute = _routes.top;
+                  },
+                  onHorizontalDragEnd: (details) {
+                    final route = _routes.top;
+                    if (details.globalPosition.dx - _swipeStartX >= 56 &&
+                        identical(route, _swipeRoute) &&
+                        route is PageRoute &&
+                        route.settings.name != fullPlayerRouteName &&
+                        route.settings.name != lyricsRouteName) {
+                      _shell.currentState?._openNavigation();
+                    }
+                  },
+                  child: child,
+                ),
+        );
+      },
+      title: 'Tag Music',
+      debugShowCheckedModeBanner: false,
+      locale: const Locale('zh', 'CN'),
+      supportedLocales: const [Locale('zh', 'CN')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      themeMode: ref.watch(themeProvider),
+      theme: _theme(Brightness.light, color),
+      darkTheme: _theme(Brightness.dark, color),
+      home: AppShell(key: _shell),
+    );
+  }
 
-  ThemeData _theme(Brightness brightness) => ThemeData(
-    useMaterial3: true,
-    dialogTheme: DialogThemeData(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      titleTextStyle: TextStyle(
-        fontFamily: 'Microsoft YaHei',
-        fontSize: 20,
-        fontWeight: FontWeight.w600,
-        color: brightness == Brightness.dark ? Colors.white : Colors.black87,
-      ),
-    ),
-    inputDecorationTheme: const InputDecorationThemeData(
-      isDense: true,
-      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      prefixIconConstraints: BoxConstraints(minWidth: 36, minHeight: 36),
-    ),
-    popupMenuTheme: const PopupMenuThemeData(
-      menuPadding: EdgeInsets.symmetric(vertical: 4),
-    ),
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: const Color(0xFF386A56),
+  ThemeData _theme(Brightness brightness, ThemeColor color) {
+    final generated = ColorScheme.fromSeed(
+      seedColor: color.seed,
       brightness: brightness,
-    ),
-    fontFamily: 'Microsoft YaHei',
-  );
+    );
+    final scheme = brightness == Brightness.light
+        ? generated.copyWith(
+            surface: Colors.white,
+            surfaceBright: Colors.white,
+            surfaceDim: const Color(0xFFE1E3E6),
+            surfaceContainerLowest: Colors.white,
+            surfaceContainerLow: const Color(0xFFF7F8FA),
+            surfaceContainer: const Color(0xFFF2F4F6),
+            surfaceContainerHigh: const Color(0xFFECEEF1),
+            surfaceContainerHighest: const Color(0xFFE5E8EC),
+            onSurface: const Color(0xFF171A20),
+            onSurfaceVariant: const Color(0xFF494E57),
+          )
+        : generated;
+    return ThemeData(
+      useMaterial3: true,
+      dialogTheme: DialogThemeData(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titleTextStyle: TextStyle(
+          fontFamily: 'Microsoft YaHei',
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: brightness == Brightness.dark ? Colors.white : Colors.black87,
+        ),
+      ),
+      inputDecorationTheme: const InputDecorationThemeData(
+        isDense: true,
+        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        prefixIconConstraints: BoxConstraints(minWidth: 36, minHeight: 36),
+      ),
+      popupMenuTheme: const PopupMenuThemeData(
+        menuPadding: EdgeInsets.symmetric(vertical: 4),
+      ),
+      scaffoldBackgroundColor: scheme.surface,
+      colorScheme: scheme,
+      fontFamily: 'Microsoft YaHei',
+    );
+  }
 }
 
 class _TopRouteObserver extends NavigatorObserver {
@@ -448,10 +477,10 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _saving = false;
 
-  Future<void> _select(ThemeMode mode) async {
+  Future<void> _save(Future<void> Function() apply) async {
     setState(() => _saving = true);
     try {
-      await ref.read(themeProvider.notifier).select(mode);
+      await apply();
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -465,6 +494,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final mode = ref.watch(themeProvider);
+    final color = ref.watch(themeColorProvider);
     final package = ref.watch(packageInfoProvider);
     final playback = ref.watch(playbackProvider);
     final theme = Theme.of(context);
@@ -521,9 +551,33 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         selected: {mode},
                         onSelectionChanged: _saving
                             ? null
-                            : (selected) => _select(selected.single),
+                            : (selected) => _save(
+                                () => ref
+                                    .read(themeProvider.notifier)
+                                    .select(selected.single),
+                              ),
                       ),
                     ),
+                  ),
+                  Text('主题色', style: theme.textTheme.titleMedium),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final option in ThemeColor.values)
+                        ChoiceChip(
+                          avatar: CircleAvatar(backgroundColor: option.seed),
+                          label: Text(option.label),
+                          selected: color == option,
+                          showCheckmark: false,
+                          onSelected: _saving
+                              ? null
+                              : (_) => _save(
+                                  () => ref
+                                      .read(themeColorProvider.notifier)
+                                      .select(option),
+                                ),
+                        ),
+                    ],
                   ),
                   if (playback?.documents.android == true) ...[
                     Align(

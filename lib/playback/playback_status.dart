@@ -34,10 +34,12 @@ class PlaybackToggleButton extends StatelessWidget {
     this.filled = true,
     this.enabled = true,
     this.onToggleLayout,
+    this.large = false,
     super.key,
   });
   final PlaybackController playback;
   final bool filled, enabled;
+  final bool large;
   final VoidCallback? onToggleLayout;
 
   @override
@@ -60,7 +62,49 @@ class PlaybackToggleButton extends StatelessWidget {
                   dimension: 24,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-        : Icon(playback.playing ? Icons.pause : Icons.play_arrow);
+        : Icon(switch ((large, playback.playing)) {
+            (true, true) => Icons.pause_rounded,
+            (true, false) => Icons.play_arrow_rounded,
+            (false, true) => Icons.pause,
+            (false, false) => Icons.play_arrow,
+          }, size: large ? 36 : null);
+    if (onToggleLayout case final toggleLayout?) {
+      final theme = Theme.of(context);
+      final scheme = theme.colorScheme;
+      return Semantics(
+        label: label,
+        value: playbackActivityLabel(playback),
+        button: true,
+        enabled: true,
+        onTap: canToggle ? playback.togglePlayPause : null,
+        onLongPress: toggleLayout,
+        customSemanticsActions: {
+          const CustomSemanticsAction(label: '切换沉浸模式'): toggleLayout,
+        },
+        child: Material(
+          shape: const CircleBorder(),
+          color: filled ? scheme.primary : Colors.white12,
+          child: InkWell(
+            key: const ValueKey('play-pause'),
+            customBorder: const CircleBorder(),
+            onTap: canToggle ? playback.togglePlayPause : null,
+            onLongPress: toggleLayout,
+            excludeFromSemantics: true,
+            child: SizedBox.square(
+              dimension: large ? 64 : 48,
+              child: Center(
+                child: IconTheme.merge(
+                  data: IconThemeData(
+                    color: filled ? scheme.onPrimary : Colors.white,
+                  ),
+                  child: icon,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     final button = filled
         ? IconButton.filled(
             key: const ValueKey('play-pause'),
@@ -74,12 +118,6 @@ class PlaybackToggleButton extends StatelessWidget {
             onPressed: canToggle ? playback.togglePlayPause : null,
             icon: icon,
           );
-    return Semantics(
-      value: playbackActivityLabel(playback),
-      customSemanticsActions: onToggleLayout == null
-          ? null
-          : {const CustomSemanticsAction(label: '切换沉浸模式'): onToggleLayout!},
-      child: GestureDetector(onLongPress: onToggleLayout, child: button),
-    );
+    return Semantics(value: playbackActivityLabel(playback), child: button);
   }
 }

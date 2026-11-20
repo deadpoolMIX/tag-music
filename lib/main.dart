@@ -62,6 +62,7 @@ Future<void> main() async {
   }
   final store = PreferencesSettingsStore();
   var mode = ThemeMode.system;
+  var themeColor = ThemeColor.blue;
   String? warning;
   PlaybackController? playback;
   LibraryController? library;
@@ -89,11 +90,18 @@ Future<void> main() async {
     warning =
         '${warning == null ? '' : '$warning\n'}无法读取主题设置，当前跟随系统。请检查存储空间后重新启动。';
   }
+  try {
+    themeColor = ThemeColor.decode(await store.readThemeColor());
+  } catch (_) {
+    warning = '${warning == null ? '' : '$warning\n'}无法读取主题色，当前使用海蓝。';
+  }
   runApp(
     ProviderScope(
       overrides: [
         settingsStoreProvider.overrideWithValue(store),
         initialThemeProvider.overrideWithValue(mode),
+        themeColorStoreProvider.overrideWithValue(store),
+        initialThemeColorProvider.overrideWithValue(themeColor),
         startupWarningProvider.overrideWithValue(warning),
         playbackProvider.overrideWithValue(playback),
         libraryProvider.overrideWithValue(library),

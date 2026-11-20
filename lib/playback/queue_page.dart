@@ -21,33 +21,42 @@ class PlaybackControls extends StatelessWidget {
   const PlaybackControls({
     required this.playback,
     this.onToggleLayout,
-    this.leading,
-    this.trailing = const [],
+    this.large = false,
+    this.immersive = false,
     super.key,
   });
   final PlaybackController playback;
   final VoidCallback? onToggleLayout;
-  final Widget? leading;
-  final List<Widget> trailing;
+  final bool large, immersive;
 
   @override
   Widget build(BuildContext context) => Wrap(
     alignment: WrapAlignment.center,
     crossAxisAlignment: WrapCrossAlignment.center,
+    spacing: large ? 24 : 0,
     children: [
-      ?leading,
       IconButton(
         tooltip: '上一首',
+        color: immersive ? Colors.white : null,
+        disabledColor: immersive ? Colors.white38 : null,
+        iconSize: large ? 32 : null,
         onPressed: playback.canPrevious ? playback.previous : null,
         icon: const Icon(Icons.skip_previous),
       ),
-      PlaybackToggleButton(playback: playback, onToggleLayout: onToggleLayout),
+      PlaybackToggleButton(
+        playback: playback,
+        onToggleLayout: onToggleLayout,
+        large: large,
+        filled: !immersive,
+      ),
       IconButton(
         tooltip: '下一首',
+        color: immersive ? Colors.white : null,
+        disabledColor: immersive ? Colors.white38 : null,
+        iconSize: large ? 32 : null,
         onPressed: playback.canNext ? playback.next : null,
         icon: const Icon(Icons.skip_next),
       ),
-      ...trailing,
     ],
   );
 }

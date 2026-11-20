@@ -34,6 +34,7 @@ class PlayerActions {
       const PopupMenuItem(value: 'info', child: Text('歌曲信息')),
     if (playback.error != null || playback.playbackNotice != null)
       const PopupMenuItem(value: 'status', child: Text('查看播放提示')),
+    const PopupMenuItem(value: 'close', child: Text('关闭播放页')),
   ];
 
   Future<void> show(BuildContext context, {Offset? globalPosition}) async {
@@ -76,6 +77,8 @@ class PlayerActions {
         }
       case 'status':
         await showPlaybackFeedback(context, playback);
+      case 'close':
+        await Navigator.maybePop(context);
     }
   }
 }

@@ -6,6 +6,67 @@ import 'library_header.dart';
 import 'song_list.dart';
 import 'track_cover.dart';
 
+final _artistSeparator = RegExp(r'[;；、／]|\s+/\s*|\s*/\s+');
+
+List<String> artistNames(String? metadata) => {
+  for (final name in (metadata ?? '').split(_artistSeparator))
+    if (name.trim().isNotEmpty) name.trim(),
+}.toList();
+
+Future<void> openArtistTracks(
+  BuildContext context,
+  LibraryController library,
+  PlaybackController playback,
+  String artist,
+) => Navigator.of(context).push<void>(
+  MaterialPageRoute(
+    builder: (_) => Scaffold(
+      appBar: AppBar(
+        title: Text(artist, maxLines: 1, overflow: TextOverflow.ellipsis),
+      ),
+      body: ListenableBuilder(
+        listenable: library,
+        builder: (context, _) => _GroupSongs(
+          name: artist,
+          albums: false,
+          library: library,
+          playback: playback,
+          rows: library.tracks
+              .where((track) => artistNames(track.song.artist).contains(artist))
+              .toList(),
+        ),
+      ),
+    ),
+  ),
+);
+
+class _GroupSongs extends StatelessWidget {
+  const _GroupSongs({
+    required this.name,
+    required this.albums,
+    required this.library,
+    required this.playback,
+    required this.rows,
+  });
+
+  final String? name;
+  final bool albums;
+  final LibraryController library;
+  final PlaybackController playback;
+  final List<LibraryTrack> rows;
+
+  @override
+  Widget build(BuildContext context) => SongList(
+    key: ValueKey((albums, name)),
+    library: library,
+    playback: playback,
+    source: rows,
+    rows: rows,
+    scope: albums ? 'album' : 'artist',
+    emptyText: '没有歌曲',
+  );
+}
+
 /// A compact, consistently ordered list for library groups.
 class GroupList extends StatelessWidget {
   const GroupList({
@@ -93,9 +154,13 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
   bool opened = false;
   String? selected;
 
-  String? groupName(LibraryTrack track) {
-    final value = widget.albums ? track.song.album : track.song.artist;
-    return value == null || value.trim().isEmpty ? null : value;
+  Iterable<String?> groupNames(LibraryTrack track) {
+    if (widget.albums) {
+      final album = track.song.album;
+      return [album == null || album.trim().isEmpty ? null : album];
+    }
+    final names = artistNames(track.song.artist);
+    return names.isEmpty ? [null] : names;
   }
 
   @override
@@ -104,7 +169,9 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
     builder: (context, _) {
       final groups = <String?, List<LibraryTrack>>{};
       for (final track in widget.library.tracks) {
-        groups.putIfAbsent(groupName(track), () => []).add(track);
+        for (final name in groupNames(track)) {
+          groups.putIfAbsent(name, () => []).add(track);
+        }
       }
       final unknown = widget.albums ? '未知专辑' : '未知歌手';
       if (opened) {
@@ -139,14 +206,12 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
                 ],
               ),
               Expanded(
-                child: SongList(
-                  key: ValueKey((widget.albums, selected)),
+                child: _GroupSongs(
+                  name: selected,
+                  albums: widget.albums,
                   library: widget.library,
                   playback: widget.playback,
-                  source: rows,
                   rows: rows,
-                  scope: widget.albums ? 'album' : 'artist',
-                  emptyText: '没有歌曲',
                 ),
               ),
             ],
