@@ -21,3 +21,4 @@ windows/flutter/ephemeral/
 __pycache__/
 *.pyc
 
+/output/
