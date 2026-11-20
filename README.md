@@ -1,19 +1,7 @@
 # Tag Music
 
-Windows / Android 本地音乐播放器，Flutter + Material 3。原创代码 MIT，第三方许可独立保留。
+Windows 和 Android 本地音乐播放器。支持曲库、标签筛选、歌单、队列、本地歌词和曲库备份。原创代码采用 MIT 许可，第三方组件另有许可。
 
-协作规则：[AGENTS](AGENTS.md)。新对话先读 [当前交接](docs/HANDOFF.md)，沿其链接恢复当前计划；[项目索引](docs/README.md) 按任务查阅，不必通读所有文档。产品目标见 [PLAN](docs/PLAN.md)。
-
-日常续行只需说：
-
-> 继续当前阶段，按项目交接恢复。
-
-新阶段用Plan模式确认目标、依赖与验收，再以阶段Goal推进；阶段内由Codex自主拆分、验证和建立Git检查点。你负责关键决策与验收、额度观察、压缩及换对话。设备/前台操作仍须本批交互确认。
-
-## 侧聊模型
-
-侧聊模型手动选择：零碎问题 Luna High，方案取舍 Sol Medium，复杂技术判断 Sol High；侧聊需在界面手动选/切，文档不自动换主模型。开发、修复和测试默认由[项目专用Skill](.agents/skills/tagmusic-subagents/SKILL.md)协调，无需手动调用；主协调建议手动选 Luna High。
-
-模块/验证入口在项目索引，环境与签名见 [TOOLCHAIN](docs/TOOLCHAIN.md)，许可见 [THIRD_PARTY](docs/THIRD_PARTY.md)。产物 `artifacts/Rxx/`、SDK `.tools/`、密钥 `.secrets/` 均不提交Git；候选不复用构建号覆盖。
-
-完成摘要见 [开发日志](docs/开发日志.md)，原始计划在 `docs/archive/PLAN.original.md`，仅作历史依据。
+- [下载个人使用版](output/) · [R9 交付记录](docs/rounds/R9.md)
+- [日常维护规则](AGENTS.md) · [当前交接](docs/HANDOFF.md)
+- [开发计划收尾](docs/PLAN.md) · [第三方许可](docs/THIRD_PARTY.md)
