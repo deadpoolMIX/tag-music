@@ -57,7 +57,7 @@ class _TrackCoverState extends State<TrackCover> {
     if (_scrollRegion?.deferred == true) return CoverPriority.deferred;
     final box = context.findRenderObject();
     if (box is RenderBox && box.attached && box.hasSize) {
-      final viewport = RenderAbstractViewport.maybeOf(box);
+      final RenderObject? viewport = RenderAbstractViewport.maybeOf(box);
       if (viewport is RenderBox && viewport.hasSize) {
         final origin = box.localToGlobal(Offset.zero, ancestor: viewport);
         if (!(origin & box.size).overlaps(Offset.zero & viewport.size)) {
