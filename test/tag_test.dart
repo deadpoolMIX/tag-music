@@ -145,12 +145,13 @@ void main() {
       await library.scan();
       expect(library.tracks.single.available, isFalse);
       expect(library.tagsForSong(songId), {tagId});
-      expect(library.countForTag(tagId), 1);
+      expect(library.countForTag(tagId), 0);
       access.files['root'] = [entry('tagged')];
       await library.scan();
       expect(library.tracks.single.song.id, songId);
       expect(library.tracks.single.available, isTrue);
       expect(library.tagsForSong(songId), {tagId});
+      expect(library.countForTag(tagId), 1);
     } finally {
       await library.shutdown();
     }

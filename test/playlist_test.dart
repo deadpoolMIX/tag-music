@@ -14,21 +14,21 @@ import 'package:tag_music/playback/playback_queue.dart';
 
 import 'library_test.dart' show FakeDocuments, entry;
 
-class FailPlaylistMigration extends Migrator {
-  FailPlaylistMigration(super.database);
+class FailLibraryMigration extends Migrator {
+  FailLibraryMigration(super.database);
   @override
-  Future<void> createTable(TableInfo table) {
-    if (table.actualTableName == 'playlist_songs') {
+  Future<void> addColumn(TableInfo table, GeneratedColumn column) {
+    if (table.actualTableName == 'library_roots') {
       throw const FileSystemException('simulated late migration write failure');
     }
-    return super.createTable(table);
+    return super.addColumn(table, column);
   }
 }
 
 class FailingMigrationDatabase extends LibraryDatabase {
   FailingMigrationDatabase(super.executor);
   @override
-  Migrator createMigrator() => FailPlaylistMigration(this);
+  Migrator createMigrator() => FailLibraryMigration(this);
 }
 
 void main() {
@@ -186,6 +186,7 @@ void main() {
         ids[1],
       ]);
       final queue = PlaybackQueue()
+        ..setMode(PlaybackMode.sequential)
         ..replace([
           tracks[1].queueSong,
           tracks[0].queueSong,
@@ -194,12 +195,10 @@ void main() {
       final entryIds = queue.entries.map((e) => e.entryId).toList();
       access.files['root'] = [entry('甲')];
       await library.scan();
-      expect(library.playlistTracks(id).map((t) => t.song.id), [
-        ids[1],
-        ids[0],
-      ]);
-      expect(library.playlistTracks(id).first.available, isFalse);
-      await library.reorderPlaylist(id, [ids[0], ids[1]]);
+      expect(library.playlistSongIds[id], [ids[1], ids[0]]);
+      expect(library.playlistTracks(id).map((t) => t.song.id), [ids[0]]);
+      await library.reorderPlaylist(id, [ids[0]]);
+      expect(library.playlistSongIds[id], [ids[1], ids[0]]);
       await library.removePlaylistSongs(id, [ids[0]]);
       await library.deletePlaylist(id);
       expect(queue.entries.map((e) => e.entryId), entryIds);
@@ -335,7 +334,7 @@ void main() {
     );
 
     test(
-      'failed v$version migration rolls back newly created tables and version',
+      'failed v$version migration restores original schema and version',
       () async {
         final dir = await Directory.systemTemp.createTemp('playlist-rollback-');
         final file = File('${dir.path}/library.sqlite');
@@ -391,7 +390,7 @@ void main() {
         try {
           await expectLater(
             failed.select(failed.songs).get(),
-            throwsA(anything),
+            throwsA(isA<FileSystemException>()),
           );
         } finally {
           await failed.close();
@@ -435,32 +434,6 @@ void main() {
                 .map((r) => Map<String, Object?>.from(r))
                 .toList(),
             beforeSchema,
-          );
-          expect(
-            check.select(
-              "SELECT name FROM sqlite_master WHERE name='playlists'",
-            ),
-            isEmpty,
-          );
-          if (version == 1) {
-            expect(
-              check.select("SELECT name FROM sqlite_master WHERE name='tags'"),
-              isEmpty,
-            );
-          }
-          if (version < 3) {
-            expect(
-              check.select(
-                "SELECT name FROM sqlite_master WHERE name='current_filters'",
-              ),
-              isEmpty,
-            );
-          }
-          expect(
-            check.select(
-              "SELECT name FROM sqlite_master WHERE name='playlist_songs'",
-            ),
-            isEmpty,
           );
         } finally {
           check.close();

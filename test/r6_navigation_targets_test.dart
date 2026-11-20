@@ -15,7 +15,7 @@ import 'package:tag_music/library/tags_page.dart';
 import 'package:tag_music/playback/playback_controller.dart';
 
 import 'library_test.dart' show FakeDocuments, entry;
-import 'playlists_page_test.dart' show PlaylistPlayback;
+import 'queue_playback_test.dart' show QueuePlayer;
 import 'settings_test.dart' show MemorySettings;
 
 const _targets = [
@@ -213,7 +213,7 @@ Future<void> _withApp(
     LibraryDatabase(NativeDatabase.memory()),
     documents,
   );
-  final playback = PlaylistPlayback()..current = null;
+  final playback = PlaybackController(QueuePlayer(), documents);
   try {
     await tester.runAsync(() async {
       await library.initialize();
@@ -240,7 +240,7 @@ Future<void> _withApp(
       try {
         await tester.runAsync(library.shutdown);
       } finally {
-        playback.dispose();
+        await tester.runAsync(playback.shutdown);
       }
     }
   }
@@ -357,7 +357,10 @@ void main() {
       await tester.pumpAndSettle();
       final tagChip = _within(
         AppDestination.filter,
-        find.byKey(ValueKey('filter-chip-0-$tagId')),
+        find.descendant(
+          of: find.byKey(const ValueKey('filter-pick-0')),
+          matching: find.text(tagName),
+        ),
       );
       final filter = _within(AppDestination.filter, find.byType(FilterPage));
       final originalElement = tester.element(filter);
