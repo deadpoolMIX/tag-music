@@ -99,7 +99,9 @@ class _LibrarySearchPageState extends State<LibrarySearchPage> {
           );
         },
       ),
-      bottomNavigationBar: const PlaybackMinibar(),
+      bottomNavigationBar: Theme.of(context).platform == TargetPlatform.windows
+          ? null
+          : const PlaybackMinibar(),
     ),
   );
 }

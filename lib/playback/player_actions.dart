@@ -16,7 +16,7 @@ class PlayerActions {
   final LibraryController? library;
   final Future<void> Function()? openLyrics;
 
-  List<PopupMenuEntry<String>> _items() => [
+  List<PopupMenuEntry<String>> _items({required bool includeClose}) => [
     if (openLyrics != null)
       PopupMenuItem(
         value: 'lyrics',
@@ -37,10 +37,15 @@ class PlayerActions {
       const PopupMenuItem(value: 'info', child: Text('歌曲信息')),
     if (playback.playerFeedback != null)
       const PopupMenuItem(value: 'status', child: Text('查看播放提示')),
-    const PopupMenuItem(value: 'close', child: Text('关闭播放页')),
+    if (includeClose)
+      const PopupMenuItem(value: 'close', child: Text('关闭播放页')),
   ];
 
-  Future<void> show(BuildContext context, {Offset? globalPosition}) async {
+  Future<void> show(
+    BuildContext context, {
+    Offset? globalPosition,
+    bool includeClose = true,
+  }) async {
     final overlay =
         Navigator.of(context).overlay!.context.findRenderObject() as RenderBox;
     final anchor = context.findRenderObject() as RenderBox;
@@ -53,7 +58,7 @@ class PlayerActions {
         Rect.fromLTWH(point.dx, point.dy, 0, 0),
         Offset.zero & overlay.size,
       ),
-      items: _items(),
+      items: _items(includeClose: includeClose),
     );
     if (!context.mounted ||
         choice == null ||

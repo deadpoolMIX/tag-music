@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 /// Recreate a page when the user follows the Windows forward history.
@@ -5,14 +6,16 @@ Future<void> pushAppPage(
   BuildContext context,
   PageRoute<void> Function() create,
 ) {
-  final navigator = Navigator.of(context);
   final history = DesktopNavigation.maybeOf(context);
+  final navigator = history?.navigator ?? Navigator.of(context);
   if (history != null) return history._push(navigator, create);
   return navigator.push<void>(create());
 }
 
 class DesktopNavigation extends NavigatorObserver {
-  Route<dynamic>? top;
+  final _activeRoute = ValueNotifier<Route<dynamic>?>(null);
+  ValueListenable<Route<dynamic>?> get activeRoute => _activeRoute;
+  Route<dynamic>? get top => _activeRoute.value;
   final _pages = Expando<(Object, PageRoute<void> Function())>();
   final _forward = <(Object, VoidCallback)>[];
   final _local = <(ModalRoute<dynamic>, Object)>[];
@@ -102,8 +105,10 @@ class DesktopNavigation extends NavigatorObserver {
 
   @override
   void didChangeTop(Route<dynamic> topRoute, Route<dynamic>? previousTopRoute) {
-    top = topRoute;
+    _activeRoute.value = topRoute;
   }
+
+  void dispose() => _activeRoute.dispose();
 }
 
 class DesktopNavigationScope extends InheritedWidget {

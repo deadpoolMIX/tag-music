@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +9,7 @@ import 'core/diagnostics.dart';
 import 'core/desktop_navigation.dart';
 import 'core/settings.dart';
 import 'playback/cover_viewer.dart' show coverViewerRouteName;
+import 'playback/desktop_player.dart';
 import 'playback/full_player.dart' show fullPlayerRouteName;
 import 'playback/playback_minibar.dart';
 import 'playback/queue_page.dart' show playbackQueueRouteName;
@@ -43,30 +45,51 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
   void _handleMouseNavigation(PointerDownEvent event) {
     if (event.kind != PointerDeviceKind.mouse) return;
     if (event.buttons == kBackMouseButton) {
-      _routes.back();
+      _desktopBack();
     } else if (event.buttons == kForwardMouseButton) {
-      _routes.forward();
+      _desktopForward();
     }
+  }
+
+  void _desktopBack() {
+    final root = _appNavigator.currentState;
+    if (root?.canPop() == true) {
+      root!.maybePop();
+    } else {
+      _routes.back();
+    }
+  }
+
+  void _desktopForward() {
+    if (_appNavigator.currentState?.canPop() == false) _routes.forward();
+  }
+
+  @override
+  void dispose() {
+    _routes.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final color = ref.watch(themeColorProvider);
+    final desktop = defaultTargetPlatform == TargetPlatform.windows;
+    final shell = AppShell(key: _shell);
     return MaterialApp(
       navigatorKey: _appNavigator,
-      navigatorObservers: [_routes],
+      navigatorObservers: desktop ? const [] : [_routes],
       scrollBehavior: const _TagMusicScrollBehavior(),
       builder: (context, child) {
-        final desktop = Theme.of(context).platform == TargetPlatform.windows;
         return CallbackShortcuts(
           bindings: {
-            const SingleActivator(LogicalKeyboardKey.escape): () =>
-                _appNavigator.currentState?.maybePop(),
+            const SingleActivator(LogicalKeyboardKey.escape): desktop
+                ? _desktopBack
+                : () => _appNavigator.currentState?.maybePop(),
             if (desktop) ...{
               const SingleActivator(LogicalKeyboardKey.browserBack):
-                  _routes.back,
+                  _desktopBack,
               const SingleActivator(LogicalKeyboardKey.browserForward):
-                  _routes.forward,
+                  _desktopForward,
             },
           },
           child: desktop
@@ -120,7 +143,9 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
       themeMode: ref.watch(themeProvider),
       theme: _theme(Brightness.light, color),
       darkTheme: _theme(Brightness.dark, color),
-      home: AppShell(key: _shell),
+      home: desktop
+          ? DesktopPlaybackFrame(navigation: _routes, libraryPage: shell)
+          : shell,
     );
   }
 
@@ -534,7 +559,7 @@ class _AppShellState extends ConsumerState<AppShell>
                 ),
               ),
             ),
-            const PlaybackMinibar(),
+            if (!desktop) const PlaybackMinibar(),
           ],
         ),
       );
