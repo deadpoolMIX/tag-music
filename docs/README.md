@@ -6,7 +6,7 @@
 
 | 任务 | 最小入口；扩大读取的条件 |
 |---|---|
-| 恢复 R8 | [范围、实现与待验收项](rounds/R8.md) |
+| 回查 R8 | [实现、候选与用户验收](rounds/R8.md) |
 | 回查 R7 | [范围、实现与体验入口](rounds/R7.md) |
 | 回查 R6 | [实现进度](rounds/R6.md)及[验收结论和保留版本](rounds/R6-ACCEPTANCE.md) |
 | 新阶段/产品行为决策 | [PLAN](PLAN.md)对应阶段/产品语义；需要操作Goal才读[细则](WORKFLOW.md#goal-状态) |
