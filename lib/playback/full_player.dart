@@ -284,8 +284,9 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                               )
                             : Column(
                                 children: [
-                                  if (!simple)
-                                    Padding(
+                                  _StandardPlayerControl(
+                                    visible: !simple,
+                                    child: Padding(
                                       padding: const EdgeInsets.fromLTRB(
                                         20,
                                         6,
@@ -306,6 +307,7 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                                         ],
                                       ),
                                     ),
+                                  ),
                                   Expanded(
                                     child: _PlayerBody(
                                       playback: playback,
@@ -328,6 +330,30 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
       },
     );
   }
+}
+
+// Keep the artwork and the main controls in the same layout in both modes.
+class _StandardPlayerControl extends StatelessWidget {
+  const _StandardPlayerControl({required this.visible, required this.child});
+
+  final bool visible;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    excluding: !visible,
+    child: ExcludeFocus(
+      excluding: !visible,
+      child: IgnorePointer(
+        ignoring: !visible,
+        child: AnimatedOpacity(
+          duration: playerLayoutFadeDuration(context),
+          opacity: visible ? 1 : 0,
+          child: TickerMode(enabled: visible, child: child),
+        ),
+      ),
+    ),
+  );
 }
 
 class _PlayerHeading extends StatelessWidget {
@@ -604,28 +630,37 @@ class _PlayerBody extends StatelessWidget {
         large: true,
         immersiveColor: controlColor,
       ),
-      if (!simple) ...[
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      _StandardPlayerControl(
+        visible: !simple,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            PlaybackModeButton(playback: playback),
-            IconButton(
-              tooltip: playback.sleep.active ? '睡眠定时已开启' : '睡眠定时',
-              icon: Icon(
-                playback.sleep.active ? Icons.bedtime : Icons.bedtime_outlined,
-              ),
-              onPressed: () => showSleepTimer(context, playback),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                PlaybackModeButton(playback: playback),
+                IconButton(
+                  tooltip: playback.sleep.active ? '睡眠定时已开启' : '睡眠定时',
+                  icon: Icon(
+                    playback.sleep.active
+                        ? Icons.bedtime
+                        : Icons.bedtime_outlined,
+                  ),
+                  onPressed: () => showSleepTimer(context, playback),
+                ),
+                IconButton(
+                  tooltip: '播放队列',
+                  icon: const Icon(Icons.queue_music),
+                  onPressed: () =>
+                      showPlaybackQueue(context, playback, library),
+                ),
+              ],
             ),
-            IconButton(
-              tooltip: '播放队列',
-              icon: const Icon(Icons.queue_music),
-              onPressed: () => showPlaybackQueue(context, playback, library),
-            ),
+            if (playback.sleep.active) SleepTimerStatus(playback: playback),
           ],
         ),
-        if (playback.sleep.active) SleepTimerStatus(playback: playback),
-      ],
+      ),
       PlaybackFeedback(playback: playback, color: controlColor),
     ],
   );
@@ -639,9 +674,12 @@ class _PlayerBody extends StatelessWidget {
     ),
   );
 
-  Widget _seekBar(double width) => SizedBox(
-    width: width,
-    child: PlayerSeek(playback: playback),
+  Widget _seekBar([double? width]) => _StandardPlayerControl(
+    visible: !simple,
+    child: SizedBox(
+      width: width,
+      child: PlayerSeek(playback: playback),
+    ),
   );
 
   Widget _coverWithSeek() => LayoutBuilder(
@@ -672,12 +710,10 @@ class _PlayerBody extends StatelessWidget {
       final horizontal = constraints.maxWidth < 360 ? 14.0 : 22.0;
       final width = math.max(0.0, constraints.maxWidth - horizontal * 2);
       final height = constraints.maxHeight;
-      final bottom = simple ? (height * .095).clamp(14.0, 80.0) : 10.0;
       final controls = _controls(context);
-      final wide = !simple && width >= 760 && height >= 320;
+      final wide = width >= 760 && height >= 320;
       final short =
-          height < (simple ? 200 : 355) ||
-          MediaQuery.textScalerOf(context).scale(16) > 26;
+          height < 355 || MediaQuery.textScalerOf(context).scale(16) > 26;
       final Widget content;
       if (wide && !short) {
         content = Row(
@@ -688,11 +724,7 @@ class _PlayerBody extends StatelessWidget {
             Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  PlayerSeek(playback: playback),
-                  const SizedBox(height: 8),
-                  controls,
-                ],
+                children: [_seekBar(), const SizedBox(height: 8), controls],
               ),
             ),
           ],
@@ -706,7 +738,7 @@ class _PlayerBody extends StatelessWidget {
             spacing: 10,
             children: [
               _artwork(context, coverSize),
-              if (!simple) _seekBar(coverSize),
+              _seekBar(coverSize),
               controls,
             ],
           ),
@@ -715,14 +747,14 @@ class _PlayerBody extends StatelessWidget {
         content = Column(
           key: const ValueKey('player-stacked-layout'),
           children: [
-            Expanded(child: simple ? _coverArea(context) : _coverWithSeek()),
-            SizedBox(height: simple ? 20 : 8),
+            Expanded(child: _coverWithSeek()),
+            const SizedBox(height: 8),
             controls,
           ],
         );
       }
       return Padding(
-        padding: EdgeInsets.fromLTRB(horizontal, 8, horizontal, bottom),
+        padding: EdgeInsets.fromLTRB(horizontal, 8, horizontal, 10),
         child: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: wide ? 1080 : 560),
@@ -900,6 +932,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
     final active = lyrics.indexAt(playback.player.state.position);
     final padding = math.max(12.0, (constraints.maxWidth - 720) / 2);
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    final scaler = MediaQuery.textScalerOf(context);
     _metrics(
       context,
       lyrics,
@@ -907,7 +940,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
         0.0,
         constraints.maxWidth - padding * 2 - _linePadding.horizontal,
       ),
-      MediaQuery.textScalerOf(context),
+      scaler,
     );
     if (_viewportHeight != constraints.maxHeight) {
       _viewportHeight = constraints.maxHeight;
@@ -917,15 +950,17 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
     if (lyrics.lines.isEmpty) {
       return _lyricsStatus(lyrics);
     }
-    final center = constraints.maxHeight / 2;
-    final headSpace = math.max(0.0, center - _heights.first / 2);
-    final tailSpace = math.max(0.0, center - _heights.last / 2);
+    final viewport = constraints.maxHeight;
+    final lineHeight = scaler.scale(_original.fontSize!) * _original.height!;
+    final anchor = viewport / 2 - math.min(lineHeight, viewport * .12);
+    final headSpace = math.max(0.0, anchor - _heights.first / 2);
+    final tailSpace = math.max(0.0, viewport - anchor - _heights.last / 2);
     if (_follow && _pointers == 0 && active != _last) {
       final reanchor = _last == -2;
       _last = active;
       final target = active < 0
           ? 0.0
-          : headSpace + _offsets[active] + _heights[active] / 2 - center;
+          : headSpace + _offsets[active] + _heights[active] / 2 - anchor;
       final generation = ++_followGeneration;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted ||

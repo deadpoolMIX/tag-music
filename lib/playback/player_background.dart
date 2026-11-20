@@ -7,6 +7,11 @@ import 'package:flutter/services.dart';
 import 'cover_cache.dart';
 import 'playback_controller.dart';
 
+Duration playerLayoutFadeDuration(BuildContext context) =>
+    MediaQuery.disableAnimationsOf(context)
+    ? Duration.zero
+    : const Duration(milliseconds: 200);
+
 class PlayerBackground extends StatefulWidget {
   const PlayerBackground({
     required this.playback,
@@ -34,15 +39,19 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
   Future<((String, int?, int?), _BlurredCover?)?>? _cover;
 
   (String, int?, int?)? get _currentKey {
-    final track = widget.immersive ? widget.playback.current : null;
+    final track = widget.playback.current;
     return track == null ? null : (track.location, track.size, track.modified);
   }
 
   void _updateCover() {
     final key = _currentKey;
-    if (key == _coverKey) return;
-    _coverKey = key;
-    _cover = key == null ? null : _loadCover(key);
+    if (key != _coverKey) {
+      _coverKey = key;
+      _cover = null;
+    }
+    if (widget.immersive && key != null) {
+      _cover ??= _loadCover(key);
+    }
   }
 
   Future<((String, int?, int?), _BlurredCover?)?> _loadCover(
@@ -67,14 +76,14 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
     final immersive = widget.immersive;
     final lyrics = immersive && widget.lyricsVisible;
     final surfaceIsDark = scheme.brightness == Brightness.dark;
+    final surface = surfaceIsDark ? const Color(0xFF161616) : Colors.white;
     return FutureBuilder(
       future: _cover,
       builder: (context, snapshot) {
-        final cover =
+        final coverReady =
             snapshot.connectionState == ConnectionState.done &&
-                snapshot.data?.$1 == _currentKey
-            ? snapshot.data?.$2
-            : null;
+            snapshot.data?.$1 == _coverKey;
+        final cover = coverReady ? snapshot.data?.$2 : null;
         final lyricsDarkInk = cover == null ? !surfaceIsDark : cover.bright;
         final lyricsInk = lyricsDarkInk
             ? const Color(0xFF181A1E)
@@ -91,33 +100,33 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              RepaintBoundary(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: surfaceIsDark
-                        ? const Color(0xFF161616)
-                        : Colors.white,
-                    gradient: !immersive
-                        ? null
-                        : LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              scheme.secondaryContainer,
-                              scheme.surface,
-                              scheme.primaryContainer,
-                            ],
+              ColoredBox(color: surface),
+              AnimatedOpacity(
+                duration: playerLayoutFadeDuration(context),
+                opacity: immersive && (coverReady || _coverKey == null) ? 1 : 0,
+                child: RepaintBoundary(
+                  child: cover != null
+                      ? Image.memory(
+                          cover.bytes,
+                          key: ValueKey(_coverKey),
+                          fit: BoxFit.fill,
+                          excludeFromSemantics: true,
+                        )
+                      : coverReady || _coverKey == null
+                      ? DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                scheme.secondaryContainer,
+                                scheme.surface,
+                                scheme.primaryContainer,
+                              ],
+                            ),
                           ),
-                  ),
-                  child: cover == null
-                      ? const SizedBox.expand()
-                      : ExcludeSemantics(
-                          child: Image.memory(
-                            cover.bytes,
-                            key: ValueKey(_coverKey),
-                            fit: BoxFit.fill,
-                          ),
-                        ),
+                        )
+                      : const SizedBox.expand(),
                 ),
               ),
               AnimatedContainer(
