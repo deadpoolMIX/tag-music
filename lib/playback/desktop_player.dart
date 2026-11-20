@@ -12,7 +12,6 @@ import 'cover_viewer.dart';
 import 'full_player.dart' show ImmersiveLyrics, PlayerSeek;
 import 'playback_bar_gestures.dart';
 import 'playback_controller.dart';
-import 'playback_queue.dart' show QueueEntry;
 import 'playback_status.dart';
 import 'player_actions.dart';
 import 'player_background.dart';
@@ -210,8 +209,7 @@ class _DesktopPlaybackBar extends ConsumerWidget {
 
   Widget _transport(
     BuildContext context,
-    PlaybackController? playback,
-    LibraryController? library, {
+    PlaybackController? playback, {
     required bool preview,
   }) => Column(
     mainAxisSize: MainAxisSize.min,
@@ -219,7 +217,6 @@ class _DesktopPlaybackBar extends ConsumerWidget {
       if (playback != null)
         PlaybackControls(
           playback: playback,
-          tagLibrary: library,
           blockBackgroundTap: true,
         )
       else
@@ -257,6 +254,18 @@ class _DesktopPlaybackBar extends ConsumerWidget {
       alignment: WrapAlignment.end,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
+        if (library != null)
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            excludeFromSemantics: true,
+            // Leave the player layer alone when the tag button is disabled.
+            onTap: () {},
+            child: PlaybackTagButton(
+              playback: playback,
+              library: library,
+              iconSize: 20,
+            ),
+          ),
         PlaybackModeButton(playback: playback),
         IconButton(
           tooltip: playback.sleep.active
@@ -319,7 +328,6 @@ class _DesktopPlaybackBar extends ConsumerWidget {
           final controls = _transport(
             context,
             playback,
-            library,
             preview: preview != null,
           );
           final auxiliary = _auxiliary(context, playback, library);

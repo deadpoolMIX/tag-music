@@ -4,12 +4,14 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tag_music/core/desktop_navigation.dart';
 import 'package:tag_music/library/database.dart';
 import 'package:tag_music/library/filter_page.dart';
 import 'package:tag_music/library/filter_rule.dart';
 import 'package:tag_music/library/library_controller.dart';
 import 'package:tag_music/library/library_page.dart';
 import 'package:tag_music/library/playlists_page.dart';
+import 'package:tag_music/playback/desktop_player.dart';
 import 'package:tag_music/playback/documents.dart';
 import 'package:tag_music/playback/playback_controller.dart';
 import 'package:tag_music/playback/playback_page.dart';
@@ -74,6 +76,50 @@ void main() {
 
   List<String> names() =>
       playback.queue.entries.map((e) => e.song.track.name).toList();
+
+  queueTest('desktop keeps transport and right-side actions in order', (
+    tester,
+  ) async {
+    final navigation = DesktopNavigation();
+    addTearDown(navigation.dispose);
+    await mount(
+      tester,
+      ProviderScope(
+        overrides: [
+          libraryProvider.overrideWithValue(library),
+          playbackProvider.overrideWithValue(playback),
+        ],
+        child: DesktopPlaybackFrame(
+          navigation: navigation,
+          libraryPage: const SizedBox.expand(),
+          lightTheme: ThemeData.light(),
+          darkTheme: ThemeData.dark(),
+        ),
+      ),
+    );
+
+    final previous = tester.getCenter(find.byTooltip('上一首'));
+    final play = tester.getCenter(find.byKey(const ValueKey('play-pause')));
+    final next = tester.getCenter(find.byTooltip('下一首'));
+    expect(previous.dx, lessThan(play.dx));
+    expect(play.dx, lessThan(next.dx));
+
+    final actions = [
+      find.byKey(const ValueKey('player-add-tag')),
+      find.byKey(const ValueKey('playback-mode')),
+      find.byTooltip('睡眠定时'),
+      find.byKey(const ValueKey('open-playback-queue')),
+      find.byKey(const ValueKey('player-volume')),
+    ].map(tester.getCenter).toList();
+    expect(actions.first.dx - next.dx, greaterThan(next.dx - play.dx));
+    expect(actions.map((center) => center.dy).toSet(), hasLength(1));
+    for (var index = 1; index < actions.length; index++) {
+      expect(actions[index].dx, greaterThan(actions[index - 1].dx));
+    }
+    final seek = tester.getRect(find.byKey(const ValueKey('playback-seek')));
+    expect(seek.center.dx, closeTo(play.dx, 1));
+    expect(seek.right, lessThan(actions.first.dx));
+  });
 
   queueTest(
     'long queue locates and moves the selected duplicate without reopening',

@@ -14,7 +14,6 @@ import '../library/song_information.dart';
 import '../library/tags_page.dart' show showTagActions;
 import '../library/track_cover.dart';
 import 'playback_controller.dart';
-import 'playback_queue.dart' show QueueEntry;
 import 'playback_status.dart';
 import 'slide_dismiss_route.dart';
 
@@ -28,7 +27,6 @@ const playbackModeNames = {
 class PlaybackControls extends StatelessWidget {
   const PlaybackControls({
     required this.playback,
-    this.tagLibrary,
     this.onToggleLayout,
     this.large = false,
     this.immersiveColor,
@@ -36,7 +34,6 @@ class PlaybackControls extends StatelessWidget {
     super.key,
   });
   final PlaybackController playback;
-  final LibraryController? tagLibrary;
   final VoidCallback? onToggleLayout;
   final bool large;
   final Color? immersiveColor;
@@ -84,37 +81,7 @@ class PlaybackControls extends StatelessWidget {
   );
 
   @override
-  Widget build(BuildContext context) {
-    final library = tagLibrary;
-    if (library == null) return _buttonArea(_transport(large ? 24 : 0));
-    final tagWidth = large ? 48.0 : 36.0;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final balanced = width >= (large ? 256 : 184);
-        final spacing = large && width >= 304 ? 24.0 : 0.0;
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (balanced) SizedBox(width: tagWidth),
-            Flexible(child: _buttonArea(_transport(spacing))),
-            _buttonArea(
-              SizedBox(
-                width: tagWidth,
-                child: PlaybackTagButton(
-                  playback: playback,
-                  library: library,
-                  foreground: immersiveColor,
-                  iconSize: large ? 24 : 20,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
+  Widget build(BuildContext context) => _buttonArea(_transport(large ? 24 : 0));
 }
 
 class PlaybackTagButton extends StatelessWidget {
