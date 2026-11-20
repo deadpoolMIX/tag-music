@@ -169,6 +169,95 @@ Future<void> addToPlaylist(
   }
 }
 
+Future<void> addToPlaylists(
+  BuildContext context,
+  LibraryController library,
+  Iterable<String> songIds,
+) async {
+  final ids = songIds.toSet();
+  final lists = library.playlists.where((p) => p.kind == 'regular').toList();
+  final selected = <String>{};
+  var query = '';
+  final targets = await showDialog<Set<String>>(
+    context: context,
+    builder: (dialog) => StatefulBuilder(
+      builder: (context, setState) {
+        final needle = query.trim().toLowerCase();
+        final visible = lists
+            .where((list) => list.nameKey.contains(needle))
+            .toList();
+        return CompactAlertDialog(
+          title: const Text('添加到歌单'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  decoration: const InputDecoration(
+                    hintText: '搜索歌单',
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                  onChanged: (value) => setState(() => query = value),
+                ),
+                if (visible.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text('没有匹配的普通歌单'),
+                  ),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    padding: EdgeInsets.zero,
+                    itemCount: visible.length,
+                    itemBuilder: (context, index) {
+                      final list = visible[index];
+                      return CheckboxListTile(
+                        controlAffinity: ListTileControlAffinity.trailing,
+                        dense: true,
+                        title: Text(
+                          list.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        value: selected.contains(list.id),
+                        onChanged: (checked) => setState(() {
+                          if (checked == true) {
+                            selected.add(list.id);
+                          } else {
+                            selected.remove(list.id);
+                          }
+                        }),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialog),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: selected.isEmpty
+                  ? null
+                  : () => Navigator.pop(dialog, selected),
+              child: const Text('保存'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+  if (targets == null || !context.mounted) return;
+  await playlistAction(
+    context,
+    () => library.addSongsToPlaylists(targets, ids),
+  );
+}
+
 Future<void> pickPlaylistSongs(
   BuildContext context,
   LibraryController library,

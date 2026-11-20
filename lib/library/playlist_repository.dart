@@ -4,6 +4,8 @@ import 'package:uuid/uuid.dart';
 import 'database.dart';
 import 'filter_rule.dart';
 
+const favoritesPlaylistName = '我喜欢';
+
 class PlaylistSnapshot {
   const PlaylistSnapshot(this.playlists, this.songIds);
   final List<Playlist> playlists;
@@ -16,6 +18,35 @@ class PlaylistSnapshot {
 class PlaylistRepository {
   PlaylistRepository(this.db);
   final LibraryDatabase db;
+
+  Future<String> ensureFavorites() => db.transaction(_ensureFavorites);
+
+  Future<String> _ensureFavorites() async {
+    final existing =
+        await (db.select(db.playlists)
+              ..where((list) => list.nameKey.equals(favoritesPlaylistName)))
+            .getSingleOrNull();
+    if (existing != null) {
+      if (existing.kind == 'regular') return existing.id;
+      final lists = await db.select(db.playlists).get();
+      final names = lists.map((list) => list.nameKey).toSet();
+      var name = '我喜欢（智能歌单）';
+      var suffix = 2;
+      while (names.contains(name)) {
+        name = '我喜欢（智能歌单 $suffix）';
+        suffix++;
+      }
+      await rename(existing.id, name);
+    }
+    return create(favoritesPlaylistName, const []);
+  }
+
+  Future<void> toggleFavorite(String songId) => db.transaction(() async {
+    final id = await _ensureFavorites();
+    final songs = (await _regularSongs(id)).toSet();
+    if (!songs.remove(songId)) songs.add(songId);
+    await _writeSongs(id, songs.toList());
+  });
 
   static FilterPreferences preferences(Playlist playlist) {
     if (playlist.kind != 'smart' || playlist.ruleJson == null) {
@@ -163,11 +194,18 @@ class PlaylistRepository {
     return rows.map((r) => r.songId).toList();
   }
 
-  Future<void> add(String id, Iterable<String> songs) {
-    final added = songs.toList();
+  Future<void> add(String id, Iterable<String> songs) => addToMany([id], songs);
+
+  Future<void> addToMany(Iterable<String> playlists, Iterable<String> songs) {
+    final targets = playlists.toSet();
+    final added = songs.toSet();
     return db.transaction(() async {
-      final ids = (await _regularSongs(id)).toSet()..addAll(added);
-      await _writeSongs(id, ids.toList());
+      for (final id in targets) {
+        final ids = (await _regularSongs(id)).toSet();
+        final originalSize = ids.length;
+        ids.addAll(added);
+        if (ids.length != originalSize) await _writeSongs(id, ids.toList());
+      }
     });
   }
 

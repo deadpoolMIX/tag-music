@@ -12,6 +12,7 @@ import '../core/compact_dialog.dart';
 import '../core/desktop_navigation.dart';
 import '../library/group_pages.dart';
 import '../library/library_controller.dart';
+import '../library/playlist_actions.dart';
 import '../library/track_cover.dart';
 import 'cover_viewer.dart';
 import 'playback_controller.dart';
@@ -683,6 +684,9 @@ class _PlayerBody extends StatelessWidget {
   );
 
   Widget _controls(BuildContext context) {
+    final songId = playback.currentSongId;
+    final songLibrary = library;
+    final canEditPlaylists = songLibrary != null && songId != null;
     final transport = PlaybackControls(
       playback: playback,
       onToggleLayout: playback.toggleLayout,
@@ -717,6 +721,34 @@ class _PlayerBody extends StatelessWidget {
                 playback: playback,
                 library: library,
                 foreground: controlColor,
+              ),
+              IconButton(
+                tooltip: '添加到歌单',
+                color: controlColor,
+                onPressed: canEditPlaylists
+                    ? () => addToPlaylists(context, songLibrary, [songId])
+                    : null,
+                icon: const Icon(Icons.playlist_add),
+              ),
+              ListenableBuilder(
+                listenable: Listenable.merge([songLibrary]),
+                builder: (context, _) {
+                  final liked =
+                      canEditPlaylists && songLibrary.isFavorite(songId);
+                  return IconButton(
+                    tooltip: '我喜欢',
+                    isSelected: liked,
+                    color: controlColor,
+                    onPressed: canEditPlaylists
+                        ? () => playlistAction(
+                            context,
+                            () => songLibrary.toggleFavorite(songId),
+                          )
+                        : null,
+                    icon: const Icon(Icons.favorite_border),
+                    selectedIcon: const Icon(Icons.favorite),
+                  );
+                },
               ),
             ])
               Expanded(

@@ -327,6 +327,7 @@ class LibraryController extends ChangeNotifier {
     for (final root in await documents.roots()) {
       await _addRoot(root);
     }
+    await playlistsStore.ensureFavorites();
     await reload();
     await _loadFilter();
   }
@@ -582,6 +583,30 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> addPlaylistSongs(String id, Iterable<String> songs) async {
     await playlistsStore.add(id, songs);
+    await reloadPlaylists();
+  }
+
+  Future<void> addSongsToPlaylists(
+    Iterable<String> ids,
+    Iterable<String> songs,
+  ) async {
+    await playlistsStore.addToMany(ids, songs);
+    await reloadPlaylists();
+  }
+
+  bool isFavorite(String songId) {
+    final favorite = playlists
+        .where(
+          (list) =>
+              list.kind == 'regular' && list.nameKey == favoritesPlaylistName,
+        )
+        .firstOrNull;
+    return favorite != null &&
+        playlistSongIds[favorite.id]?.contains(songId) == true;
+  }
+
+  Future<void> toggleFavorite(String songId) async {
+    await playlistsStore.toggleFavorite(songId);
     await reloadPlaylists();
   }
 

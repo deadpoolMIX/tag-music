@@ -127,6 +127,7 @@ class LibraryBackup {
       batch.insertAll(db.playlists, playlists);
       batch.insertAll(db.playlistSongs, playlistSongs);
     });
+    if (!trustedLocations) await PlaylistRepository(db).ensureFavorites();
     // Write the recovery file before SQLite commits. A storage failure rolls
     // back all SQL changes and leaves the previous recovery file intact.
     await writeBackupFile(recoveryFile, await _encode(current));
