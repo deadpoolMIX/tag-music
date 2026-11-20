@@ -117,8 +117,14 @@ class AppShell extends ConsumerStatefulWidget {
 class _AppShellState extends ConsumerState<AppShell>
     with WidgetsBindingObserver {
   AppDestination _selected = AppDestination.songs;
+  final _scaffold = GlobalKey<ScaffoldState>();
 
   Future<void> _openNavigation() async {
+    final scaffold = _scaffold.currentState;
+    if (scaffold != null && ModalRoute.isCurrentOf(context) == true) {
+      scaffold.openDrawer();
+      return;
+    }
     final navigator = Navigator.of(context, rootNavigator: true);
     var swipeStartX = 0.0;
     final destination = await showGeneralDialog<AppDestination>(
@@ -298,92 +304,106 @@ class _AppShellState extends ConsumerState<AppShell>
         body: Column(
           children: [
             Expanded(
-              child: SafeArea(
-                bottom: false,
-                child: Row(
-                  children: [
-                    if (desktop)
-                      SizedBox(
-                        width: constraints.maxWidth >= 1000 ? 190 : 72,
-                        child: _navigation(
-                          constraints.maxWidth < 1000,
-                          _select,
-                        ),
+              child: Scaffold(
+                key: _scaffold,
+                drawer: desktop
+                    ? null
+                    : Drawer(
+                        width: constraints.maxWidth * .52,
+                        child: _navigation(false, (destination) {
+                          _select(destination);
+                          _scaffold.currentState?.closeDrawer();
+                        }),
                       ),
-                    if (desktop) const VerticalDivider(width: 1),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          if (!desktop &&
-                              (_selected != AppDestination.songs ||
-                                  library == null ||
-                                  playback == null))
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: IconButton(
-                                key: const ValueKey('open-navigation'),
-                                tooltip: '打开导航菜单',
-                                onPressed: _openNavigation,
-                                icon: const Icon(Icons.menu),
-                              ),
-                            ),
-                          if (ref.watch(startupWarningProvider)
-                              case final warning?)
-                            MaterialBanner(
-                              content: Text(warning),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => setState(
-                                    () => _selected = AppDestination.settings,
-                                  ),
-                                  child: const Text('查看设置'),
+                drawerScrimColor: Colors.black26,
+                body: SafeArea(
+                  bottom: false,
+                  child: Row(
+                    children: [
+                      if (desktop)
+                        SizedBox(
+                          width: constraints.maxWidth >= 1000 ? 190 : 72,
+                          child: _navigation(
+                            constraints.maxWidth < 1000,
+                            _select,
+                          ),
+                        ),
+                      if (desktop) const VerticalDivider(width: 1),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            if (!desktop &&
+                                (_selected != AppDestination.songs ||
+                                    library == null ||
+                                    playback == null))
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: IconButton(
+                                  key: const ValueKey('open-navigation'),
+                                  tooltip: '打开导航菜单',
+                                  onPressed: _openNavigation,
+                                  icon: const Icon(Icons.menu),
                                 ),
-                              ],
-                            ),
-                          if (playback != null)
-                            ListenableBuilder(
-                              listenable: playback,
-                              builder: (_, _) => Column(
-                                mainAxisSize: MainAxisSize.min,
+                              ),
+                            if (ref.watch(startupWarningProvider)
+                                case final warning?)
+                              MaterialBanner(
+                                content: Text(warning),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => setState(
+                                      () => _selected = AppDestination.settings,
+                                    ),
+                                    child: const Text('查看设置'),
+                                  ),
+                                ],
+                              ),
+                            if (playback != null)
+                              ListenableBuilder(
+                                listenable: playback,
+                                builder: (_, _) => Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (playback.error != null ||
+                                        playback.playbackNotice != null)
+                                      Text(
+                                        playback.error ??
+                                            playback.playbackNotice!,
+                                        key: const ValueKey('playback-error'),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    if (!playback.notificationsEnabled)
+                                      Text(
+                                        playback.notificationMessage ??
+                                            '允许播放通知后，可在通知栏和锁屏控制音乐。',
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    if (!playback.notificationsEnabled)
+                                      TextButton(
+                                        onPressed: playback
+                                            .requestNotificationPermission,
+                                        child: const Text('开启播放通知'),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            Expanded(
+                              child: IndexedStack(
+                                index: _selected.index,
                                 children: [
-                                  if (playback.error != null ||
-                                      playback.playbackNotice != null)
-                                    Text(
-                                      playback.error ??
-                                          playback.playbackNotice!,
-                                      key: const ValueKey('playback-error'),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  if (!playback.notificationsEnabled)
-                                    Text(
-                                      playback.notificationMessage ??
-                                          '允许播放通知后，可在通知栏和锁屏控制音乐。',
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  if (!playback.notificationsEnabled)
-                                    TextButton(
-                                      onPressed: playback
-                                          .requestNotificationPermission,
-                                      child: const Text('开启播放通知'),
-                                    ),
+                                  for (final destination
+                                      in AppDestination.values)
+                                    branch(destination),
                                 ],
                               ),
                             ),
-                          Expanded(
-                            child: IndexedStack(
-                              index: _selected.index,
-                              children: [
-                                for (final destination in AppDestination.values)
-                                  branch(destination),
-                              ],
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
