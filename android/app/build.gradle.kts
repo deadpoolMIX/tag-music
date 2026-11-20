@@ -25,9 +25,17 @@ android {
 
     defaultConfig {
         val benchmark = System.getenv("TAG_MUSIC_BENCHMARK") == "1"
-        applicationId = if (benchmark) "app.tagmusic.player.benchmark" else "app.tagmusic.player"
-        manifestPlaceholders["tagMusicLabel"] =
-            if (benchmark) "Tag Music ${System.getenv("TAG_MUSIC_BENCHMARK_ROUND") ?: "R3"} Benchmark" else "Tag Music"
+        val originPlayerTrial = System.getenv("TAG_MUSIC_ORIGIN_PLAYER_TRIAL") == "1"
+        applicationId = when {
+            benchmark -> "app.tagmusic.player.benchmark"
+            originPlayerTrial -> "com.luna.music"
+            else -> "app.tagmusic.player"
+        }
+        manifestPlaceholders["tagMusicLabel"] = when {
+            benchmark -> "Tag Music ${System.getenv("TAG_MUSIC_BENCHMARK_ROUND") ?: "R3"} Benchmark"
+            originPlayerTrial -> "Tag Music 随身听试用版"
+            else -> "Tag Music"
+        }
         minSdk = 29
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION

@@ -1,12 +1,21 @@
 #Requires -Version 7.0
-param([ValidateSet('all','android','windows')][string]$Target = 'all', [ValidateRange(1,2100000000)][int]$BuildNumber = 9, [ValidatePattern('^R[0-9]+$')][string]$Round = 'R1')
+param(
+    [ValidateSet('all','android','windows')][string]$Target = 'all',
+    [ValidateRange(1,2100000000)][int]$BuildNumber = 9,
+    [ValidatePattern('^R[0-9]+$')][string]$Round = 'R1',
+    [switch]$OriginPlayerTrial
+)
+if ($OriginPlayerTrial -and $Target -ne 'android') { throw '随身听试用包须指定 -Target android。' }
 . "$PSScriptRoot/env.ps1"
 Set-Location $ProjectRoot
 $report = Join-Path $ProjectRoot "artifacts/$Round"
 $versionMatch = [regex]::Match((Get-Content pubspec.yaml -Raw), '(?m)^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+')
 if (!$versionMatch.Success) { throw '无法读取 pubspec 版本。' }
 $version = $versionMatch.Groups[1].Value
-foreach ($package in @("tag-music-$version+$BuildNumber.apk", "tag-music-windows-$version+$BuildNumber.zip")) {
+$standardApk = "tag-music-$version+$BuildNumber.apk"
+$originPlayerApk = "tag-music-origin-player-$version+$BuildNumber.apk"
+$androidApk = if ($OriginPlayerTrial) { $originPlayerApk } else { $standardApk }
+foreach ($package in @($standardApk, $originPlayerApk, "tag-music-windows-$version+$BuildNumber.zip")) {
     if (Test-Path -LiteralPath (Join-Path $report $package)) { throw "候选包已存在，必须使用新构建号：$package" }
 }
 New-Item -ItemType Directory -Force $report | Out-Null
@@ -17,8 +26,14 @@ if (!$revision) { $revision = 'uncommitted' }
 if (& git status --porcelain --untracked-files=normal) { $revision = "$revision-dirty" }
 if ($Target -in 'all','android') {
     & "$PSScriptRoot/signing.ps1"
-    Invoke-Checked $Flutter @('build','apk','--release',"--build-number=$BuildNumber","--dart-define=GIT_REVISION=$revision") "$report/build-android-$BuildNumber.log"
-    Copy-Item build/app/outputs/flutter-apk/app-release.apk "$report/tag-music-$version+$BuildNumber.apk"
+    $previousOriginPlayerTrial = $env:TAG_MUSIC_ORIGIN_PLAYER_TRIAL
+    try {
+        $env:TAG_MUSIC_ORIGIN_PLAYER_TRIAL = if ($OriginPlayerTrial) { '1' }
+        Invoke-Checked $Flutter @('build','apk','--release',"--build-number=$BuildNumber","--dart-define=GIT_REVISION=$revision") "$report/build-android-$BuildNumber.log"
+        Copy-Item build/app/outputs/flutter-apk/app-release.apk "$report/$androidApk"
+    } finally {
+        $env:TAG_MUSIC_ORIGIN_PLAYER_TRIAL = $previousOriginPlayerTrial
+    }
 }
 if ($Target -in 'all','windows') {
     & "$PSScriptRoot/prepare-windows.ps1"
