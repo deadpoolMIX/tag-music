@@ -115,12 +115,9 @@ class BackupFolder {
     }
   }
 
-  Future<Uint8List> readSnapshot(
-    String name, {
-    List<BackupEntry>? entries,
-  }) async {
+  Future<Uint8List> readSnapshot(String name) async {
     final byName = <String, BackupEntry>{};
-    for (final entry in entries ?? await list()) {
+    for (final entry in await list()) {
       if (!entry.isBackup) continue;
       if (byName.containsKey(entry.name)) {
         throw const FormatException('备份文件夹包含重名文件');

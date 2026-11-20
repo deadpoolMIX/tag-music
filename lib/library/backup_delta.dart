@@ -61,34 +61,6 @@ Map<String, Map<String, dynamic>> _keyedRows(
     _rowKey(table, row): row,
 };
 
-Future<Uint8List> encodeBackupIncrement(
-  String parent,
-  Uint8List before,
-  Uint8List after,
-) => Isolate.run(() {
-  final previous = _readPackage(before).data;
-  final current = _readPackage(after).data;
-  final changes = <String, dynamic>{};
-  for (final table in _primaryKeys.keys) {
-    final old = _keyedRows(table, previous);
-    final next = _keyedRows(table, current);
-    final removed = old.keys.where((key) => !next.containsKey(key)).toList();
-    final changed = [
-      for (final entry in next.entries)
-        if (jsonEncode(old[entry.key]) != jsonEncode(entry.value)) entry.value,
-    ];
-    if (removed.isNotEmpty || changed.isNotEmpty) {
-      changes[table] = {'removed': removed, 'changed': changed};
-    }
-  }
-  return _encodePackage(_incrementFormat, {
-    'parent': parent,
-    'base': _hash(before),
-    'result': _hash(after),
-    'changes': changes,
-  });
-});
-
 Future<String?> backupParent(Uint8List bytes) => Isolate.run(() {
   final package = _readPackage(bytes);
   if (package.format == _format) return null;

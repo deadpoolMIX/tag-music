@@ -127,14 +127,7 @@ class ScheduledLibraryBackup extends ChangeNotifier {
         .firstOrNull;
     final source = existing == null ? selected : selected.child(existing);
     final entries = existing == null ? top : await source.list();
-    final snapshot = await LibraryBackup.export(db);
-    final bytes = manual
-        ? snapshot
-        : await encodeBackupIncrement(
-            previous!.head,
-            await source.readSnapshot(previous.head, entries: entries),
-            snapshot,
-          );
+    final bytes = await LibraryBackup.export(db);
 
     var destination = source;
     final copied = <BackupEntry>[];
@@ -154,17 +147,11 @@ class ScheduledLibraryBackup extends ChangeNotifier {
 
     final stamp =
         '${_clock().toUtc().toIso8601String().substring(0, 19).replaceAll(':', '-')}Z';
-    final kind = manual ? 'full' : 'increment';
-    final name = 'Tag Music-$stamp-$kind-${const Uuid().v4()}.tagmusic';
+    final name = 'Tag Music-$stamp-full-${const Uuid().v4()}.tagmusic';
     await _writeVerified(destination, name, bytes);
-    if (!manual &&
-        copied.isNotEmpty &&
-        !listEquals(snapshot, await destination.readSnapshot(name))) {
-      throw const FormatException('迁移后的备份校验失败');
-    }
     if (manual) await selected.persistWriteAccess();
     final completedAt = _clock().toUtc();
-    final state = _BackupState(root, destination.id, name, completedAt);
+    final state = _BackupState(root, destination.id, completedAt);
     await writeBackupFile(await _stateFile(), state.encode());
     lastBackup = completedAt;
     problem = null;
@@ -208,11 +195,10 @@ class ScheduledLibraryBackup extends ChangeNotifier {
 }
 
 class _BackupState {
-  const _BackupState(this.root, this.directory, this.head, this.completedAt);
+  const _BackupState(this.root, this.directory, this.completedAt);
 
   final String root;
   final String directory;
-  final String head;
   final DateTime completedAt;
 
   factory _BackupState.decode(String text) {
@@ -220,7 +206,6 @@ class _BackupState {
     return _BackupState(
       data['root'] as String,
       data['directory'] as String,
-      data['head'] as String,
       DateTime.parse(data['completedAt'] as String),
     );
   }
@@ -230,7 +215,6 @@ class _BackupState {
       jsonEncode({
         'root': root,
         'directory': directory,
-        'head': head,
         'completedAt': completedAt.toIso8601String(),
       }),
     ),

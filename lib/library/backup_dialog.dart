@@ -57,7 +57,7 @@ class _BackupDialogState extends State<_BackupDialog> {
     final root = await BackupFolder.pick(library.documents, write: true);
     if (root == null) return;
     await library.scheduledBackup.manualBackup(root);
-    _status = '完整备份已保存，之后每 7 天自动保存一次增量。';
+    _status = '完整备份已保存，之后每 7 天自动保存一份完整备份。';
   }, '导出失败，请检查保存位置和可用空间。');
 
   Future<void> _readFolder() => _run(() async {
@@ -172,8 +172,8 @@ class _BackupDialogState extends State<_BackupDialog> {
                   const Text('备份包含曲库记录、标签、歌单和筛选规则，不包含音乐文件。'),
                   Text(
                     backup.lastBackup == null
-                        ? '手动备份一次后，每 7 天自动增量备份。'
-                        : '自动备份已开启，应用运行时每 7 天保存一次增量。',
+                        ? '手动备份一次后，每 7 天自动保存一份完整备份。'
+                        : '自动备份已开启，应用运行时每 7 天保存一份完整备份。',
                   ),
                   if (backup.problem case final problem?) Text(problem),
                   ListTile(

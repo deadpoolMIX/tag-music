@@ -46,7 +46,7 @@ void main() {
   });
 
   test(
-    'requires a successful manual backup, then saves each week of changes',
+    'requires a manual backup, then saves a standalone copy each week',
     () async {
       await expectLater(
         service.manualBackup(p.join(temp.path, 'missing')),
@@ -76,18 +76,22 @@ void main() {
       expect(await root.list(), hasLength(1));
       now = now.add(const Duration(hours: 1));
       await Future.wait([service.check(), service.check()]);
-      final firstIncrement = (await root.list()).singleWhere(
+      final firstAutomatic = (await root.list()).singleWhere(
         (entry) => entry.name != first.name,
       );
-      final increment = await root.read(firstIncrement);
-      expect(await backupParent(increment), first.name);
-      expect(utf8.decode(increment), isNot(contains('保留')));
+      final automatic = await root.read(firstAutomatic);
+      expect(await backupParent(automatic), isNull);
+      expect(automatic, await LibraryBackup.export(db));
       expect(
-        await root.readSnapshot(firstIncrement.name),
-        await LibraryBackup.export(db),
+        (await LibraryBackup.decode(automatic)).tags.map((tag) => tag.name),
+        unorderedEquals(['新名称', '新增', '保留']),
       );
 
-      // Base and both increments must be available together after relocation.
+      // Existing settings from the first release may still reference a missing head.
+      final saved =
+          jsonDecode(await settings.readAsString()) as Map<String, dynamic>;
+      saved['head'] = 'removed-increment.tagmusic';
+      await settings.writeAsString(jsonEncode(saved));
       final note = await File(p.join(destination.path, '外部文件.txt'))
           .writeAsString('保留我');
       await service.close();
@@ -105,24 +109,21 @@ void main() {
       expect(files, hasLength(3));
       expect(await note.readAsString(), '保留我');
       final second = files.singleWhere(
-        (entry) => !{first.name, firstIncrement.name}.contains(entry.name),
+        (entry) => !{first.name, firstAutomatic.name}.contains(entry.name),
       );
-      expect(
-        await backupParent(await dedicated.read(second)),
-        firstIncrement.name,
-      );
+      expect(await dedicated.readSnapshot(first.name), originalBytes);
+
+      for (final entry in files.where((entry) => entry.name != second.name)) {
+        await dedicated.remove(entry);
+      }
       expect(
         await dedicated.readSnapshot(second.name),
         await LibraryBackup.export(db),
       );
-      expect(await dedicated.readSnapshot(first.name), originalBytes);
-
-      await dedicated.remove(
-        files.singleWhere((entry) => entry.name == firstIncrement.name),
-      );
-      await expectLater(
-        dedicated.readSnapshot(second.name),
-        throwsFormatException,
+      expect(
+        (await LibraryBackup.decode(await dedicated.read(second))).tags
+            .map((tag) => tag.name),
+        unorderedEquals(['新名称', '新增', '第二周']),
       );
     },
   );
