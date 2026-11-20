@@ -1,22 +1,30 @@
 import 'package:flutter/material.dart';
 
+import '../core/compact_dialog.dart';
 import '../playback/playback_controller.dart';
 import 'filter_rule.dart';
 import 'library_controller.dart';
+import 'library_header.dart';
 import 'rule_editor.dart';
 import 'smart_playlist_editor.dart';
 import 'song_list.dart';
 
 class FilterPage extends StatelessWidget {
-  const FilterPage({required this.library, required this.playback, super.key});
+  const FilterPage({
+    required this.library,
+    required this.playback,
+    this.menuButton,
+    super.key,
+  });
 
   final LibraryController library;
   final PlaybackController playback;
+  final Widget? menuButton;
 
   Future<void> _reset(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialog) => AlertDialog(
+      builder: (dialog) => CompactAlertDialog(
         title: const Text('重置筛选记录？'),
         content: const Text('将替换无法读取的规则，恢复全部可用歌曲和默认排序。'),
         actions: [
@@ -53,33 +61,35 @@ class FilterPage extends StatelessWidget {
       return LayoutBuilder(
         builder: (context, constraints) => Column(
           children: [
+            LibraryHeader(
+              menuButton: menuButton,
+              actions: [
+                IconButton(
+                  key: const ValueKey('save-smart-playlist'),
+                  tooltip: '保存为智能歌单',
+                  onPressed: enabled
+                      ? () => editSmartPlaylist(
+                          context,
+                          library,
+                          initial: preferences,
+                        )
+                      : null,
+                  icon: const Icon(Icons.bookmark_add_outlined),
+                ),
+              ],
+            ),
             ConstrainedBox(
               constraints: BoxConstraints(
                 maxHeight: constraints.maxHeight * .65,
               ),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-                child: Column(
-                  children: [
-                    RuleEditor(
-                      library: library,
-                      rule: preferences.rule,
-                      enabled: enabled,
-                      compact: true,
-                      onChanged: (rule) => library.updateFilter(rule: rule),
-                    ),
-                    FilledButton(
-                      key: const ValueKey('save-smart-playlist'),
-                      onPressed: enabled
-                          ? () => editSmartPlaylist(
-                              context,
-                              library,
-                              initial: preferences,
-                            )
-                          : null,
-                      child: const Text('保存为智能歌单'),
-                    ),
-                  ],
+                child: RuleEditor(
+                  library: library,
+                  rule: preferences.rule,
+                  enabled: enabled,
+                  compact: true,
+                  onChanged: (rule) => library.updateFilter(rule: rule),
                 ),
               ),
             ),

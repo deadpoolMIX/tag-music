@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/compact_dialog.dart';
+
 import 'library_controller.dart';
 
 Future<void> showSongInformation(BuildContext context, LibraryTrack track) =>
@@ -112,22 +114,22 @@ class _SongInformationDialogState extends State<_SongInformationDialog> {
         header: true,
         child: Text(title, style: Theme.of(context).textTheme.titleSmall),
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 6),
       for (final field in fields.entries) ...[
         Text(
           field.key,
           style: Theme.of(context).textTheme.labelMedium
               ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         Text(field.value),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
       ],
     ],
   );
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
+  Widget build(BuildContext context) => CompactAlertDialog(
     title: const Text('歌曲信息 · 只读'),
     content: SizedBox(
       width: 440,
@@ -137,7 +139,7 @@ class _SongInformationDialogState extends State<_SongInformationDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('信息来自曲库记录，仅供查看，不修改音乐文件。'),
-            const SizedBox(height: 20),
+            const SizedBox(height: 8),
             SelectionArea(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -145,7 +147,7 @@ class _SongInformationDialogState extends State<_SongInformationDialog> {
                 children: [
                   _section('歌曲资料', _metadata),
                   const Divider(),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 4),
                   _section('文件资料', _file),
                 ],
               ),

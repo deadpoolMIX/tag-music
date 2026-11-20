@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/compact_dialog.dart';
+
 import 'playback_controller.dart';
 
 String sleepTimeLabel(Duration value) {
@@ -113,7 +115,7 @@ class _SleepTimerPanelState extends State<_SleepTimerPanel> {
   Widget build(BuildContext context) => SafeArea(
     child: SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         child: ListenableBuilder(
           listenable: widget.playback,
           builder: (context, _) {
@@ -123,7 +125,7 @@ class _SleepTimerPanelState extends State<_SleepTimerPanel> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text('睡眠定时', style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 12),
+                const SizedBox(height: 6),
                 Text(
                   sleep.waitingForEnd
                       ? '已到时间，将在当前歌曲结束后停止。切换歌曲会停止播放；取消定时后可继续切换。'
@@ -139,7 +141,7 @@ class _SleepTimerPanelState extends State<_SleepTimerPanel> {
                         : '当前未累计，恢复实际播放后继续。选择新时长会重新开始计时；暂停和缓冲时不计时。',
                   ),
                 ],
-                const SizedBox(height: 20),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -153,7 +155,7 @@ class _SleepTimerPanelState extends State<_SleepTimerPanel> {
                       ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 4),
                 OutlinedButton(
                   onPressed: _busy ? null : _custom,
                   child: const Text('自定义时间'),
@@ -279,7 +281,7 @@ class _SleepDialDialogState extends State<_SleepDialDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
+  Widget build(BuildContext context) => CompactAlertDialog(
     title: const Text('自定义睡眠时间'),
     content: SizedBox(
       width: 300,

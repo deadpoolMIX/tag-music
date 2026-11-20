@@ -71,6 +71,24 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
 
   ThemeData _theme(Brightness brightness) => ThemeData(
     useMaterial3: true,
+    dialogTheme: DialogThemeData(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      titleTextStyle: TextStyle(
+        fontFamily: 'Microsoft YaHei',
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+        color: brightness == Brightness.dark ? Colors.white : Colors.black87,
+      ),
+    ),
+    inputDecorationTheme: const InputDecorationThemeData(
+      isDense: true,
+      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      prefixIconConstraints: BoxConstraints(minWidth: 36, minHeight: 36),
+    ),
+    popupMenuTheme: const PopupMenuThemeData(
+      menuPadding: EdgeInsets.symmetric(vertical: 4),
+    ),
     colorScheme: ColorScheme.fromSeed(
       seedColor: const Color(0xFF386A56),
       brightness: brightness,
@@ -249,6 +267,15 @@ class _AppShellState extends ConsumerState<AppShell>
       final desktop = Theme.of(context).platform == TargetPlatform.windows;
       final library = ref.watch(libraryProvider);
       final playback = ref.watch(playbackProvider);
+      final menuButton = desktop
+          ? null
+          : IconButton(
+              key: const ValueKey('open-navigation'),
+              tooltip: '打开导航菜单',
+              onPressed: _openNavigation,
+              icon: const Icon(Icons.menu),
+            );
+      final libraryReady = library != null && playback != null;
       Widget unavailable() => const Center(child: Text('曲库尚未就绪'));
       Widget branch(AppDestination destination) => KeyedSubtree(
         key: ValueKey(destination),
@@ -259,19 +286,16 @@ class _AppShellState extends ConsumerState<AppShell>
                 : LibraryPage(
                     library: library,
                     playback: playback,
-                    menuButton: desktop
-                        ? null
-                        : IconButton(
-                            key: const ValueKey('open-navigation'),
-                            tooltip: '打开导航菜单',
-                            onPressed: _openNavigation,
-                            icon: const Icon(Icons.menu),
-                          ),
+                    menuButton: menuButton,
                   ),
           AppDestination.filter =>
             library == null || playback == null
                 ? unavailable()
-                : FilterPage(library: library, playback: playback),
+                : FilterPage(
+                    library: library,
+                    playback: playback,
+                    menuButton: menuButton,
+                  ),
           AppDestination.playlists =>
             library == null || playback == null
                 ? unavailable()
@@ -279,6 +303,7 @@ class _AppShellState extends ConsumerState<AppShell>
                     library: library,
                     playback: playback,
                     active: _selected == AppDestination.playlists,
+                    menuButton: menuButton,
                   ),
           AppDestination.tags =>
             library == null || playback == null
@@ -287,6 +312,7 @@ class _AppShellState extends ConsumerState<AppShell>
                     library: library,
                     playback: playback,
                     active: _selected == AppDestination.tags,
+                    menuButton: menuButton,
                   ),
           AppDestination.settings => const SettingsPage(),
           AppDestination.albums || AppDestination.artists =>
@@ -297,6 +323,7 @@ class _AppShellState extends ConsumerState<AppShell>
                     playback: playback,
                     albums: destination == AppDestination.albums,
                     active: _selected == destination,
+                    menuButton: menuButton,
                   ),
         },
       );
@@ -333,17 +360,11 @@ class _AppShellState extends ConsumerState<AppShell>
                         child: Column(
                           children: [
                             if (!desktop &&
-                                (_selected != AppDestination.songs ||
-                                    library == null ||
-                                    playback == null))
+                                (_selected == AppDestination.settings ||
+                                    !libraryReady))
                               Align(
                                 alignment: Alignment.centerLeft,
-                                child: IconButton(
-                                  key: const ValueKey('open-navigation'),
-                                  tooltip: '打开导航菜单',
-                                  onPressed: _openNavigation,
-                                  icon: const Icon(Icons.menu),
-                                ),
+                                child: menuButton,
                               ),
                             if (ref.watch(startupWarningProvider)
                                 case final warning?)

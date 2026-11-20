@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/compact_dialog.dart';
 import '../playback/playback_controller.dart';
 import '../playback/queue_actions.dart';
 import 'database.dart';
@@ -15,11 +16,13 @@ class PlaylistsPage extends StatefulWidget {
     required this.library,
     required this.playback,
     this.active = true,
+    this.menuButton,
     super.key,
   });
   final LibraryController library;
   final PlaybackController playback;
   final bool active;
+  final Widget? menuButton;
   @override
   State<PlaylistsPage> createState() => _PlaylistsPageState();
 }
@@ -41,7 +44,7 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
   Future<void> _delete(Playlist list) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialog) => AlertDialog(
+      builder: (dialog) => CompactAlertDialog(
         title: Text('删除“${list.name}”？'),
         content: const Text('仅删除歌单，音乐、标签和已有播放队列保留。'),
         actions: [
@@ -68,7 +71,7 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
     } catch (error) {
       final rebuild = await showDialog<bool>(
         context: context,
-        builder: (dialog) => AlertDialog(
+        builder: (dialog) => CompactAlertDialog(
           title: const Text('重建无法读取的规则？'),
           content: Text('$error\n将从全部可用歌曲和默认排序开始编辑，保存后替换旧规则；取消会保留原记录。'),
           actions: [
@@ -138,6 +141,7 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                     children: [
                       Row(
                         children: [
+                          ?widget.menuButton,
                           IconButton(
                             tooltip: '返回歌单',
                             onPressed: busy ? null : _closePlaylist,
@@ -189,8 +193,8 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
                       TextField(
                         key: ValueKey('playlist-search-${list.id}'),
                         decoration: const InputDecoration(
-                          labelText: '搜索歌单歌曲',
-                          prefixIcon: Icon(Icons.search),
+                          hintText: '搜索歌单歌曲',
+                          prefixIcon: Icon(Icons.search, size: 18),
                         ),
                         onChanged: (value) => setState(() {
                           query = value;
@@ -326,77 +330,38 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
         final stable = c != 0 ? c : a.name.compareTo(b.name);
         return descending ? -stable : stable;
       });
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Wrap(
-            spacing: 8,
-            children: [
-              FilledButton.icon(
-                key: const ValueKey('create-playlist'),
-                onPressed: () => savePlaylist(context, library, const []),
-                icon: const Icon(Icons.add),
-                label: const Text('新建普通歌单'),
-              ),
-              TextButton.icon(
-                key: const ValueKey('create-smart-playlist'),
-                onPressed: () => editSmartPlaylist(
-                  context,
-                  library,
-                  initial: FilterPreferences(),
-                ),
-                icon: const Icon(Icons.auto_awesome),
-                label: const Text('新建智能歌单'),
-              ),
-              TextButton.icon(
-                key: const ValueKey('save-queue-playlist'),
-                onPressed: widget.playback.queue.entries.isEmpty
-                    ? null
-                    : () => savePlaylist(
-                        context,
-                        library,
-                        widget.playback.queue.entries.map((e) => e.song.songId),
-                      ),
-                icon: const Icon(Icons.save_outlined),
-                label: const Text('保存完整队列'),
-              ),
-            ],
+    return GroupList(
+      menuButton: widget.menuButton,
+      trailing: IconButton(
+        key: const ValueKey('create-playlist'),
+        tooltip: '新建歌单',
+        onPressed: () => savePlaylist(context, library, const []),
+        icon: const Icon(Icons.playlist_add),
+      ),
+      storageKey: 'playlist-overview',
+      descending: descending,
+      onSort: () => setState(() => descending = !descending),
+      itemCount: lists.length,
+      emptyText: '保存喜欢的歌曲顺序，或创建空歌单',
+      itemBuilder: (_, i) {
+        final list = lists[i];
+        return ListTile(
+          key: ValueKey('playlist-${list.id}'),
+          leading: Icon(
+            list.kind == 'smart' ? Icons.auto_awesome : Icons.queue_music,
           ),
-        ),
-        Expanded(
-          child: GroupList(
-            storageKey: 'playlist-overview',
-            descending: descending,
-            onSort: () => setState(() => descending = !descending),
-            itemCount: lists.length,
-            emptyText: '保存喜欢的歌曲顺序，或创建空歌单',
-            itemBuilder: (_, i) {
-              final list = lists[i];
-              return ListTile(
-                key: ValueKey('playlist-${list.id}'),
-                leading: Icon(
-                  list.kind == 'smart' ? Icons.auto_awesome : Icons.queue_music,
-                ),
-                title: Text(
-                  list.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Text(
-                  '${list.kind == 'smart' ? '智能歌单' : '普通歌单'} · ${_count(library, list)}',
-                ),
-                onTap: () => setState(() {
-                  openedId = list.id;
-                  query = '';
+          title: Text(list.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+          subtitle: Text(
+            '${list.kind == 'smart' ? '智能歌单' : '普通歌单'} · ${_count(library, list)}',
+          ),
+          onTap: () => setState(() {
+            openedId = list.id;
+            query = '';
 
-                  reorderingMode = false;
-                }),
-              );
-            },
-          ),
-        ),
-      ],
+            reorderingMode = false;
+          }),
+        );
+      },
     );
   }
 }

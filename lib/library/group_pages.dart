@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../playback/playback_controller.dart';
 import 'library_controller.dart';
+import 'library_header.dart';
 import 'song_list.dart';
+import 'track_cover.dart';
 
 /// A compact, consistently ordered list for library groups.
 class GroupList extends StatelessWidget {
@@ -13,6 +15,9 @@ class GroupList extends StatelessWidget {
     required this.itemCount,
     required this.itemBuilder,
     required this.emptyText,
+    this.menuButton,
+    this.heading,
+    this.trailing,
     super.key,
   });
   final String storageKey;
@@ -21,17 +26,27 @@ class GroupList extends StatelessWidget {
   final int itemCount;
   final IndexedWidgetBuilder itemBuilder;
   final String emptyText;
+  final Widget? menuButton;
+  final Widget? heading;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      Align(
-        alignment: Alignment.centerRight,
-        child: TextButton.icon(
-          onPressed: onSort,
-          icon: Icon(descending ? Icons.arrow_downward : Icons.arrow_upward),
-          label: Text(descending ? '名称降序' : '名称升序'),
-        ),
+      LibraryHeader(
+        menuButton: menuButton,
+        heading: heading,
+        actions: [
+          TextButton.icon(
+            onPressed: onSort,
+            icon: Icon(
+              descending ? Icons.arrow_downward : Icons.arrow_upward,
+              size: 16,
+            ),
+            label: Text(descending ? '名称降序' : '名称升序'),
+          ),
+          ?trailing,
+        ],
       ),
       Expanded(
         child: itemCount == 0
@@ -61,12 +76,14 @@ class MetadataGroupsPage extends StatefulWidget {
     required this.playback,
     required this.albums,
     required this.active,
+    this.menuButton,
     super.key,
   });
   final LibraryController library;
   final PlaybackController playback;
   final bool albums;
   final bool active;
+  final Widget? menuButton;
   @override
   State<MetadataGroupsPage> createState() => _MetadataGroupsPageState();
 }
@@ -101,6 +118,7 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
             children: [
               Row(
                 children: [
+                  ?widget.menuButton,
                   IconButton(
                     tooltip: '返回分组',
                     onPressed: () => setState(() => opened = false),
@@ -149,55 +167,56 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
                     : a.compareTo(b));
           return descending ? -stable : stable;
         });
-      return Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                widget.albums ? '专辑' : '歌手',
-                key: ValueKey(
-                  widget.albums ? 'albums-heading' : 'artists-heading',
-                ),
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
+      return GroupList(
+        menuButton: widget.menuButton,
+        heading: Text(
+          widget.albums ? '专辑' : '歌手',
+          key: ValueKey(widget.albums ? 'albums-heading' : 'artists-heading'),
+          style: Theme.of(context).textTheme.titleLarge,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        storageKey: widget.albums ? 'albums-overview' : 'artists-overview',
+        descending: descending,
+        onSort: () => setState(() => descending = !descending),
+        itemCount: keys.length,
+        emptyText: '暂无歌曲',
+        itemBuilder: (_, index) {
+          final key = keys[index];
+          final tracks = groups[key]!;
+          final coverTracks = widget.albums
+              ? tracks
+                    .where((track) => track.available)
+                    .map((track) => track.probe)
+                    .toList()
+              : null;
+          return ListTile(
+            leading: coverTracks == null
+                ? const Icon(Icons.person_outline)
+                : ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: TrackCover.album(
+                      documents: widget.library.documents,
+                      tracks: coverTracks,
+                      size: 42,
+                    ),
+                  ),
+            title: Text(
+              key ?? unknown,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          Expanded(
-            child: GroupList(
-              storageKey: widget.albums
-                  ? 'albums-overview'
-                  : 'artists-overview',
-              descending: descending,
-              onSort: () => setState(() => descending = !descending),
-              itemCount: keys.length,
-              emptyText: '暂无歌曲',
-              itemBuilder: (_, index) {
-                final key = keys[index];
-                return ListTile(
-                  leading: Icon(
-                    widget.albums ? Icons.album_outlined : Icons.person_outline,
-                  ),
-                  title: Text(
-                    key ?? unknown,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    '${groups[key]!.length} 首${key == null ? (widget.albums ? ' · 未提供专辑信息' : ' · 未提供歌手信息') : ''}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  onTap: () => setState(() {
-                    selected = key;
-                    opened = true;
-                  }),
-                );
-              },
+            subtitle: Text(
+              '${tracks.length} 首${key == null ? (widget.albums ? ' · 未提供专辑信息' : ' · 未提供歌手信息') : ''}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ],
+            onTap: () => setState(() {
+              selected = key;
+              opened = true;
+            }),
+          );
+        },
       );
     },
   );

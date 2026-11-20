@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../core/compact_dialog.dart';
 import '../core/reorder_handle.dart';
 import '../library/library_controller.dart';
 import '../library/playlist_actions.dart';
@@ -25,11 +26,14 @@ Future<void> showPlaybackModeChooser(
     context: context,
     builder: (dialogContext) => SimpleDialog(
       title: const Text('播放模式'),
+      titlePadding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      contentPadding: const EdgeInsets.only(bottom: 4),
       children: [
         for (final mode in PlaybackMode.values)
           ListenableBuilder(
             listenable: playback,
             builder: (_, _) => ListTile(
+              dense: true,
               title: Text(playbackModeNames[mode]!),
               selected: mode == playback.queue.mode,
               trailing: mode == playback.queue.mode
@@ -173,7 +177,7 @@ class _QueuePageState extends State<QueuePage> {
   Future<void> _clear() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialog) => AlertDialog(
+      builder: (dialog) => CompactAlertDialog(
         title: const Text('清空播放队列？'),
         content: const Text('将停止播放并移除全部队列条目，歌单和曲库保留。'),
         actions: [
@@ -264,13 +268,6 @@ class _QueuePageState extends State<QueuePage> {
                           child: const Text('清空队列'),
                         ),
                       ],
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 4,
-                      ),
-                      child: Text('优先待播按编号播放一次，再续原序列；已播条目保留。拖动可调整队列和待播顺序。'),
                     ),
                     if (playback.error case final error?)
                       Text(error, key: const ValueKey('queue-error')),

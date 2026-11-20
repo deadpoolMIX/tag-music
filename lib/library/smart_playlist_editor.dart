@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/compact_dialog.dart';
+
 import 'database.dart';
 import 'filter_rule.dart';
 import 'library_controller.dart';
@@ -82,82 +84,79 @@ class _SmartEditorState extends State<_SmartEditor> {
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: !saving,
-    child: AlertDialog(
+    child: CompactAlertDialog(
+      scrollable: true,
       title: Text(widget.playlist == null ? '新建智能歌单' : '编辑智能规则'),
       content: SizedBox(
-        width: 900,
-        height: MediaQuery.sizeOf(context).height * .65,
+        width: 640,
         child: ListenableBuilder(
           listenable: widget.library,
-          builder: (context, _) => SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (widget.playlist == null)
-                  TextField(
-                    key: const ValueKey('smart-name'),
-                    controller: name,
-                    enabled: !saving,
-                    decoration: const InputDecoration(labelText: '歌单名称'),
+          builder: (context, _) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (widget.playlist == null)
+                TextField(
+                  key: const ValueKey('smart-name'),
+                  controller: name,
+                  enabled: !saving,
+                  decoration: const InputDecoration(labelText: '歌单名称'),
+                ),
+              const Text(ruleExplanation),
+              RuleEditor(
+                library: widget.library,
+                rule: preferences.rule,
+                prefix: 'smart',
+                enabled: !saving && !widget.library.filterDeletingTag,
+                onChanged: (rule) => _change(rule: rule),
+              ),
+              Wrap(
+                spacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  DropdownButton<LibrarySort>(
+                    isDense: true,
+                    key: const ValueKey('smart-sort'),
+                    value: preferences.sort == LibrarySort.modified
+                        ? null
+                        : preferences.sort,
+                    hint: const Text('修改时间（已保存）'),
+                    onChanged: saving ? null : (sort) => _change(sort: sort),
+                    items: [
+                      for (final entry in {
+                        LibrarySort.title: '歌曲名',
+                        LibrarySort.artist: '歌手',
+                        LibrarySort.album: '专辑',
+                        LibrarySort.name: '文件名',
+                      }.entries)
+                        DropdownMenuItem(
+                          value: entry.key,
+                          child: Text(entry.value),
+                        ),
+                    ],
                   ),
-                const Text(ruleExplanation),
-                const Text('只保存规则和排序；搜索词不会保存。歌曲或标签变化时更新结果。'),
-                RuleEditor(
-                  library: widget.library,
-                  rule: preferences.rule,
-                  prefix: 'smart',
-                  enabled: !saving && !widget.library.filterDeletingTag,
-                  onChanged: (rule) => _change(rule: rule),
-                ),
-                Wrap(
-                  spacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    DropdownButton<LibrarySort>(
-                      key: const ValueKey('smart-sort'),
-                      value: preferences.sort == LibrarySort.modified
-                          ? null
-                          : preferences.sort,
-                      hint: const Text('修改时间（已保存）'),
-                      onChanged: saving ? null : (sort) => _change(sort: sort),
-                      items: [
-                        for (final entry in {
-                          LibrarySort.title: '歌曲名',
-                          LibrarySort.artist: '歌手',
-                          LibrarySort.album: '专辑',
-                          LibrarySort.name: '文件名',
-                        }.entries)
-                          DropdownMenuItem(
-                            value: entry.key,
-                            child: Text(entry.value),
-                          ),
-                      ],
+                  IconButton(
+                    key: const ValueKey('smart-direction'),
+                    tooltip: preferences.descending ? '改为升序' : '改为降序',
+                    onPressed: saving
+                        ? null
+                        : () => _change(descending: !preferences.descending),
+                    icon: Icon(
+                      preferences.descending ? Icons.south : Icons.north,
                     ),
-                    IconButton(
-                      key: const ValueKey('smart-direction'),
-                      tooltip: preferences.descending ? '改为升序' : '改为降序',
-                      onPressed: saving
-                          ? null
-                          : () => _change(descending: !preferences.descending),
-                      icon: Icon(
-                        preferences.descending ? Icons.south : Icons.north,
-                      ),
-                    ),
-                    Text(
-                      '${widget.library.matchingTracks(preferences).length} 首可用歌曲',
-                      key: const ValueKey('smart-preview'),
-                    ),
-                  ],
-                ),
-                if (error != null)
+                  ),
                   Text(
-                    error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
+                    '${widget.library.matchingTracks(preferences).length} 首可用歌曲',
+                    key: const ValueKey('smart-preview'),
                   ),
-              ],
-            ),
+                ],
+              ),
+              if (error != null)
+                Text(
+                  error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+            ],
           ),
         ),
       ),

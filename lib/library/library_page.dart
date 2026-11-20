@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/compact_dialog.dart';
 import '../playback/playback_controller.dart';
 import 'library_controller.dart';
 import 'library_search_page.dart';
@@ -20,44 +21,43 @@ class LibraryPage extends StatelessWidget {
   Future<void> _sort(BuildContext context) => showModalBottomSheet<void>(
     context: context,
     builder: (context) => SafeArea(
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * .5,
-        child: ListenableBuilder(
-          listenable: library,
-          builder: (context, _) => SingleChildScrollView(
-            child: Column(
-              children: [
-                const Padding(padding: EdgeInsets.all(16), child: Text('歌曲排序')),
-                for (final option in [
-                  (LibrarySort.title, '歌名'),
-                  (LibrarySort.artist, '歌手'),
-                  (LibrarySort.modified, '修改时间'),
-                ])
-                  ListTile(
-                    title: Text(option.$2),
-                    selected: library.sort == option.$1,
-                    trailing: library.sort == option.$1
-                        ? const Icon(Icons.check)
-                        : null,
-                    onTap: () => library.filter(order: option.$1),
-                  ),
-                Wrap(
-                  children: [
-                    ChoiceChip(
-                      label: const Text('升序'),
-                      selected: !library.descending,
-                      onSelected: (_) => library.filter(reverse: false),
-                    ),
-                    const SizedBox(width: 12),
-                    ChoiceChip(
-                      label: const Text('降序'),
-                      selected: library.descending,
-                      onSelected: (_) => library.filter(reverse: true),
-                    ),
-                  ],
+      child: ListenableBuilder(
+        listenable: library,
+        builder: (context, _) => SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(padding: EdgeInsets.all(8), child: Text('歌曲排序')),
+              for (final option in [
+                (LibrarySort.title, '歌名'),
+                (LibrarySort.artist, '歌手'),
+                (LibrarySort.modified, '修改时间'),
+              ])
+                ListTile(
+                  dense: true,
+                  title: Text(option.$2),
+                  selected: library.sort == option.$1,
+                  trailing: library.sort == option.$1
+                      ? const Icon(Icons.check)
+                      : null,
+                  onTap: () => library.filter(order: option.$1),
                 ),
-              ],
-            ),
+              Wrap(
+                children: [
+                  ChoiceChip(
+                    label: const Text('升序'),
+                    selected: !library.descending,
+                    onSelected: (_) => library.filter(reverse: false),
+                  ),
+                  const SizedBox(width: 12),
+                  ChoiceChip(
+                    label: const Text('降序'),
+                    selected: library.descending,
+                    onSelected: (_) => library.filter(reverse: true),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -204,7 +204,7 @@ Future<void> showDirectoryManager(
   LibraryController library,
 ) => showDialog<void>(
   context: context,
-  builder: (context) => AlertDialog(
+  builder: (context) => CompactAlertDialog(
     title: const Text('音乐目录'),
     content: SizedBox(
       width: 520,
@@ -214,9 +214,12 @@ Future<void> showDirectoryManager(
             ? const Text('尚未添加目录')
             : ListView(
                 shrinkWrap: true,
+                padding: EdgeInsets.zero,
                 children: [
                   for (final root in library.roots)
                     ListTile(
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                       title: Text(
                         root.location,
                         maxLines: 3,

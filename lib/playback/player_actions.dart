@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../core/compact_dialog.dart';
 import '../library/library_controller.dart';
 import '../library/song_information.dart';
 import 'playback_controller.dart';
@@ -124,7 +125,7 @@ Future<void> showPlaybackFeedback(
   PlaybackController playback,
 ) => showDialog<void>(
   context: context,
-  builder: (dialogContext) => AlertDialog(
+  builder: (dialogContext) => CompactAlertDialog(
     title: const Text('播放提示'),
     content: SingleChildScrollView(
       child: SelectableText(

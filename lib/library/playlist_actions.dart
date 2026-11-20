@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/compact_dialog.dart';
+
 import 'database.dart';
 import 'library_controller.dart';
 
@@ -84,7 +86,7 @@ class _PlaylistNameDialogState extends State<_PlaylistNameDialog> {
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: !saving,
-    child: AlertDialog(
+    child: CompactAlertDialog(
       scrollable: true,
       title: Text(widget.rename == null ? '保存普通歌单' : '歌单改名'),
       content: SizedBox(
@@ -129,16 +131,19 @@ Future<void> addToPlaylist(
   final lists = library.playlists.where((p) => p.kind == 'regular').toList();
   final target = await showDialog<String>(
     context: context,
-    builder: (dialog) => AlertDialog(
+    builder: (dialog) => CompactAlertDialog(
       title: const Text('添加到普通歌单'),
       content: SizedBox(
         width: 420,
-        height: 300,
         child: lists.isEmpty
-            ? const Center(child: Text('尚无普通歌单，可保存为新歌单'))
+            ? const Text('尚无普通歌单，可保存为新歌单')
             : ListView.builder(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
                 itemCount: lists.length,
                 itemBuilder: (_, i) => ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                   title: Text(lists[i].name),
                   onTap: () => Navigator.pop(dialog, lists[i].id),
                 ),
@@ -192,27 +197,48 @@ Future<void> pickPlaylistSongs(
               ].any((v) => v.toLowerCase().contains(needle)),
             )
             .toList();
-        return AlertDialog(
+        return CompactAlertDialog(
           title: const Text('从曲库添加歌曲'),
           content: SizedBox(
             width: 520,
-            height: 400,
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   key: const ValueKey('playlist-picker-search'),
-                  decoration: const InputDecoration(labelText: '搜索歌曲'),
+                  decoration: const InputDecoration(
+                    hintText: '搜索歌曲',
+                    prefixIcon: Icon(Icons.search, size: 18),
+                  ),
                   onChanged: (value) => setState(() => query = value),
                 ),
-                Text('已选 ${selected.length} 首 · 已在歌单中的歌曲不会重复添加'),
-                Expanded(
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text('已选 ${selected.length} 首'),
+                ),
+                if (visible.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text('没有匹配的歌曲'),
+                  ),
+                Flexible(
                   child: ListView.builder(
+                    shrinkWrap: true,
+                    padding: EdgeInsets.zero,
                     itemCount: visible.length,
                     itemBuilder: (_, i) {
                       final t = visible[i];
                       return CheckboxListTile(
                         key: ValueKey('pick-${t.song.id}'),
-                        title: Text(t.title),
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                        ),
+                        title: Text(
+                          t.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         subtitle: Text(
                           existing.contains(t.song.id)
                               ? '已在歌单'

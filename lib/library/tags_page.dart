@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/compact_dialog.dart';
+
 import 'library_controller.dart';
 import '../playback/playback_controller.dart';
 import 'group_pages.dart';
@@ -25,7 +27,7 @@ Future<void> _editName(
   var input = initial;
   final result = await showDialog<String>(
     context: context,
-    builder: (dialog) => AlertDialog(
+    builder: (dialog) => CompactAlertDialog(
       title: Text(id == null ? '创建标签' : '修改标签名称'),
       content: TextFormField(
         initialValue: initial,
@@ -61,7 +63,7 @@ Future<void> showTagActions(
   Set<String> songIds,
 ) => showDialog<void>(
   context: context,
-  builder: (dialog) => AlertDialog(
+  builder: (dialog) => CompactAlertDialog(
     title: Text(songIds.length == 1 ? '编辑歌曲标签' : '为 ${songIds.length} 首歌曲编辑标签'),
     content: SizedBox(
       width: 520,
@@ -71,9 +73,12 @@ Future<void> showTagActions(
             ? const Text('尚无标签。请先在“标签”页创建。')
             : ListView(
                 shrinkWrap: true,
+                padding: EdgeInsets.zero,
                 children: [
                   for (final tag in library.tags)
                     ListTile(
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                       title: Text(tag.name),
                       subtitle: Text(
                         '已标记 ${songIds.where((id) => library.tagsForSong(id).contains(tag.id)).length} / ${songIds.length} 首',
@@ -126,11 +131,13 @@ class TagsPage extends StatefulWidget {
     required this.library,
     this.playback,
     this.active = true,
+    this.menuButton,
     super.key,
   });
   final LibraryController library;
   final PlaybackController? playback;
   final bool active;
+  final Widget? menuButton;
   @override
   State<TagsPage> createState() => _TagsPageState();
 }
@@ -152,7 +159,7 @@ class _TagsPageState extends State<TagsPage> {
     }
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialog) => AlertDialog(
+      builder: (dialog) => CompactAlertDialog(
         scrollable: true,
         title: Text('删除标签“$name”？'),
         content: Text(
@@ -192,6 +199,7 @@ class _TagsPageState extends State<TagsPage> {
             children: [
               Row(
                 children: [
+                  ?widget.menuButton,
                   IconButton(
                     tooltip: '返回标签',
                     onPressed: () => setState(() => openedId = null),
@@ -234,64 +242,45 @@ class _TagsPageState extends State<TagsPage> {
           final stable = c != 0 ? c : a.name.compareTo(b.name);
           return descending ? -stable : stable;
         });
-      return Column(
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: FilledButton.icon(
-                key: const ValueKey('create-tag'),
-                onPressed: () => _editName(context, library),
-                icon: const Icon(Icons.add),
-                label: const Text('创建标签'),
-              ),
-            ),
-          ),
-          Expanded(
-            child: GroupList(
-              storageKey: 'tags-overview',
-              descending: descending,
-              onSort: () => setState(() => descending = !descending),
-              itemCount: tags.length,
-              emptyText: '尚无标签。创建后可在曲库为歌曲添加标签。',
-              itemBuilder: (_, index) {
-                final tag = tags[index];
-                return ListTile(
-                  key: ValueKey('tag-${tag.id}'),
-                  leading: const Icon(Icons.sell_outlined),
-                  title: Text(
-                    tag.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text('${library.tracksForTag(tag.id).length} 首'),
-                  onTap: () => setState(() => openedId = tag.id),
-                  trailing: PopupMenuButton<String>(
-                    tooltip: '标签操作',
-                    onSelected: (action) {
-                      if (action == 'rename') {
-                        _editName(
-                          context,
-                          library,
-                          id: tag.id,
-                          initial: tag.name,
-                        );
-                      }
-                      if (action == 'delete') {
-                        _delete(context, tag.id, tag.name);
-                      }
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'rename', child: Text('改名')),
-                      PopupMenuItem(value: 'delete', child: Text('删除')),
-                    ],
-                  ),
-                );
+      return GroupList(
+        menuButton: widget.menuButton,
+        trailing: IconButton(
+          key: const ValueKey('create-tag'),
+          tooltip: '创建标签',
+          onPressed: () => _editName(context, library),
+          icon: const Icon(Icons.add),
+        ),
+        heading: const SizedBox.shrink(),
+        storageKey: 'tags-overview',
+        descending: descending,
+        onSort: () => setState(() => descending = !descending),
+        itemCount: tags.length,
+        emptyText: '尚无标签。创建后可在曲库为歌曲添加标签。',
+        itemBuilder: (_, index) {
+          final tag = tags[index];
+          return ListTile(
+            key: ValueKey('tag-${tag.id}'),
+            leading: const Icon(Icons.sell_outlined),
+            title: Text(tag.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+            subtitle: Text('${library.tracksForTag(tag.id).length} 首'),
+            onTap: () => setState(() => openedId = tag.id),
+            trailing: PopupMenuButton<String>(
+              tooltip: '标签操作',
+              onSelected: (action) {
+                if (action == 'rename') {
+                  _editName(context, library, id: tag.id, initial: tag.name);
+                }
+                if (action == 'delete') {
+                  _delete(context, tag.id, tag.name);
+                }
               },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'rename', child: Text('改名')),
+                PopupMenuItem(value: 'delete', child: Text('删除')),
+              ],
             ),
-          ),
-        ],
+          );
+        },
       );
     },
   );

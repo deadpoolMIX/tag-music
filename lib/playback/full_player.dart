@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/gestures.dart' show PointerEvent;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/compact_dialog.dart';
 import '../library/library_controller.dart';
 import '../library/track_cover.dart';
 import 'playback_controller.dart';
@@ -233,6 +235,7 @@ class FullPlayer extends ConsumerWidget {
           openLyrics: () => Navigator.push<void>(
             context,
             MaterialPageRoute(
+              settings: const RouteSettings(name: '/lyrics'),
               builder: (_) => ImmersiveLyrics(playback: playback),
             ),
           ),
@@ -304,6 +307,7 @@ class _PlayerBody extends StatelessWidget {
             : () => Navigator.push<void>(
                 context,
                 MaterialPageRoute(
+                  settings: const RouteSettings(name: '/lyrics'),
                   builder: (_) => ImmersiveLyrics(playback: playback),
                 ),
               ),
@@ -521,14 +525,10 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
   final _scroll = ScrollController();
   final _pageFocus = FocusNode(debugLabel: 'lyrics-page');
   final _lyricsFocus = FocusNode(debugLabel: 'lyrics-lines');
-  final _headerFocus = FocusNode(debugLabel: 'lyrics-header');
-  final _controlsFocus = FocusNode(debugLabel: 'lyrics-controls');
-  Timer? _hide;
-  bool _controls = true, _follow = true, _keyboardInput = false;
-  int _pointers = 0, _followGeneration = 0, _modalInteractions = 0;
+  bool _follow = true;
+  int _pointers = 0, _followGeneration = 0;
   int _last = -2;
   Lyrics? _lyrics;
-  Lyrics? _observedLyrics;
   List<double> _offsets = [], _heights = [];
   double _width = 0, _viewportHeight = 0;
   TextScaler? _textScaler;
@@ -549,13 +549,11 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
   @override
   void initState() {
     super.initState();
-    _observedLyrics = widget.playback.lyrics.value;
     widget.playback.addListener(_changed);
     FocusManager.instance.addEarlyKeyEventHandler(_keyEvent);
-    _arm();
   }
 
-  // Observe before child shortcuts consume slider or scrolling keys. Never
+  // Observe before child scrolling shortcuts consume keys. Never
   // consume the event, and leave keys on other routes entirely untouched.
   KeyEventResult _keyEvent(KeyEvent event) {
     if (!mounted ||
@@ -564,7 +562,6 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
         (event is! KeyDownEvent && event is! KeyRepeatEvent)) {
       return KeyEventResult.ignored;
     }
-    _keyboardInput = true;
     if ((_lyricsFocus.hasFocus || _pageFocus.hasPrimaryFocus) &&
         const [
           LogicalKeyboardKey.arrowUp,
@@ -575,67 +572,12 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
           LogicalKeyboardKey.end,
         ].contains(event.logicalKey)) {
       _pauseFollow();
-    } else {
-      _reveal();
     }
     return KeyEventResult.ignored;
   }
 
   void _changed() {
-    if (!mounted) return;
-    final lyrics = widget.playback.lyrics.value;
-    final changedLyrics = !identical(_observedLyrics, lyrics);
-    _observedLyrics = lyrics;
-    setState(() {
-      if (changedLyrics) _controls = true;
-    });
-    // Reset only when the result changes, not on every playback position tick.
-    if (changedLyrics) _arm();
-  }
-
-  void _arm() {
-    _hide?.cancel();
-    if (_holdingControls) return;
-    _hide = Timer(const Duration(seconds: 5), () {
-      if (!mounted ||
-          _holdingControls ||
-          (MediaQuery.accessibleNavigationOf(context) ||
-              WidgetsBinding.instance.semanticsEnabled)) {
-        return;
-      }
-      setState(() => _controls = false);
-    });
-  }
-
-  bool get _holdingControls =>
-      widget.playback.lyrics.value.lines.isEmpty ||
-      _modalInteractions > 0 ||
-      _pointers > 0 ||
-      (_keyboardInput && (_headerFocus.hasFocus || _controlsFocus.hasFocus));
-
-  Future<void> _interact(Future<void> Function() action) async {
-    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
-    _modalInteractions++;
-    _reveal();
-    try {
-      await action();
-    } finally {
-      _modalInteractions--;
-      if (mounted) _reveal();
-    }
-  }
-
-  void _controlFocusChanged(bool focused) {
-    if (focused) {
-      _reveal();
-    } else {
-      _arm();
-    }
-  }
-
-  void _reveal() {
-    setState(() => _controls = true);
-    _arm();
+    if (mounted) setState(() {});
   }
 
   void _goCurrent() {
@@ -644,23 +586,29 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
       _last = -2;
       _followGeneration++;
     });
-    _reveal();
   }
 
   void _pauseFollow() {
+    if (!_follow) return;
     setState(() {
       _follow = false;
       _followGeneration++;
     });
-    _reveal();
   }
 
-  void _browseWithPointer() {
-    _keyboardInput = false;
-    _pauseFollow();
+  void _releasePointer(PointerEvent _) {
+    setState(() {
+      _pointers = math.max(0, _pointers - 1);
+      if (_pointers == 0 && _follow) _last = -2;
+    });
   }
 
-  void _metrics(Lyrics lyrics, double width, TextScaler scaler) {
+  void _metrics(
+    BuildContext context,
+    Lyrics lyrics,
+    double width,
+    TextScaler scaler,
+  ) {
     final baseStyle = DefaultTextStyle.of(context).style;
     final direction = Directionality.of(context);
     final locale = Localizations.maybeLocaleOf(context);
@@ -710,7 +658,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
   TextStyle _lineStyle(int index) {
     var style = _baseStyle!.merge(index == 0 ? _original : _translation);
     if (_boldText) style = style.copyWith(fontWeight: FontWeight.bold);
-    return style.copyWith(inherit: false);
+    return style.copyWith(inherit: false, decoration: TextDecoration.none);
   }
 
   Widget _lines(BuildContext context, BoxConstraints constraints) {
@@ -722,6 +670,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
     final padding = math.max(24.0, (constraints.maxWidth - 720) / 2);
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
     _metrics(
+      context,
       lyrics,
       math.max(0.0, constraints.maxWidth - padding * 2),
       MediaQuery.textScalerOf(context),
@@ -738,6 +687,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted ||
             !_follow ||
+            _pointers != 0 ||
             generation != _followGeneration ||
             !_scroll.hasClients) {
           return;
@@ -781,8 +731,8 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
           focusNode: _lyricsFocus,
           skipTraversal: true,
           child: Listener(
-            onPointerSignal: (_) => _browseWithPointer(),
-            onPointerPanZoomStart: (_) => _browseWithPointer(),
+            onPointerSignal: (_) => _pauseFollow(),
+            onPointerPanZoomStart: (_) => _pauseFollow(),
             child: ListView.builder(
               controller: _scroll,
               padding: EdgeInsets.fromLTRB(
@@ -888,7 +838,7 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
         ? null
         : '${dot > 0 ? name.substring(0, dot) : name}.lrc';
     final explanation = !hasSong
-        ? '可从播放队列选择歌曲，或返回曲库开始播放。'
+        ? '返回播放器或曲库后即可选择歌曲。'
         : switch (lyrics.status) {
             LyricsStatus.loading => '歌词读取完成后会自动显示，不影响继续播放。',
             LyricsStatus.unreadable =>
@@ -956,21 +906,19 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
                   if (lyrics.status == LyricsStatus.unreadable &&
                       lyrics.message != null)
                     TextButton.icon(
-                      onPressed: () => _interact(
-                        () => showDialog<void>(
-                          context: context,
-                          builder: (dialog) => AlertDialog(
-                            title: const Text('歌词读取详情'),
-                            content: SingleChildScrollView(
-                              child: SelectableText(lyrics.message!),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(dialog),
-                                child: const Text('关闭'),
-                              ),
-                            ],
+                      onPressed: () => showDialog<void>(
+                        context: context,
+                        builder: (dialog) => CompactAlertDialog(
+                          title: const Text('歌词读取详情'),
+                          content: SingleChildScrollView(
+                            child: SelectableText(lyrics.message!),
                           ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dialog),
+                              child: const Text('关闭'),
+                            ),
+                          ],
                         ),
                       ),
                       icon: const Icon(Icons.info_outline),
@@ -985,41 +933,35 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
     );
   }
 
-  Widget _controlPanel(BuildContext context, double maxHeight) => Align(
-    alignment: Alignment.bottomCenter,
+  @override
+  Widget build(BuildContext context) => CallbackShortcuts(
+    bindings: {
+      const SingleActivator(LogicalKeyboardKey.escape): () =>
+          Navigator.maybePop(context),
+    },
     child: Focus(
-      focusNode: _controlsFocus,
-      skipTraversal: true,
-      onFocusChange: _controlFocusChanged,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 720, maxHeight: maxHeight),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+      focusNode: _pageFocus,
+      autofocus: true,
+      child: Scaffold(
+        body: PlayerBackground(
+          playback: widget.playback,
           child: Material(
-            color: Theme.of(context).colorScheme.surface.withValues(alpha: .92),
-            borderRadius: BorderRadius.circular(24),
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  PlaybackActivity(playback: widget.playback),
-                  PlayerSeek(playback: widget.playback, onSeek: _goCurrent),
-                  PlaybackControls(playback: widget.playback),
-                  if (widget.playback.sleep.active)
-                    SleepTimerStatus(
-                      playback: widget.playback,
-                      onManage: () => _interact(
-                        () => showSleepTimer(context, widget.playback),
-                      ),
+            type: MaterialType.transparency,
+            child: Listener(
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: (_) => _pointers++,
+              onPointerUp: _releasePointer,
+              onPointerCancel: _releasePointer,
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    const Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: BackButton(),
                     ),
-                  PlaybackFeedback(
-                    playback: widget.playback,
-                    onOpen: () => _interact(
-                      () => showPlaybackFeedback(context, widget.playback),
-                    ),
-                  ),
-                ],
+                    Expanded(child: LayoutBuilder(builder: _lines)),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1029,110 +971,11 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
   );
 
   @override
-  Widget build(BuildContext context) {
-    final actions = PlayerActions(
-      playback: widget.playback,
-      library: ref.watch(libraryProvider),
-    );
-    final showControls =
-        _controls ||
-        widget.playback.lyrics.value.lines.isEmpty ||
-        MediaQuery.accessibleNavigationOf(context) ||
-        WidgetsBinding.instance.semanticsEnabled;
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.escape): () =>
-            Navigator.maybePop(context),
-      },
-      child: Focus(
-        focusNode: _pageFocus,
-        autofocus: true,
-        child: Scaffold(
-          body: GestureDetector(
-            onSecondaryTapUp: (details) => unawaited(
-              _interact(
-                () => actions.show(
-                  context,
-                  globalPosition: details.globalPosition,
-                ),
-              ),
-            ),
-            child: PlayerBackground(
-              playback: widget.playback,
-              child: Listener(
-                behavior: HitTestBehavior.opaque,
-                onPointerDown: (_) {
-                  _keyboardInput = false;
-                  _pointers++;
-                  _reveal();
-                },
-                onPointerUp: (_) {
-                  setState(() => _pointers = math.max(0, _pointers - 1));
-                  _arm();
-                },
-                onPointerCancel: (_) {
-                  setState(() => _pointers = math.max(0, _pointers - 1));
-                  _arm();
-                },
-                child: SafeArea(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) => Column(
-                      children: [
-                        if (showControls || !_follow)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            child: Focus(
-                              focusNode: _headerFocus,
-                              skipTraversal: true,
-                              onFocusChange: _controlFocusChanged,
-                              child: Row(
-                                children: [
-                                  if (showControls) const BackButton(),
-                                  const Spacer(),
-                                  if (!_follow)
-                                    Flexible(
-                                      child: FilledButton.tonalIcon(
-                                        onPressed: _goCurrent,
-                                        icon: const Icon(Icons.my_location),
-                                        label: const Text('回到当前句'),
-                                      ),
-                                    ),
-                                  if (showControls)
-                                    PlayerActionsButton(
-                                      actions: actions,
-                                      interact: _interact,
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        Expanded(child: LayoutBuilder(builder: _lines)),
-                        if (showControls)
-                          _controlPanel(context, constraints.maxHeight * .45),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
   void dispose() {
-    _hide?.cancel();
     FocusManager.instance.removeEarlyKeyEventHandler(_keyEvent);
     widget.playback.removeListener(_changed);
     _pageFocus.dispose();
     _lyricsFocus.dispose();
-    _headerFocus.dispose();
-    _controlsFocus.dispose();
     _scroll.dispose();
     super.dispose();
   }
