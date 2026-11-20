@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/gestures.dart' show DragStartBehavior;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -62,6 +62,7 @@ class _SleepDialDialogState extends State<_SleepDialDialog> {
   int _hours = 0, _minutes = 15;
   bool _hourDial = false, _showFocus = false, _submitting = false;
   String? _error;
+  int? _dialPointer;
 
   int get _count => _hourDial ? 13 : 60;
   int get _value => _hourDial ? _hours : _minutes;
@@ -96,19 +97,20 @@ class _SleepDialDialogState extends State<_SleepDialDialog> {
   }
 
   void _set(int value) {
-    if (_submitting) return;
+    final next = value.clamp(0, _count - 1);
+    if (_submitting || next == _value) return;
     setState(() {
       if (_hourDial) {
-        _hours = value.clamp(0, 12);
+        _hours = next;
       } else {
-        _minutes = value.clamp(0, 59);
+        _minutes = next;
       }
     });
   }
 
   void _point(Offset point, double side) {
     final delta = point - Offset(side / 2, side / 2);
-    if (delta.distance < side * .12) return;
+    if (delta.distanceSquared < 9) return;
     final angle =
         (math.atan2(delta.dy, delta.dx) + math.pi / 2) % (2 * math.pi);
     _set((angle * _count / (2 * math.pi)).round() % _count);
@@ -137,32 +139,59 @@ class _SleepDialDialogState extends State<_SleepDialDialog> {
       child: FocusableActionDetector(
         focusNode: _dialFocus,
         onShowFocusHighlight: (value) => setState(() => _showFocus = value),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          dragStartBehavior: DragStartBehavior.down,
-          onTapUp: (event) {
-            _dialFocus.requestFocus();
-            _point(event.localPosition, side);
-          },
-          onPanStart: (event) {
-            _dialFocus.requestFocus();
-            _point(event.localPosition, side);
-          },
-          onPanUpdate: (event) => _point(event.localPosition, side),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: _showFocus
-                  ? Border.all(color: Theme.of(context).colorScheme.primary)
-                  : null,
-            ),
-            child: CustomPaint(
-              size: Size.square(side),
-              painter: _SleepDialPainter(
-                count: _count,
-                selected: _value,
-                scheme: Theme.of(context).colorScheme,
-                textScaler: MediaQuery.textScalerOf(context),
+        child: ClipOval(
+          child: RawGestureDetector(
+            behavior: HitTestBehavior.opaque,
+            gestures: {
+              EagerGestureRecognizer:
+                  GestureRecognizerFactoryWithHandlers<EagerGestureRecognizer>(
+                    () => EagerGestureRecognizer(
+                      supportedDevices: const {
+                        PointerDeviceKind.touch,
+                        PointerDeviceKind.mouse,
+                        PointerDeviceKind.stylus,
+                        PointerDeviceKind.invertedStylus,
+                      },
+                      allowedButtonsFilter: (buttons) =>
+                          buttons == kPrimaryButton,
+                    ),
+                    (_) {},
+                  ),
+            },
+            child: Listener(
+              onPointerDown: (event) {
+                if (_submitting ||
+                    _dialPointer != null ||
+                    event.buttons != kPrimaryButton) {
+                  return;
+                }
+                _dialPointer = event.pointer;
+                _dialFocus.requestFocus();
+                _point(event.localPosition, side);
+              },
+              onPointerMove: (event) {
+                if (event.pointer == _dialPointer) {
+                  _point(event.localPosition, side);
+                }
+              },
+              onPointerUp: _releaseDial,
+              onPointerCancel: _releaseDial,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: _showFocus
+                      ? Border.all(color: Theme.of(context).colorScheme.primary)
+                      : null,
+                ),
+                child: CustomPaint(
+                  size: Size.square(side),
+                  painter: _SleepDialPainter(
+                    count: _count,
+                    selected: _value,
+                    scheme: Theme.of(context).colorScheme,
+                    textScaler: MediaQuery.textScalerOf(context),
+                  ),
+                ),
               ),
             ),
           ),
@@ -170,6 +199,10 @@ class _SleepDialDialogState extends State<_SleepDialDialog> {
       ),
     ),
   );
+
+  void _releaseDial(PointerEvent event) {
+    if (event.pointer == _dialPointer) _dialPointer = null;
+  }
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -206,38 +239,36 @@ class _SleepDialDialogState extends State<_SleepDialDialog> {
                 ],
               ),
               const SizedBox(height: 4),
-              Text(
-                _hours == 0 ? '$_minutes 分钟' : '$_hours 小时 $_minutes 分钟',
-                style: Theme.of(context).textTheme.titleMedium,
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 48),
+                    child: Text(
+                      _hours == 0 ? '$_minutes 分钟' : '$_hours 小时 $_minutes 分钟',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: IconButton.filledTonal(
+                      tooltip: _hourDial ? '切换到分钟' : '切换到小时',
+                      onPressed: _submitting
+                          ? null
+                          : () => setState(() => _hourDial = !_hourDial),
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size.square(36),
+                        padding: EdgeInsets.zero,
+                      ),
+                      icon: Text(_hourDial ? 'H' : 'S'),
+                    ),
+                  ),
+                ],
               ),
               LayoutBuilder(
-                builder: (context, constraints) => Stack(
-                  alignment: Alignment.topCenter,
-                  fit: StackFit.passthrough,
-                  children: [
-                    Center(
-                      child: _dial(
-                        context,
-                        math.min(216, constraints.maxWidth),
-                      ),
-                    ),
-                    PositionedDirectional(
-                      top: 0,
-                      end: 0,
-                      child: IconButton.filledTonal(
-                        tooltip: _hourDial ? '切换到分钟' : '切换到小时',
-                        onPressed: _submitting
-                            ? null
-                            : () => setState(() => _hourDial = !_hourDial),
-                        style: IconButton.styleFrom(
-                          minimumSize: const Size.square(36),
-                          padding: EdgeInsets.zero,
-                        ),
-                        icon: Text(_hourDial ? 'H' : 'S'),
-                      ),
-                    ),
-                  ],
-                ),
+                builder: (context, constraints) =>
+                    _dial(context, math.min(216, constraints.maxWidth) * .92),
               ),
               if (playback.sleep.active)
                 Text(sleepTimerProgressLabel(playback)),
@@ -296,7 +327,7 @@ class _SleepDialPainter extends CustomPainter {
   final TextScaler textScaler;
   @override
   void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero), radius = size.shortestSide * .46;
+    final center = size.center(Offset.zero), radius = size.shortestSide / 2;
     canvas.drawCircle(
       center,
       radius,
@@ -308,10 +339,7 @@ class _SleepDialPainter extends CustomPainter {
           Offset(math.cos(angle), math.sin(angle)) * (radius * fraction);
     }
 
-    final selectedPoint = point(
-      selected,
-      count == 60 && selected % 5 != 0 ? .47 : .78,
-    );
+    final selectedPoint = point(selected, .47);
     canvas.drawLine(
       center,
       selectedPoint,
@@ -321,26 +349,23 @@ class _SleepDialPainter extends CustomPainter {
     );
     canvas.drawCircle(selectedPoint, 15, Paint()..color = scheme.primary);
     canvas.drawCircle(center, 3, Paint()..color = scheme.primary);
-    for (var i = 0; i < count; i++) {
-      if (count == 60 && i % 5 != 0 && i != selected) continue;
+    void drawLabel(int value, Offset position, Color color) {
       final label = TextPainter(
         text: TextSpan(
-          text: '$i',
-          style: TextStyle(
-            fontSize: 14,
-            color: i == selected ? scheme.onPrimary : scheme.onSurface,
-          ),
+          text: '$value',
+          style: TextStyle(fontSize: 14, color: color),
         ),
         textDirection: TextDirection.ltr,
         textScaler: TextScaler.linear(math.min(textScaler.scale(14) / 14, 1.3)),
       )..layout();
-      label.paint(
-        canvas,
-        (i == selected ? selectedPoint : point(i, .78)) -
-            Offset(label.width / 2, label.height / 2),
-      );
+      label.paint(canvas, position - Offset(label.width / 2, label.height / 2));
       label.dispose();
     }
+
+    for (var i = 0; i < count; i += count == 60 ? 5 : 1) {
+      drawLabel(i, point(i, .78), scheme.onSurface);
+    }
+    drawLabel(selected, selectedPoint, scheme.onPrimary);
   }
 
   @override

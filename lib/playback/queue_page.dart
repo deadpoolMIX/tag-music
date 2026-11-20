@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 
 import '../core/compact_dialog.dart';
+import '../core/fast_scrollbar.dart';
 import '../core/reorder_handle.dart';
 import '../library/library_controller.dart';
 import '../library/playlist_actions.dart';
@@ -379,38 +380,48 @@ class _QueuePageState extends State<QueuePage> {
             Expanded(
               child: entries.isEmpty
                   ? const Center(child: Text('队列为空，从曲库、筛选或歌单添加歌曲'))
-                  : ReorderableListView.builder(
-                      key: const ValueKey('queue-order'),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      scrollController: _scroll,
-                      physics: const AlwaysScrollableScrollPhysics(
-                        parent: ClampingScrollPhysics(),
-                      ),
-                      itemExtent: _rowExtent,
-                      buildDefaultDragHandles: false,
-                      proxyDecorator: (child, _, animation) => AnimatedBuilder(
-                        animation: animation,
-                        child: child,
-                        builder: (context, child) => Material(
-                          color: theme.colorScheme.surfaceContainerHigh,
-                          shape: _rowShape,
-                          clipBehavior: Clip.antiAlias,
-                          elevation: 6 * animation.value,
-                          child: child,
+                  : CoverScrollRegion(
+                      cache: playback.documents.coverCache,
+                      child: FastScrollbar(
+                        controller: _scroll,
+                        child: ReorderableListView.builder(
+                          key: const ValueKey('queue-order'),
+                          padding: const EdgeInsets.only(
+                            left: 8,
+                            right: FastScrollbar.dragWidth - 4,
+                          ),
+                          scrollController: _scroll,
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: ClampingScrollPhysics(),
+                          ),
+                          itemExtent: _rowExtent,
+                          buildDefaultDragHandles: false,
+                          proxyDecorator: (child, _, animation) =>
+                              AnimatedBuilder(
+                                animation: animation,
+                                child: child,
+                                builder: (context, child) => Material(
+                                  color: theme.colorScheme.surfaceContainerHigh,
+                                  shape: _rowShape,
+                                  clipBehavior: Clip.antiAlias,
+                                  elevation: 6 * animation.value,
+                                  child: child,
+                                ),
+                              ),
+                          itemCount: entries.length,
+                          onReorderItem: (oldIndex, newIndex) {
+                            final ids = entries.map((e) => e.entryId).toList();
+                            ids.insert(newIndex, ids.removeAt(oldIndex));
+                            _change(() => playback.reorderQueue(ids));
+                          },
+                          itemBuilder: (context, index) => _entryTile(
+                            context,
+                            entries[index],
+                            index,
+                            entries.length,
+                            priority[entries[index].entryId],
+                          ),
                         ),
-                      ),
-                      itemCount: entries.length,
-                      onReorderItem: (oldIndex, newIndex) {
-                        final ids = entries.map((e) => e.entryId).toList();
-                        ids.insert(newIndex, ids.removeAt(oldIndex));
-                        _change(() => playback.reorderQueue(ids));
-                      },
-                      itemBuilder: (context, index) => _entryTile(
-                        context,
-                        entries[index],
-                        index,
-                        entries.length,
-                        priority[entries[index].entryId],
                       ),
                     ),
             ),

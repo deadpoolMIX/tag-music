@@ -3,25 +3,27 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-class SongListScrollbar extends StatefulWidget {
-  const SongListScrollbar({
+class FastScrollbar extends StatefulWidget {
+  const FastScrollbar({
     required this.controller,
-    required this.visible,
+    this.visible = true,
     required this.child,
     super.key,
   });
 
-  static const double dragWidth = 20;
+  static const double dragWidth = 16;
+  static const double rowEndPadding = 8;
+  static const double gutter = dragWidth - rowEndPadding;
 
   final ScrollController controller;
   final bool visible;
   final Widget child;
 
   @override
-  State<SongListScrollbar> createState() => _SongListScrollbarState();
+  State<FastScrollbar> createState() => _FastScrollbarState();
 }
 
-class _SongListScrollbarState extends State<SongListScrollbar> {
+class _FastScrollbarState extends State<FastScrollbar> {
   static const double _barWidth = 4;
   static const double _endInset = 4;
   static const double _minThumbHeight = 36;
@@ -98,7 +100,9 @@ class _SongListScrollbarState extends State<SongListScrollbar> {
     if (position == null) return const SizedBox.shrink();
     final range = position.maxScrollExtent - position.minScrollExtent;
     final height = constraints.maxHeight - 2 * _endInset;
-    if (range <= 0 || !range.isFinite || height <= 0) {
+    if (range <= position.viewportDimension * .75 ||
+        !range.isFinite ||
+        height <= 0) {
       return const SizedBox.shrink();
     }
     final visibleFraction =
@@ -180,13 +184,17 @@ class _SongListScrollbarState extends State<SongListScrollbar> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            widget.child,
+            ScrollConfiguration(
+              behavior: ScrollConfiguration.of(context)
+                  .copyWith(scrollbars: false),
+              child: widget.child,
+            ),
             if (widget.visible || _grabFraction != null)
               Positioned(
                 top: 0,
                 bottom: 0,
                 right: 0,
-                width: SongListScrollbar.dragWidth,
+                width: FastScrollbar.dragWidth,
                 child: ListenableBuilder(
                   listenable: widget.controller,
                   builder: (context, _) => LayoutBuilder(builder: _rail),

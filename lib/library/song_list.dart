@@ -4,10 +4,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/fast_scrollbar.dart';
 import '../core/reorder_handle.dart';
 import '../playback/playback_controller.dart';
 import 'library_controller.dart';
-import 'song_list_scrollbar.dart';
+
 import 'track_cover.dart';
 import 'song_information.dart';
 import 'playlist_actions.dart';
@@ -54,8 +55,6 @@ class SongList extends StatefulWidget {
 }
 
 class _SongListState extends State<SongList> {
-  static const double _rowRightPadding = 8;
-
   final _scroll = ScrollController();
   final _selectionFocus = FocusNode(debugLabel: 'song-list-selection');
   final _selected = <String>{};
@@ -401,9 +400,7 @@ class _SongListState extends State<SongList> {
                           listConstraints.maxHeight * 1.75;
                       // The edge can reuse the row's outer padding without
                       // covering the menu or reorder handle.
-                      final gutter = longList
-                          ? SongListScrollbar.dragWidth - _rowRightPadding
-                          : 0.0;
+                      final gutter = longList ? FastScrollbar.gutter : 0.0;
                       final reordering =
                           widget.reordering &&
                           !_selecting &&
@@ -421,41 +418,35 @@ class _SongListState extends State<SongList> {
                           else
                             CoverScrollRegion(
                               cache: widget.playback.documents.coverCache,
-                              child: SongListScrollbar(
+                              child: FastScrollbar(
                                 controller: _scroll,
                                 visible: longList,
-                                child: ScrollConfiguration(
-                                  behavior: ScrollConfiguration.of(context)
-                                      .copyWith(scrollbars: false),
-                                  child: reordering
-                                      ? ReorderableListView.builder(
-                                          key: scrollKey,
-                                          scrollController: _scroll,
-                                          keyboardDismissBehavior:
-                                              widget.keyboardDismissBehavior,
-                                          itemExtent: extent,
-                                          buildDefaultDragHandles: false,
-                                          itemCount: widget.rows.length,
-                                          padding: EdgeInsets.only(
-                                            right: gutter,
-                                          ),
-                                          itemBuilder: row,
-                                          onReorderItem: widget.onReorder!,
-                                        )
-                                      : ListView.builder(
-                                          key: scrollKey,
-                                          controller: _scroll,
-                                          keyboardDismissBehavior:
-                                              widget.keyboardDismissBehavior,
-                                          itemExtent: extent,
-                                          itemCount: widget.rows.length,
-                                          padding: EdgeInsets.only(
-                                            right: gutter,
-                                            bottom: 64,
-                                          ),
-                                          itemBuilder: row,
+                                child: reordering
+                                    ? ReorderableListView.builder(
+                                        key: scrollKey,
+                                        scrollController: _scroll,
+                                        keyboardDismissBehavior:
+                                            widget.keyboardDismissBehavior,
+                                        itemExtent: extent,
+                                        buildDefaultDragHandles: false,
+                                        itemCount: widget.rows.length,
+                                        padding: EdgeInsets.only(right: gutter),
+                                        itemBuilder: row,
+                                        onReorderItem: widget.onReorder!,
+                                      )
+                                    : ListView.builder(
+                                        key: scrollKey,
+                                        controller: _scroll,
+                                        keyboardDismissBehavior:
+                                            widget.keyboardDismissBehavior,
+                                        itemExtent: extent,
+                                        itemCount: widget.rows.length,
+                                        padding: EdgeInsets.only(
+                                          right: gutter,
+                                          bottom: 64,
                                         ),
-                                ),
+                                        itemBuilder: row,
+                                      ),
                               ),
                             ),
                           Positioned(
@@ -533,7 +524,7 @@ class SongRow extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(
                 left: 8,
-                right: _SongListState._rowRightPadding,
+                right: FastScrollbar.rowEndPadding,
               ),
               child: Row(
                 children: [

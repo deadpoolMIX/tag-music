@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
 
 import 'descriptor_file.dart';
 import 'cover_cache.dart';
@@ -282,6 +283,60 @@ class DocumentAccess {
       await close(fd);
     }
   });
+
+  Future<String> saveCover(Uint8List bytes, String title) async {
+    final (extension, mimeType) = _coverFormat(bytes);
+    final cleaned = title.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1f]'), '_');
+    final shortTitle = String.fromCharCodes(cleaned.runes.take(60)).trim();
+    final suffix = const Uuid().v4().substring(0, 8);
+    final name = '${shortTitle.isEmpty ? '封面' : shortTitle}-$suffix.$extension';
+    if (android) {
+      return (await channel.invokeMethod<String>('saveCover', {
+        'name': name,
+        'mimeType': mimeType,
+        'bytes': bytes,
+      }))!;
+    }
+
+    final downloads = await getDownloadsDirectory();
+    if (downloads == null) throw StateError('无法找到下载目录');
+    final directory = await Directory(p.join(downloads.path, 'Tag Music'))
+        .create(recursive: true);
+    final path = p.join(directory.path, name);
+    final pending = File('$path.part');
+    try {
+      await pending.writeAsBytes(bytes, flush: true);
+      await pending.rename(path);
+    } finally {
+      if (await pending.exists()) await pending.delete();
+    }
+    return path;
+  }
+
+  (String, String) _coverFormat(Uint8List bytes) {
+    bool matches(int start, List<int> pattern) {
+      if (bytes.length < start + pattern.length) return false;
+      for (var i = 0; i < pattern.length; i++) {
+        if (bytes[start + i] != pattern[i]) return false;
+      }
+      return true;
+    }
+
+    if (matches(0, [0xff, 0xd8, 0xff])) return ('jpg', 'image/jpeg');
+    if (matches(0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) {
+      return ('png', 'image/png');
+    }
+    if (matches(0, ascii.encode('GIF8'))) return ('gif', 'image/gif');
+    if (matches(0, ascii.encode('RIFF')) && matches(8, ascii.encode('WEBP'))) {
+      return ('webp', 'image/webp');
+    }
+    if (matches(0, ascii.encode('BM'))) return ('bmp', 'image/bmp');
+    if (matches(4, ascii.encode('ftypavif')) ||
+        matches(4, ascii.encode('ftypavis'))) {
+      return ('avif', 'image/avif');
+    }
+    throw const FormatException('无法识别原图格式');
+  }
 
   final coverCache = CoverCache(cacheDirectory: getApplicationCacheDirectory);
   Future<Uint8List?> cachedCover(

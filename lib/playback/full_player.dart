@@ -12,6 +12,7 @@ import '../core/compact_dialog.dart';
 import '../library/group_pages.dart';
 import '../library/library_controller.dart';
 import '../library/track_cover.dart';
+import 'cover_viewer.dart';
 import 'playback_controller.dart';
 import 'player_background.dart';
 import 'playback_page.dart' show formatPosition;
@@ -550,31 +551,43 @@ class _PlayerBody extends StatelessWidget {
 
   Widget _artwork(BuildContext context, double size) {
     final current = playback.current;
+    final artwork = ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: SizedBox.square(
+        dimension: size,
+        child: ColoredBox(
+          color: Theme.of(context).colorScheme.surfaceContainer
+              .withValues(alpha: .6),
+          child: current == null
+              ? Icon(Icons.album_outlined, size: math.min(96, size))
+              : TrackCover(
+                  documents: playback.documents,
+                  track: current,
+                  size: size,
+                  currentArtwork: true,
+                ),
+        ),
+      ),
+    );
     return Semantics(
       button: true,
       enabled: current != null,
-      label: '打开沉浸歌词',
+      label: '歌曲封面',
+      hint: '点按查看歌词，长按查看原图',
       child: InkWell(
         borderRadius: BorderRadius.circular(28),
         onTap: current == null ? null : openLyrics,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: SizedBox.square(
-            dimension: size,
-            child: ColoredBox(
-              color: Theme.of(context).colorScheme.surfaceContainer
-                  .withValues(alpha: .6),
-              child: current == null
-                  ? Icon(Icons.album_outlined, size: math.min(96, size))
-                  : TrackCover(
-                      documents: playback.documents,
-                      track: current,
-                      size: size,
-                      currentArtwork: true,
-                    ),
-            ),
-          ),
-        ),
+        onLongPress: current == null
+            ? null
+            : () => showCoverViewer(
+                context,
+                documents: playback.documents,
+                track: current,
+                previewSize: size,
+              ),
+        child: current == null
+            ? artwork
+            : Hero(tag: playerCoverHeroTag(current), child: artwork),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/fast_scrollbar.dart';
 import '../playback/cover_cache.dart';
 import '../playback/playback_controller.dart';
 import 'library_controller.dart';
@@ -69,7 +70,7 @@ class _GroupSongs extends StatelessWidget {
 }
 
 /// A compact, consistently ordered list for library groups.
-class GroupList extends StatelessWidget {
+class GroupList extends StatefulWidget {
   const GroupList({
     required this.storageKey,
     required this.descending,
@@ -95,43 +96,71 @@ class GroupList extends StatelessWidget {
   final CoverCache? coverCache;
 
   @override
+  State<GroupList> createState() => _GroupListState();
+}
+
+class _GroupListState extends State<GroupList> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) => Column(
     children: [
       LibraryHeader(
-        menuButton: menuButton,
-        heading: heading,
+        menuButton: widget.menuButton,
+        heading: widget.heading,
         actions: [
           TextButton.icon(
-            onPressed: onSort,
+            onPressed: widget.onSort,
             icon: Icon(
-              descending ? Icons.arrow_downward : Icons.arrow_upward,
+              widget.descending ? Icons.arrow_downward : Icons.arrow_upward,
               size: 16,
             ),
-            label: Text(descending ? '名称降序' : '名称升序'),
+            label: Text(widget.descending ? '名称降序' : '名称升序'),
           ),
-          ?trailing,
+          ?widget.trailing,
         ],
       ),
       Expanded(
-        child: itemCount == 0
+        child: widget.itemCount == 0
             ? Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Text(emptyText, textAlign: TextAlign.center),
+                  child: Text(widget.emptyText, textAlign: TextAlign.center),
                 ),
               )
-            : ListTileTheme(dense: true, minVerticalPadding: 8, child: _list()),
+            : ListTileTheme(
+                dense: true,
+                minVerticalPadding: 8,
+                contentPadding: const EdgeInsets.fromLTRB(
+                  16,
+                  0,
+                  FastScrollbar.rowEndPadding,
+                  0,
+                ),
+                child: _list(),
+              ),
       ),
     ],
   );
 
   Widget _list() {
-    final list = ListView.builder(
-      key: PageStorageKey(storageKey),
-      itemCount: itemCount,
-      itemBuilder: itemBuilder,
+    final list = FastScrollbar(
+      controller: _scroll,
+      child: ListView.builder(
+        key: PageStorageKey(widget.storageKey),
+        controller: _scroll,
+        padding: const EdgeInsets.only(right: FastScrollbar.gutter),
+        itemCount: widget.itemCount,
+        itemBuilder: widget.itemBuilder,
+      ),
     );
-    final cache = coverCache;
+    final cache = widget.coverCache;
     return cache == null ? list : CoverScrollRegion(cache: cache, child: list);
   }
 }

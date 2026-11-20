@@ -3,21 +3,24 @@ package app.tagmusic.player
 import android.app.Activity
 import android.app.NotificationManager
 import android.Manifest
+import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
+import android.provider.MediaStore
 import android.provider.Settings
 import android.database.Cursor
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.Executors
 
-/** SAF only: never resolve document URIs into filesystem paths. */
+/** Music reads use SAF URIs. Image export writes a new gallery entry. */
 class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger) {
     private val channel = MethodChannel(messenger, "app.tagmusic.player/documents")
     private val main = Handler(Looper.getMainLooper())
@@ -78,6 +81,11 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                             "nextScan" -> requireNotNull(scans[call.argument<Int>("token")]).next()
                             "endScan" -> { scans.remove(call.argument<Int>("token"))?.close(); null }
                             "directoryName" -> directoryName(Uri.parse(requireNotNull(call.argument<String>("uri"))))
+                            "saveCover" -> saveCover(
+                                requireNotNull(call.argument<String>("name")),
+                                requireNotNull(call.argument<String>("mimeType")),
+                                requireNotNull(call.argument<ByteArray>("bytes"))
+                            )
                             "list" -> list(Uri.parse(requireNotNull(call.argument<String>("uri"))))
                             "findLyrics" -> findLyrics(Uri.parse(requireNotNull(call.argument<String>("uri"))), lyricRequest)?.toString()
                             "readLyrics" -> {
@@ -122,6 +130,28 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                 }
             }
         }
+    }
+
+    private fun saveCover(name: String, mimeType: String, bytes: ByteArray): String {
+        val resolver = activity.contentResolver
+        val folder = "${Environment.DIRECTORY_PICTURES}/Tag Music"
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "$folder/")
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        }
+        val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val uri = checkNotNull(resolver.insert(collection, values))
+        try {
+            checkNotNull(resolver.openOutputStream(uri)).use { it.write(bytes) }
+            val published = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
+            check(resolver.update(uri, published, null, null) == 1)
+        } catch (error: Exception) {
+            runCatching { resolver.delete(uri, null, null) }
+            throw error
+        }
+        return "$folder/$name"
     }
 
     private fun notificationsEnabled(): Boolean =
