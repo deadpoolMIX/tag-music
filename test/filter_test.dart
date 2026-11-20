@@ -97,7 +97,7 @@ void main() {
 
   for (final version in [1, 2]) {
     test(
-      'v$version file migrates to v4 and reopens with all old data intact',
+      'v$version file migrates to v5 and reopens with all old data intact',
       () async {
         final dir = await Directory.systemTemp.createTemp('filter-migration-');
         final file = File('${dir.path}/library.sqlite');
@@ -148,18 +148,19 @@ void main() {
         }
         var db = LibraryDatabase(NativeDatabase(file));
         try {
-          for (final table in before.keys) {
+          for (final entry in before.entries) {
+            final columns = entry.value.first.keys.join(', ');
             expect(
-              (await db.customSelect('SELECT * FROM $table').get())
+              (await db.customSelect('SELECT $columns FROM ${entry.key}').get())
                   .map((row) => row.data)
                   .toList(),
-              before[table],
+              entry.value,
             );
           }
           expect(
             (await db.customSelect('PRAGMA user_version').getSingle())
                 .read<int>('user_version'),
-            4,
+            5,
           );
           final repository = FilterRepository(db);
           expect((await repository.load()).rule.isEmpty, isTrue);

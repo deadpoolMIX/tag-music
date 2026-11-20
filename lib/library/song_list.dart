@@ -13,6 +13,7 @@ import 'library_controller.dart';
 
 import 'track_cover.dart';
 import 'song_information.dart';
+import 'relocation_dialog.dart';
 import 'playlist_actions.dart';
 import 'song_selection.dart';
 import 'tags_page.dart';
@@ -638,6 +639,17 @@ class SongRow extends StatelessWidget {
                           onPressed: () => showSongInformation(context, track),
                           child: const Text('歌曲信息'),
                         ),
+                        if (!track.available)
+                          MenuItemButton(
+                            onPressed: library.directoryBusy
+                                ? null
+                                : () => showSongRelocation(
+                                    context,
+                                    library,
+                                    track.song,
+                                  ),
+                            child: const Text('重新关联文件'),
+                          ),
                         if (canSelect)
                           MenuItemButton(
                             onPressed: onSelect,

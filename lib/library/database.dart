@@ -16,6 +16,7 @@ class Songs extends Table {
   TextColumn get album => text().nullable()();
   IntColumn get durationMs => integer().nullable()();
   TextColumn get metadataError => text().nullable()();
+  TextColumn get fileSha256 => text().nullable()();
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -25,6 +26,8 @@ class LibraryRoots extends Table {
   BoolColumn get accessible => boolean().withDefault(const Constant(true))();
   TextColumn get status => text().withDefault(const Constant('尚未扫描'))();
   IntColumn get scannedAt => integer().nullable()();
+  BoolColumn get requiresReselection =>
+      boolean().withDefault(const Constant(false))();
   @override
   Set<Column> get primaryKey => {location};
 }
@@ -119,7 +122,7 @@ class LibraryDatabase extends _$LibraryDatabase {
             ),
       );
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
@@ -129,7 +132,7 @@ class LibraryDatabase extends _$LibraryDatabase {
       );
     },
     onUpgrade: (m, from, to) => transaction(() async {
-      if (from >= 1 && from <= 3 && to == 4) {
+      if (from >= 1 && from <= 4 && to == 5) {
         if (from < 2) {
           await m.createTable(tags);
           await m.createTable(songTags);
@@ -138,8 +141,12 @@ class LibraryDatabase extends _$LibraryDatabase {
           );
         }
         if (from < 3) await m.createTable(currentFilters);
-        await m.createTable(playlists);
-        await m.createTable(playlistSongs);
+        if (from < 4) {
+          await m.createTable(playlists);
+          await m.createTable(playlistSongs);
+        }
+        await m.addColumn(songs, songs.fileSha256);
+        await m.addColumn(libraryRoots, libraryRoots.requiresReselection);
         return;
       }
       throw StateError('不支持的数据库升级 $from → $to');

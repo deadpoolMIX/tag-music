@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
@@ -7,6 +8,8 @@ import 'package:uuid/uuid.dart';
 
 import '../playback/documents.dart';
 import 'database.dart';
+import 'library_backup.dart';
+import 'library_relocation.dart';
 import 'tag_repository.dart';
 import 'filter_rule.dart';
 import 'filter_repository.dart';
@@ -112,7 +115,9 @@ class LibraryController extends ChangeNotifier {
     bool? reverse,
     bool reset = false,
   }) {
-    if (filterDeletingTag || (filterLoadError != null && !reset)) {
+    if (restoringBackup ||
+        filterDeletingTag ||
+        (filterLoadError != null && !reset)) {
       return Future.value();
     }
     filterPreferences = FilterPreferences(
@@ -167,7 +172,18 @@ class LibraryController extends ChangeNotifier {
   bool showMissing = false;
   bool scanning = false;
   bool choosing = false;
-  bool get directoryBusy => scanning || choosing || _removeTask != null;
+  bool restoringBackup = false;
+  bool relocating = false;
+  bool hashingBaselines = false;
+  bool baselineCancelling = false;
+  int baselineProcessed = 0;
+  bool get directoryBusy =>
+      scanning ||
+      choosing ||
+      restoringBackup ||
+      relocating ||
+      hashingBaselines ||
+      _removeTask != null;
   bool _cancelled = false;
   bool _closed = false;
   int discovered = 0;
@@ -178,6 +194,10 @@ class LibraryController extends ChangeNotifier {
   Timer? _messageTimer;
   Future<void>? _scanTask;
   Future<bool>? _removeTask;
+  Future<bool>? _restoreTask;
+  Future<void>? _relocationTask;
+  Future<void>? _baselineTask;
+  Future<void>? _baselineCancellation;
   List<LibraryTrack>? _visibleCache;
 
   void _setMessage(String? value, {bool transient = false}) {
@@ -194,18 +214,21 @@ class LibraryController extends ChangeNotifier {
   List<LibraryTrack> get visible {
     if (_visibleCache != null) return _visibleCache!;
     final needle = query.trim().toLowerCase();
-    final rows = (showMissing ? tracks : availableTracks)
-        .where(
-          (t) =>
-              needle.isEmpty ||
-              [
-                t.title,
-                t.song.name,
-                t.song.artist ?? '',
-                t.song.album ?? '',
-              ].any((v) => v.toLowerCase().contains(needle)),
-        )
-        .toList();
+    final rows =
+        (showMissing
+                ? tracks.where((track) => !track.available)
+                : availableTracks)
+            .where(
+              (t) =>
+                  needle.isEmpty ||
+                  [
+                    t.title,
+                    t.song.name,
+                    t.song.artist ?? '',
+                    t.song.album ?? '',
+                  ].any((v) => v.toLowerCase().contains(needle)),
+            )
+            .toList();
     _sortTracks(rows, sort, descending);
     return _visibleCache = List.unmodifiable(rows);
   }
@@ -305,6 +328,12 @@ class LibraryController extends ChangeNotifier {
       await _addRoot(root);
     }
     await reload();
+    await _loadFilter();
+  }
+
+  Future<void> _loadFilter() async {
+    filterLoadError = null;
+    filterSaveError = null;
     try {
       filterPreferences = await filterStore.load();
       if (!tags
@@ -317,6 +346,124 @@ class LibraryController extends ChangeNotifier {
       filterLoadError = '无法读取筛选：$error';
     }
     _invalidateFilter();
+    _publish();
+  }
+
+  Future<bool> restoreBackup(
+    LibraryBackup backup,
+    File recoveryFile, {
+    required bool trustedLocations,
+  }) {
+    if (_closed || directoryBusy || filterDeletingTag) {
+      throw StateError('请等待当前曲库操作结束');
+    }
+    restoringBackup = true;
+    final task = _restoreBackup(backup, recoveryFile, trustedLocations);
+    _restoreTask = task;
+    _publish();
+    return task;
+  }
+
+  Future<bool> _restoreBackup(
+    LibraryBackup backup,
+    File recoveryFile,
+    bool trustedLocations,
+  ) async {
+    try {
+      await _filterWrites;
+      // All current bookmarks have already been imported into the database.
+      // Clearing the legacy cache prevents old directories returning on restart.
+      await documents.clearDirectoryBookmarks();
+      await backup.restore(
+        db,
+        recoveryFile: recoveryFile,
+        trustedLocations: trustedLocations,
+      );
+      try {
+        await reload(publish: false);
+        await _loadFilter();
+        return true;
+      } catch (error, stack) {
+        debugPrint('备份已恢复，重新加载曲库失败：$error\n$stack');
+        return false;
+      }
+    } finally {
+      restoringBackup = false;
+      _restoreTask = null;
+      _publish();
+    }
+  }
+
+  Future<void> runRelocation(
+    Future<void> Function(LibraryRelocation relocation) work,
+  ) {
+    if (_closed || directoryBusy) {
+      throw StateError('请等待当前曲库操作结束');
+    }
+    relocating = true;
+    final task = _runRelocation(work);
+    _relocationTask = task;
+    _publish();
+    return task;
+  }
+
+  Future<void> _runRelocation(
+    Future<void> Function(LibraryRelocation relocation) work,
+  ) async {
+    try {
+      await work(LibraryRelocation(db, documents));
+      await reload();
+    } finally {
+      relocating = false;
+      _relocationTask = null;
+      _publish();
+    }
+  }
+
+  void startBaselines() {
+    if (_closed || directoryBusy) return;
+    hashingBaselines = true;
+    baselineProcessed = 0;
+    _setMessage(null);
+    _baselineTask = _saveBaselines();
+    _publish();
+  }
+
+  Future<void> _saveBaselines() async {
+    try {
+      final (saved, failed) = await LibraryRelocation(db, documents)
+          .saveBaselines(
+            cancelled: () => baselineCancelling,
+            progress: (count) {
+              baselineProcessed = count;
+              if (count % 16 == 0) _publish();
+            },
+          );
+      await reload(publish: false);
+      _setMessage(
+        '${baselineCancelling ? '已取消。' : ''}新增保存 $saved 首指纹。'
+        '${failed == 0 ? '' : '另有 $failed 首未能读取。'}',
+        transient: true,
+      );
+    } catch (error, stack) {
+      debugPrint('保存歌曲指纹失败：$error\n$stack');
+      _setMessage('保存指纹失败，请检查存储空间后重试。', transient: true);
+    } finally {
+      await _baselineCancellation;
+      hashingBaselines = false;
+      baselineCancelling = false;
+      _baselineCancellation = null;
+      _baselineTask = null;
+      _publish();
+    }
+  }
+
+  void cancelBaselines() {
+    if (!hashingBaselines || baselineCancelling) return;
+    baselineCancelling = true;
+    _baselineCancellation = documents.cancelMusicHash().catchError(
+      (Object error) => debugPrint('取消歌曲指纹读取：$error'),
+    );
     _publish();
   }
 
@@ -539,14 +686,14 @@ class LibraryController extends ChangeNotifier {
         mode: InsertMode.insertOrIgnore,
       );
 
-  Future<void> reload() async {
-    roots = await db.select(db.libraryRoots).get();
+  Future<void> reload({bool publish = true}) async {
+    final nextRoots = await db.select(db.libraryRoots).get();
     final songs = await db.select(db.songs).get();
     final locations = await (db.select(
       db.songLocations,
     )..where((r) => r.available.equals(true))).get();
     final bySong = <String, String>{};
-    final unavailableRoots = roots
+    final unavailableRoots = nextRoots
         .where((r) => !r.accessible)
         .map((r) => r.location)
         .toSet();
@@ -555,17 +702,18 @@ class LibraryController extends ChangeNotifier {
         bySong.putIfAbsent(row.songId, () => row.location);
       }
     }
+    final tagSnapshot = await tagsStore.load();
+    final playlistSnapshot = await playlistsStore.load();
+    roots = nextRoots;
     tracks = [for (final song in songs) LibraryTrack(song, bySong[song.id])];
     _visibleCache = null;
-    final tagSnapshot = await tagsStore.load();
     tags = tagSnapshot.tags;
     tagIdsBySong = tagSnapshot.bySong;
     tagCounts = _countTags(tagSnapshot.bySong);
-    final playlistSnapshot = await playlistsStore.load();
     playlists = playlistSnapshot.playlists;
     playlistSongIds = playlistSnapshot.songIds;
     _invalidateFilter();
-    _publish();
+    if (publish) _publish();
   }
 
   Map<String, int> _countTags(Map<String, Set<String>> bySong) {
@@ -586,6 +734,12 @@ class LibraryController extends ChangeNotifier {
     try {
       root = await documents.pickDirectory();
       if (root != null) {
+        if (roots.any(
+          (row) => row.location == root && row.requiresReselection,
+        )) {
+          _setMessage('这个目录已在列表中，请在管理目录中点“重新定位”。');
+          return;
+        }
         await _addRoot(root);
         await reload();
       }
@@ -645,7 +799,15 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> scan([List<String>? selected]) {
     if (_closed || directoryBusy) return Future.value();
-    return _scanTask = _scan(selected ?? roots.map((r) => r.location).toList());
+    final pending = {
+      for (final root in roots)
+        if (root.requiresReselection) root.location,
+    };
+    final targets = (selected ?? roots.map((root) => root.location))
+        .where((root) => !pending.contains(root))
+        .toList();
+    if (targets.isEmpty) return Future.value();
+    return _scanTask = _scan(targets);
   }
 
   Future<void> _scan(List<String> selected) async {
@@ -704,6 +866,14 @@ class LibraryController extends ChangeNotifier {
                     ? metadata?.duration?.inMilliseconds
                     : old?.durationMs,
                 metadataError: failure,
+                fileSha256:
+                    old != null &&
+                        file.size != null &&
+                        file.modified != null &&
+                        old.size == file.size &&
+                        old.modified == file.modified
+                    ? old.fileSha256
+                    : null,
               );
             }
             staged[file.identity] = (file, song);
@@ -785,8 +955,12 @@ class LibraryController extends ChangeNotifier {
     _closed = true;
     _cancelled = true;
     _messageTimer?.cancel();
+    cancelBaselines();
     await _scanTask;
     await _removeTask;
+    await _restoreTask;
+    await _relocationTask;
+    await _baselineTask;
     await _filterWrites;
     await db.close();
     super.dispose();

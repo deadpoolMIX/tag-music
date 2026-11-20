@@ -209,7 +209,7 @@ void main() {
     });
   });
 
-  for (final version in [1, 2, 3]) {
+  for (final version in [1, 2, 3, 4]) {
     test(
       'v$version migration preserves exact old rows, reopens and supports playlists',
       () async {
@@ -256,12 +256,21 @@ void main() {
               ],
             );
           }
+          if (version == 4) {
+            old.execute(
+              "INSERT INTO playlists(id,name,name_key,kind) VALUES ('old-list','旧歌单','旧歌单','regular')",
+            );
+            old.execute(
+              "INSERT INTO playlist_songs(playlist_id,song_id,position) VALUES ('old-list','stable',0)",
+            );
+          }
           for (final name in [
             'songs',
             'library_roots',
             'song_locations',
             if (version >= 2) ...['tags', 'song_tags'],
             if (version >= 3) 'current_filters',
+            if (version == 4) ...['playlists', 'playlist_songs'],
           ]) {
             before[name] = old
                 .select('SELECT * FROM $name')
@@ -273,24 +282,26 @@ void main() {
         }
         var migrated = LibraryDatabase(NativeDatabase(file));
         try {
-          for (final name in before.keys) {
+          for (final entry in before.entries) {
+            final columns = entry.value.first.keys.join(', ');
             expect(
-              (await migrated.customSelect('SELECT * FROM $name').get()).map(
-                (r) => r.data,
-              ),
-              before[name],
+              (await migrated
+                      .customSelect('SELECT $columns FROM ${entry.key}')
+                      .get())
+                  .map((r) => r.data),
+              entry.value,
             );
           }
           expect(
             (await migrated.customSelect('PRAGMA user_version').getSingle())
                 .read<int>('user_version'),
-            4,
+            5,
           );
           expect(
             await migrated.customSelect('PRAGMA foreign_key_check').get(),
             isEmpty,
           );
-          if (version == 3) {
+          if (version >= 3) {
             final filter = await FilterRepository(migrated).load();
             expect(filter.rule.allTagIds, {'tag'});
             expect(filter.sort, LibrarySort.album);
@@ -313,7 +324,7 @@ void main() {
               )
               .get();
           final baseline = jsonDecode(
-            await File('docs/database-schema/v4.json').readAsString(),
+            await File('docs/database-schema/v5.json').readAsString(),
           );
           expect(ddl.map((r) => r.data).toList(), baseline['schema']);
         } finally {

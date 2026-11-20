@@ -118,6 +118,17 @@ class $SongsTable extends Songs with TableInfo<$SongsTable, Song> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _fileSha256Meta = const VerificationMeta(
+    'fileSha256',
+  );
+  @override
+  late final GeneratedColumn<String> fileSha256 = GeneratedColumn<String>(
+    'file_sha256',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -131,6 +142,7 @@ class $SongsTable extends Songs with TableInfo<$SongsTable, Song> {
     album,
     durationMs,
     metadataError,
+    fileSha256,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -218,6 +230,12 @@ class $SongsTable extends Songs with TableInfo<$SongsTable, Song> {
         ),
       );
     }
+    if (data.containsKey('file_sha256')) {
+      context.handle(
+        _fileSha256Meta,
+        fileSha256.isAcceptableOrUnknown(data['file_sha256']!, _fileSha256Meta),
+      );
+    }
     return context;
   }
 
@@ -271,6 +289,10 @@ class $SongsTable extends Songs with TableInfo<$SongsTable, Song> {
         DriftSqlType.string,
         data['${effectivePrefix}metadata_error'],
       ),
+      fileSha256: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file_sha256'],
+      ),
     );
   }
 
@@ -292,6 +314,7 @@ class Song extends DataClass implements Insertable<Song> {
   final String? album;
   final int? durationMs;
   final String? metadataError;
+  final String? fileSha256;
   const Song({
     required this.id,
     required this.identity,
@@ -304,6 +327,7 @@ class Song extends DataClass implements Insertable<Song> {
     this.album,
     this.durationMs,
     this.metadataError,
+    this.fileSha256,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -333,6 +357,9 @@ class Song extends DataClass implements Insertable<Song> {
     if (!nullToAbsent || metadataError != null) {
       map['metadata_error'] = Variable<String>(metadataError);
     }
+    if (!nullToAbsent || fileSha256 != null) {
+      map['file_sha256'] = Variable<String>(fileSha256);
+    }
     return map;
   }
 
@@ -361,6 +388,9 @@ class Song extends DataClass implements Insertable<Song> {
       metadataError: metadataError == null && nullToAbsent
           ? const Value.absent()
           : Value(metadataError),
+      fileSha256: fileSha256 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(fileSha256),
     );
   }
 
@@ -381,6 +411,7 @@ class Song extends DataClass implements Insertable<Song> {
       album: serializer.fromJson<String?>(json['album']),
       durationMs: serializer.fromJson<int?>(json['durationMs']),
       metadataError: serializer.fromJson<String?>(json['metadataError']),
+      fileSha256: serializer.fromJson<String?>(json['fileSha256']),
     );
   }
   @override
@@ -398,6 +429,7 @@ class Song extends DataClass implements Insertable<Song> {
       'album': serializer.toJson<String?>(album),
       'durationMs': serializer.toJson<int?>(durationMs),
       'metadataError': serializer.toJson<String?>(metadataError),
+      'fileSha256': serializer.toJson<String?>(fileSha256),
     };
   }
 
@@ -413,6 +445,7 @@ class Song extends DataClass implements Insertable<Song> {
     Value<String?> album = const Value.absent(),
     Value<int?> durationMs = const Value.absent(),
     Value<String?> metadataError = const Value.absent(),
+    Value<String?> fileSha256 = const Value.absent(),
   }) => Song(
     id: id ?? this.id,
     identity: identity ?? this.identity,
@@ -427,6 +460,7 @@ class Song extends DataClass implements Insertable<Song> {
     metadataError: metadataError.present
         ? metadataError.value
         : this.metadataError,
+    fileSha256: fileSha256.present ? fileSha256.value : this.fileSha256,
   );
   Song copyWithCompanion(SongsCompanion data) {
     return Song(
@@ -445,6 +479,9 @@ class Song extends DataClass implements Insertable<Song> {
       metadataError: data.metadataError.present
           ? data.metadataError.value
           : this.metadataError,
+      fileSha256: data.fileSha256.present
+          ? data.fileSha256.value
+          : this.fileSha256,
     );
   }
 
@@ -461,7 +498,8 @@ class Song extends DataClass implements Insertable<Song> {
           ..write('artist: $artist, ')
           ..write('album: $album, ')
           ..write('durationMs: $durationMs, ')
-          ..write('metadataError: $metadataError')
+          ..write('metadataError: $metadataError, ')
+          ..write('fileSha256: $fileSha256')
           ..write(')'))
         .toString();
   }
@@ -479,6 +517,7 @@ class Song extends DataClass implements Insertable<Song> {
     album,
     durationMs,
     metadataError,
+    fileSha256,
   );
   @override
   bool operator ==(Object other) =>
@@ -494,7 +533,8 @@ class Song extends DataClass implements Insertable<Song> {
           other.artist == this.artist &&
           other.album == this.album &&
           other.durationMs == this.durationMs &&
-          other.metadataError == this.metadataError);
+          other.metadataError == this.metadataError &&
+          other.fileSha256 == this.fileSha256);
 }
 
 class SongsCompanion extends UpdateCompanion<Song> {
@@ -509,6 +549,7 @@ class SongsCompanion extends UpdateCompanion<Song> {
   final Value<String?> album;
   final Value<int?> durationMs;
   final Value<String?> metadataError;
+  final Value<String?> fileSha256;
   final Value<int> rowid;
   const SongsCompanion({
     this.id = const Value.absent(),
@@ -522,6 +563,7 @@ class SongsCompanion extends UpdateCompanion<Song> {
     this.album = const Value.absent(),
     this.durationMs = const Value.absent(),
     this.metadataError = const Value.absent(),
+    this.fileSha256 = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SongsCompanion.insert({
@@ -536,6 +578,7 @@ class SongsCompanion extends UpdateCompanion<Song> {
     this.album = const Value.absent(),
     this.durationMs = const Value.absent(),
     this.metadataError = const Value.absent(),
+    this.fileSha256 = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        identity = Value(identity),
@@ -553,6 +596,7 @@ class SongsCompanion extends UpdateCompanion<Song> {
     Expression<String>? album,
     Expression<int>? durationMs,
     Expression<String>? metadataError,
+    Expression<String>? fileSha256,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -567,6 +611,7 @@ class SongsCompanion extends UpdateCompanion<Song> {
       if (album != null) 'album': album,
       if (durationMs != null) 'duration_ms': durationMs,
       if (metadataError != null) 'metadata_error': metadataError,
+      if (fileSha256 != null) 'file_sha256': fileSha256,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -583,6 +628,7 @@ class SongsCompanion extends UpdateCompanion<Song> {
     Value<String?>? album,
     Value<int?>? durationMs,
     Value<String?>? metadataError,
+    Value<String?>? fileSha256,
     Value<int>? rowid,
   }) {
     return SongsCompanion(
@@ -597,6 +643,7 @@ class SongsCompanion extends UpdateCompanion<Song> {
       album: album ?? this.album,
       durationMs: durationMs ?? this.durationMs,
       metadataError: metadataError ?? this.metadataError,
+      fileSha256: fileSha256 ?? this.fileSha256,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -637,6 +684,9 @@ class SongsCompanion extends UpdateCompanion<Song> {
     if (metadataError.present) {
       map['metadata_error'] = Variable<String>(metadataError.value);
     }
+    if (fileSha256.present) {
+      map['file_sha256'] = Variable<String>(fileSha256.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -657,6 +707,7 @@ class SongsCompanion extends UpdateCompanion<Song> {
           ..write('album: $album, ')
           ..write('durationMs: $durationMs, ')
           ..write('metadataError: $metadataError, ')
+          ..write('fileSha256: $fileSha256, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -716,12 +767,27 @@ class $LibraryRootsTable extends LibraryRoots
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _requiresReselectionMeta =
+      const VerificationMeta('requiresReselection');
+  @override
+  late final GeneratedColumn<bool> requiresReselection = GeneratedColumn<bool>(
+    'requires_reselection',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("requires_reselection" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     location,
     accessible,
     status,
     scannedAt,
+    requiresReselection,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -761,6 +827,15 @@ class $LibraryRootsTable extends LibraryRoots
         scannedAt.isAcceptableOrUnknown(data['scanned_at']!, _scannedAtMeta),
       );
     }
+    if (data.containsKey('requires_reselection')) {
+      context.handle(
+        _requiresReselectionMeta,
+        requiresReselection.isAcceptableOrUnknown(
+          data['requires_reselection']!,
+          _requiresReselectionMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -786,6 +861,10 @@ class $LibraryRootsTable extends LibraryRoots
         DriftSqlType.int,
         data['${effectivePrefix}scanned_at'],
       ),
+      requiresReselection: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}requires_reselection'],
+      )!,
     );
   }
 
@@ -800,11 +879,13 @@ class LibraryRoot extends DataClass implements Insertable<LibraryRoot> {
   final bool accessible;
   final String status;
   final int? scannedAt;
+  final bool requiresReselection;
   const LibraryRoot({
     required this.location,
     required this.accessible,
     required this.status,
     this.scannedAt,
+    required this.requiresReselection,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -815,6 +896,7 @@ class LibraryRoot extends DataClass implements Insertable<LibraryRoot> {
     if (!nullToAbsent || scannedAt != null) {
       map['scanned_at'] = Variable<int>(scannedAt);
     }
+    map['requires_reselection'] = Variable<bool>(requiresReselection);
     return map;
   }
 
@@ -826,6 +908,7 @@ class LibraryRoot extends DataClass implements Insertable<LibraryRoot> {
       scannedAt: scannedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(scannedAt),
+      requiresReselection: Value(requiresReselection),
     );
   }
 
@@ -839,6 +922,9 @@ class LibraryRoot extends DataClass implements Insertable<LibraryRoot> {
       accessible: serializer.fromJson<bool>(json['accessible']),
       status: serializer.fromJson<String>(json['status']),
       scannedAt: serializer.fromJson<int?>(json['scannedAt']),
+      requiresReselection: serializer.fromJson<bool>(
+        json['requiresReselection'],
+      ),
     );
   }
   @override
@@ -849,6 +935,7 @@ class LibraryRoot extends DataClass implements Insertable<LibraryRoot> {
       'accessible': serializer.toJson<bool>(accessible),
       'status': serializer.toJson<String>(status),
       'scannedAt': serializer.toJson<int?>(scannedAt),
+      'requiresReselection': serializer.toJson<bool>(requiresReselection),
     };
   }
 
@@ -857,11 +944,13 @@ class LibraryRoot extends DataClass implements Insertable<LibraryRoot> {
     bool? accessible,
     String? status,
     Value<int?> scannedAt = const Value.absent(),
+    bool? requiresReselection,
   }) => LibraryRoot(
     location: location ?? this.location,
     accessible: accessible ?? this.accessible,
     status: status ?? this.status,
     scannedAt: scannedAt.present ? scannedAt.value : this.scannedAt,
+    requiresReselection: requiresReselection ?? this.requiresReselection,
   );
   LibraryRoot copyWithCompanion(LibraryRootsCompanion data) {
     return LibraryRoot(
@@ -871,6 +960,9 @@ class LibraryRoot extends DataClass implements Insertable<LibraryRoot> {
           : this.accessible,
       status: data.status.present ? data.status.value : this.status,
       scannedAt: data.scannedAt.present ? data.scannedAt.value : this.scannedAt,
+      requiresReselection: data.requiresReselection.present
+          ? data.requiresReselection.value
+          : this.requiresReselection,
     );
   }
 
@@ -880,13 +972,15 @@ class LibraryRoot extends DataClass implements Insertable<LibraryRoot> {
           ..write('location: $location, ')
           ..write('accessible: $accessible, ')
           ..write('status: $status, ')
-          ..write('scannedAt: $scannedAt')
+          ..write('scannedAt: $scannedAt, ')
+          ..write('requiresReselection: $requiresReselection')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(location, accessible, status, scannedAt);
+  int get hashCode =>
+      Object.hash(location, accessible, status, scannedAt, requiresReselection);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -894,7 +988,8 @@ class LibraryRoot extends DataClass implements Insertable<LibraryRoot> {
           other.location == this.location &&
           other.accessible == this.accessible &&
           other.status == this.status &&
-          other.scannedAt == this.scannedAt);
+          other.scannedAt == this.scannedAt &&
+          other.requiresReselection == this.requiresReselection);
 }
 
 class LibraryRootsCompanion extends UpdateCompanion<LibraryRoot> {
@@ -902,12 +997,14 @@ class LibraryRootsCompanion extends UpdateCompanion<LibraryRoot> {
   final Value<bool> accessible;
   final Value<String> status;
   final Value<int?> scannedAt;
+  final Value<bool> requiresReselection;
   final Value<int> rowid;
   const LibraryRootsCompanion({
     this.location = const Value.absent(),
     this.accessible = const Value.absent(),
     this.status = const Value.absent(),
     this.scannedAt = const Value.absent(),
+    this.requiresReselection = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LibraryRootsCompanion.insert({
@@ -915,6 +1012,7 @@ class LibraryRootsCompanion extends UpdateCompanion<LibraryRoot> {
     this.accessible = const Value.absent(),
     this.status = const Value.absent(),
     this.scannedAt = const Value.absent(),
+    this.requiresReselection = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : location = Value(location);
   static Insertable<LibraryRoot> custom({
@@ -922,6 +1020,7 @@ class LibraryRootsCompanion extends UpdateCompanion<LibraryRoot> {
     Expression<bool>? accessible,
     Expression<String>? status,
     Expression<int>? scannedAt,
+    Expression<bool>? requiresReselection,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -929,6 +1028,8 @@ class LibraryRootsCompanion extends UpdateCompanion<LibraryRoot> {
       if (accessible != null) 'accessible': accessible,
       if (status != null) 'status': status,
       if (scannedAt != null) 'scanned_at': scannedAt,
+      if (requiresReselection != null)
+        'requires_reselection': requiresReselection,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -938,6 +1039,7 @@ class LibraryRootsCompanion extends UpdateCompanion<LibraryRoot> {
     Value<bool>? accessible,
     Value<String>? status,
     Value<int?>? scannedAt,
+    Value<bool>? requiresReselection,
     Value<int>? rowid,
   }) {
     return LibraryRootsCompanion(
@@ -945,6 +1047,7 @@ class LibraryRootsCompanion extends UpdateCompanion<LibraryRoot> {
       accessible: accessible ?? this.accessible,
       status: status ?? this.status,
       scannedAt: scannedAt ?? this.scannedAt,
+      requiresReselection: requiresReselection ?? this.requiresReselection,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -964,6 +1067,9 @@ class LibraryRootsCompanion extends UpdateCompanion<LibraryRoot> {
     if (scannedAt.present) {
       map['scanned_at'] = Variable<int>(scannedAt.value);
     }
+    if (requiresReselection.present) {
+      map['requires_reselection'] = Variable<bool>(requiresReselection.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -977,6 +1083,7 @@ class LibraryRootsCompanion extends UpdateCompanion<LibraryRoot> {
           ..write('accessible: $accessible, ')
           ..write('status: $status, ')
           ..write('scannedAt: $scannedAt, ')
+          ..write('requiresReselection: $requiresReselection, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2923,6 +3030,7 @@ typedef $$SongsTableCreateCompanionBuilder = SongsCompanion Function({
   Value<String?> album,
   Value<int?> durationMs,
   Value<String?> metadataError,
+  Value<String?> fileSha256,
   Value<int> rowid,
 });
 typedef $$SongsTableUpdateCompanionBuilder = SongsCompanion Function({
@@ -2937,6 +3045,7 @@ typedef $$SongsTableUpdateCompanionBuilder = SongsCompanion Function({
   Value<String?> album,
   Value<int?> durationMs,
   Value<String?> metadataError,
+  Value<String?> fileSha256,
   Value<int> rowid,
 });
 
@@ -3063,6 +3172,11 @@ class $$SongsTableFilterComposer
 
   ColumnFilters<String> get metadataError => $composableBuilder(
     column: $table.metadataError,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fileSha256 => $composableBuilder(
+    column: $table.fileSha256,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3205,6 +3319,11 @@ class $$SongsTableOrderingComposer
     column: $table.metadataError,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get fileSha256 => $composableBuilder(
+    column: $table.fileSha256,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SongsTableAnnotationComposer
@@ -3250,6 +3369,11 @@ class $$SongsTableAnnotationComposer
 
   GeneratedColumn<String> get metadataError => $composableBuilder(
     column: $table.metadataError,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get fileSha256 => $composableBuilder(
+    column: $table.fileSha256,
     builder: (column) => column,
   );
 
@@ -3372,6 +3496,7 @@ class $$SongsTableTableManager
                 Value<String?> album = const Value.absent(),
                 Value<int?> durationMs = const Value.absent(),
                 Value<String?> metadataError = const Value.absent(),
+                Value<String?> fileSha256 = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SongsCompanion(
                 id: id,
@@ -3385,6 +3510,7 @@ class $$SongsTableTableManager
                 album: album,
                 durationMs: durationMs,
                 metadataError: metadataError,
+                fileSha256: fileSha256,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3400,6 +3526,7 @@ class $$SongsTableTableManager
                 Value<String?> album = const Value.absent(),
                 Value<int?> durationMs = const Value.absent(),
                 Value<String?> metadataError = const Value.absent(),
+                Value<String?> fileSha256 = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SongsCompanion.insert(
                 id: id,
@@ -3413,6 +3540,7 @@ class $$SongsTableTableManager
                 album: album,
                 durationMs: durationMs,
                 metadataError: metadataError,
+                fileSha256: fileSha256,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -3531,6 +3659,7 @@ typedef $$LibraryRootsTableCreateCompanionBuilder =
       Value<bool> accessible,
       Value<String> status,
       Value<int?> scannedAt,
+      Value<bool> requiresReselection,
       Value<int> rowid,
     });
 typedef $$LibraryRootsTableUpdateCompanionBuilder =
@@ -3539,6 +3668,7 @@ typedef $$LibraryRootsTableUpdateCompanionBuilder =
       Value<bool> accessible,
       Value<String> status,
       Value<int?> scannedAt,
+      Value<bool> requiresReselection,
       Value<int> rowid,
     });
 
@@ -3592,6 +3722,11 @@ class $$LibraryRootsTableFilterComposer
 
   ColumnFilters<int> get scannedAt => $composableBuilder(
     column: $table.scannedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get requiresReselection => $composableBuilder(
+    column: $table.requiresReselection,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3649,6 +3784,11 @@ class $$LibraryRootsTableOrderingComposer
     column: $table.scannedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get requiresReselection => $composableBuilder(
+    column: $table.requiresReselection,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$LibraryRootsTableAnnotationComposer
@@ -3673,6 +3813,11 @@ class $$LibraryRootsTableAnnotationComposer
 
   GeneratedColumn<int> get scannedAt =>
       $composableBuilder(column: $table.scannedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get requiresReselection => $composableBuilder(
+    column: $table.requiresReselection,
+    builder: (column) => column,
+  );
 
   Expression<T> songLocationsRefs<T extends Object>(
     Expression<T> Function($$SongLocationsTableAnnotationComposer a) f,
@@ -3734,12 +3879,14 @@ class $$LibraryRootsTableTableManager
                 Value<bool> accessible = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<int?> scannedAt = const Value.absent(),
+                Value<bool> requiresReselection = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LibraryRootsCompanion(
                 location: location,
                 accessible: accessible,
                 status: status,
                 scannedAt: scannedAt,
+                requiresReselection: requiresReselection,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3748,12 +3895,14 @@ class $$LibraryRootsTableTableManager
                 Value<bool> accessible = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<int?> scannedAt = const Value.absent(),
+                Value<bool> requiresReselection = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LibraryRootsCompanion.insert(
                 location: location,
                 accessible: accessible,
                 status: status,
                 scannedAt: scannedAt,
+                requiresReselection: requiresReselection,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

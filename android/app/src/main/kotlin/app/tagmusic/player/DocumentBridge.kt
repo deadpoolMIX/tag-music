@@ -49,10 +49,30 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                 } catch (e: Exception) {
                     result.error("notifications", e.message, null)
                 }
+            } else if (call.method == "cancelMusicHash") {
+                hashGeneration.incrementAndGet()
+                result.success(null)
+            } else if (call.method == "exportLibraryBackup" || call.method == "importLibraryBackup") {
+                if (backupPicker != null || picker != null) result.error("busy", "文件选择器已打开", null)
+                else try {
+                    val exporting = call.method == "exportLibraryBackup"
+                    val bytes = if (exporting) requireNotNull(call.argument<ByteArray>("bytes")) else null
+                    require(bytes == null || bytes.size <= BACKUP_BYTE_LIMIT) { "备份超过 64 MiB" }
+                    backupPicker = result to bytes
+                    val intent = Intent(if (exporting) Intent.ACTION_CREATE_DOCUMENT else Intent.ACTION_OPEN_DOCUMENT)
+                        .addCategory(Intent.CATEGORY_OPENABLE)
+                        .setType(if (exporting) "application/octet-stream" else "*/*")
+                    if (exporting) intent.putExtra(Intent.EXTRA_TITLE, requireNotNull(call.argument<String>("name")))
+                    activity.startActivityForResult(intent, PICK_BACKUP)
+                } catch (e: Exception) {
+                    backupPicker = null
+                    result.error("backup", e.message, null)
+                }
             } else if (call.method == "pickDirectory") {
-                if (picker != null) result.error("busy", "目录选择器已打开", null)
+                if (picker != null || backupPicker != null) result.error("busy", "文件选择器已打开", null)
                 else {
                     picker = result
+                    temporaryPicker = call.argument<Boolean>("temporary") == true
                     try {
                         activity.startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or
@@ -67,7 +87,12 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
             } else {
                 // Companion traversal must never block playback descriptor ownership.
                 val lyricRequest = if (call.method == "findLyrics") lyricGeneration.incrementAndGet() else 0L
-                val executor = if (call.method == "findLyrics" || call.method == "readLyrics") lyricsWorker else worker
+                val hashRequest = if (call.method == "hashMusic") hashGeneration.get() else 0L
+                val executor = when (call.method) {
+                    "findLyrics", "readLyrics" -> lyricsWorker
+                    "hashMusic" -> hashWorker
+                    else -> worker
+                }
                 executor.execute {
                     try {
                         val value: Any? = when (call.method) {
@@ -81,6 +106,18 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
                             "nextScan" -> requireNotNull(scans[call.argument<Int>("token")]).next()
                             "endScan" -> { scans.remove(call.argument<Int>("token"))?.close(); null }
                             "directoryName" -> directoryName(Uri.parse(requireNotNull(call.argument<String>("uri"))))
+                            "persistMusicDirectory" -> {
+                                val uri = Uri.parse(requireNotNull(call.argument<String>("uri")))
+                                require(uri.scheme == "content" && DocumentsContract.isTreeUri(uri))
+                                activity.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                null
+                            }
+                            "hashMusic" -> hashMusic(
+                                Uri.parse(requireNotNull(call.argument<String>("uri"))),
+                                (call.argument<Number>("size"))?.toLong(),
+                                (call.argument<Number>("modified"))?.toLong(),
+                                hashRequest
+                            )
                             "saveCover" -> saveCover(
                                 requireNotNull(call.argument<String>("name")),
                                 requireNotNull(call.argument<String>("mimeType")),
@@ -136,6 +173,33 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
         }
     }
 
+    private fun hashMusic(uri: Uri, size: Long?, modified: Long?, generation: Long): String {
+        require(uri.scheme == "content" && DocumentsContract.isDocumentUri(activity, uri))
+        val resolver = activity.contentResolver
+        fun timestamp(): Long? {
+            val column = DocumentsContract.Document.COLUMN_LAST_MODIFIED
+            return resolver.query(uri, arrayOf(column), null, null, null)?.use {
+                if (it.moveToFirst() && !it.isNull(0)) it.getLong(0).takeIf { value -> value > 0 } else null
+            }
+        }
+        val before = timestamp()
+        require(modified == null || before == null || modified == before) { "扫描后文件已变化" }
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        var length = 0L
+        requireNotNull(resolver.openInputStream(uri)).use { stream ->
+            val buffer = ByteArray(128 * 1024)
+            while (true) {
+                check(generation == hashGeneration.get()) { "已取消" }
+                val count = stream.read(buffer)
+                if (count < 0) break
+                length += count
+                digest.update(buffer, 0, count)
+            }
+        }
+        require((size == null || size == length) && before == timestamp()) { "计算期间文件已变化" }
+        return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    }
+
     private fun saveCover(name: String, mimeType: String, bytes: ByteArray): String {
         val resolver = activity.contentResolver
         val folder = "${Environment.DIRECTORY_PICTURES}/Tag Music"
@@ -169,15 +233,50 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
     }
 
     fun onActivityResult(request: Int, result: Int, data: Intent?): Boolean {
+        if (request == PICK_BACKUP) {
+            val (callback, bytes) = backupPicker ?: return true
+            backupPicker = null
+            val uri = data?.data
+            if (result != Activity.RESULT_OK || uri == null) callback.success(null)
+            else backupWorker.execute {
+                try {
+                    require(uri.scheme == "content") { "请选择系统文件选择器中的备份" }
+                    val resolver = activity.contentResolver
+                    if (bytes != null) {
+                        requireNotNull(resolver.openOutputStream(uri, "wt")).use { it.write(bytes) }
+                        main.post { callback.success(true) }
+                    } else {
+                        val output = java.io.ByteArrayOutputStream()
+                        requireNotNull(resolver.openInputStream(uri)).use { stream ->
+                            val buffer = ByteArray(64 * 1024)
+                            while (true) {
+                                val count = stream.read(buffer)
+                                if (count < 0) break
+                                require(output.size() + count <= BACKUP_BYTE_LIMIT) { "备份超过 64 MiB" }
+                                output.write(buffer, 0, count)
+                            }
+                        }
+                        val imported = output.toByteArray()
+                        main.post { callback.success(imported) }
+                    }
+                } catch (e: Exception) {
+                    if (bytes != null) runCatching { DocumentsContract.deleteDocument(activity.contentResolver, uri) }
+                    main.post { callback.error("backup", e.message ?: e.javaClass.simpleName, null) }
+                }
+            }
+            return true
+        }
         if (request != PICK_DIRECTORY) return false
         val pending = picker ?: return true
         picker = null
+        val temporary = temporaryPicker
+        temporaryPicker = false
         if (result != Activity.RESULT_OK || data?.data == null) pending.success(null)
         else try {
             val uri = data.data!!
             val flags = data.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION
             require(flags != 0) { "目录没有只读授权" }
-            activity.contentResolver.takePersistableUriPermission(uri, flags)
+            if (!temporary) activity.contentResolver.takePersistableUriPermission(uri, flags)
             pending.success(uri.toString())
         } catch (e: Exception) {
             pending.error("permission", e.message, null)
@@ -333,10 +432,15 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
         private val extensions = setOf("mp3", "flac", "m4a", "aac", "wav", "ogg", "opus")
         private const val PICK_DIRECTORY = 4011
         private const val NOTIFICATIONS = 4012
+        private const val PICK_BACKUP = 4013
+        private const val BACKUP_BYTE_LIMIT = 64 * 1024 * 1024
         // AudioService's FlutterEngine survives Activity recreation. Descriptor
         // ownership must survive it too; every access is serialized by worker.
         private val worker = Executors.newSingleThreadExecutor()
         private val lyricsWorker = Executors.newSingleThreadExecutor()
+        private val backupWorker = Executors.newSingleThreadExecutor()
+        private val hashWorker = Executors.newSingleThreadExecutor()
+        private val hashGeneration = java.util.concurrent.atomic.AtomicLong()
         private val lyricGeneration = java.util.concurrent.atomic.AtomicLong()
         private data class ParentKey(val authority: String?, val treeId: String, val childId: String)
         private val parents = java.util.concurrent.ConcurrentHashMap<ParentKey, String>()
@@ -346,6 +450,8 @@ class DocumentBridge(private val activity: Activity, messenger: BinaryMessenger)
         }
         private val descriptors = mutableMapOf<Int, ParcelFileDescriptor>()
         private var picker: MethodChannel.Result? = null
+        private var temporaryPicker = false
+        private var backupPicker: Pair<MethodChannel.Result, ByteArray?>? = null
         private var notificationRequest: MethodChannel.Result? = null
         private var scanToken = 0
         private val scans = mutableMapOf<Int, Scan>()

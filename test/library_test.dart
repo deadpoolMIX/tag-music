@@ -188,7 +188,7 @@ void main() {
     );
   });
 
-  test('database reopens with schema v4, stable UUIDs and saved roots without rescanning', () async {
+  test('database reopens with schema v5, stable UUIDs and saved roots without rescanning', () async {
     final dir = await Directory.systemTemp.createTemp('tag-music-db-');
     final file = File('${dir.path}/library.sqlite');
     final first = LibraryController(
@@ -212,7 +212,7 @@ void main() {
       expect(
         (await second.db.customSelect('PRAGMA user_version').getSingle())
             .read<int>('user_version'),
-        4,
+        5,
       );
       expect(
         (await second.db.customSelect('PRAGMA foreign_key_check').get()),
@@ -262,7 +262,7 @@ void main() {
     }
   });
 
-  test('schema v4 matches checked-in SQLite DDL baseline', () async {
+  test('schema v5 matches checked-in SQLite DDL baseline', () async {
     final rows = await library.db
         .customSelect(
           "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type, name",
@@ -277,7 +277,7 @@ void main() {
       await File(output)
           .writeAsString(const JsonEncoder.withIndent('  ').convert(schema));
     }
-    final baseline = File('docs/database-schema/v4.json');
+    final baseline = File('docs/database-schema/v5.json');
     if (await baseline.exists()) {
       expect(
         schema,

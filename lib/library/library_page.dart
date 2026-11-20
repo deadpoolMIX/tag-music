@@ -4,7 +4,9 @@ import '../core/compact_dialog.dart';
 import '../core/desktop_navigation.dart';
 import '../playback/playback_controller.dart';
 import 'library_controller.dart';
+import 'database.dart';
 import 'library_search_page.dart';
+import 'relocation_dialog.dart';
 import 'song_list.dart';
 export 'track_cover.dart';
 
@@ -108,20 +110,39 @@ class LibraryPage extends StatelessWidget {
                 ),
                 IconButton(
                   tooltip: '刷新所有目录',
-                  onPressed: library.directoryBusy || library.roots.isEmpty
+                  onPressed:
+                      library.directoryBusy ||
+                          !library.roots.any(
+                            (root) => !root.requiresReselection,
+                          )
                       ? null
                       : () => library.scan(),
                   icon: const Icon(Icons.refresh),
                 ),
+                IconButton(
+                  tooltip: library.showMissing ? '返回可播放歌曲' : '查看失联歌曲',
+                  isSelected: library.showMissing,
+                  onPressed: () =>
+                      library.filter(missing: !library.showMissing),
+                  icon: const Icon(Icons.link_off),
+                ),
                 const Spacer(),
-                Text('${rows.length}首'),
+                Text(
+                  library.showMissing
+                      ? '${rows.length} 首失联'
+                      : '${rows.length}首',
+                ),
                 const SizedBox(width: 16),
               ],
             ),
             LibraryStatus(library: library),
           ],
         ),
-        emptyText: library.roots.isEmpty ? '添加音乐文件夹，建立本机曲库' : '没有匹配的歌曲',
+        emptyText: library.showMissing
+            ? '没有失联歌曲'
+            : library.roots.isEmpty
+            ? '添加音乐文件夹，建立本机曲库'
+            : '没有匹配的歌曲',
         library: library,
         playback: playback,
         source: library.searchTracks(
@@ -156,6 +177,22 @@ class LibraryStatus extends StatelessWidget {
             TextButton(
               onPressed: library.cancelScan,
               child: const Text('取消扫描'),
+            ),
+          ],
+        ),
+      ],
+      if (library.hashingBaselines) ...[
+        const LinearProgressIndicator(),
+        Row(
+          children: [
+            Expanded(
+              child: Text('正在保存歌曲指纹 · 已处理 ${library.baselineProcessed} 首'),
+            ),
+            TextButton(
+              onPressed: library.baselineCancelling
+                  ? null
+                  : library.cancelBaselines,
+              child: const Text('取消'),
             ),
           ],
         ),
@@ -226,32 +263,49 @@ Future<void> showDirectoryManager(
                     _DirectoryRow(
                       key: ValueKey(root.location),
                       library: library,
-                      location: root.location,
-                      status: root.accessible ? root.status : '目录不可访问',
+                      root: root,
                     ),
                 ],
               ),
       ),
     ),
+    actions: [
+      ListenableBuilder(
+        listenable: library,
+        builder: (context, _) => Tooltip(
+          message: '搬走或重命名文件前保存，方便以后按文件内容找回',
+          child: TextButton.icon(
+            onPressed: library.hashingBaselines
+                ? (library.baselineCancelling ? null : library.cancelBaselines)
+                : (library.directoryBusy || library.availableTracks.isEmpty
+                      ? null
+                      : library.startBaselines),
+            icon: const Icon(Icons.fingerprint),
+            label: Text(
+              library.hashingBaselines
+                  ? '取消保存（${library.baselineProcessed} 首）'
+                  : '保存搬家指纹',
+            ),
+          ),
+        ),
+      ),
+    ],
   ),
 );
 
 class _DirectoryRow extends StatefulWidget {
-  const _DirectoryRow({
-    required this.library,
-    required this.location,
-    required this.status,
-    super.key,
-  });
+  const _DirectoryRow({required this.library, required this.root, super.key});
   final LibraryController library;
-  final String location, status;
+  final LibraryRoot root;
 
   @override
   State<_DirectoryRow> createState() => _DirectoryRowState();
 }
 
 class _DirectoryRowState extends State<_DirectoryRow> {
-  late final _name = widget.library.documents.directoryName(widget.location);
+  late final _name = widget.library.documents.directoryName(
+    widget.root.location,
+  );
 
   Future<void> _confirmRemoval(String name) async {
     final remove = await showDialog<bool>(
@@ -273,23 +327,26 @@ class _DirectoryRowState extends State<_DirectoryRow> {
     );
     if (!mounted || remove != true) return;
     final messenger = ScaffoldMessenger.maybeOf(context);
-    if (!await widget.library.removeDirectory(widget.location)) {
+    if (!await widget.library.removeDirectory(widget.root.location)) {
       messenger?.showSnackBar(const SnackBar(content: Text('目录未能移除，请稍后重试。')));
     }
   }
 
   @override
   Widget build(BuildContext context) => FutureBuilder(
-    future: _name,
+    future: widget.root.requiresReselection ? null : _name,
     builder: (context, snapshot) {
-      final name = snapshot.data ?? (snapshot.hasError ? '无法读取名称' : '正在读取名称…');
+      final root = widget.root;
+      final name = root.requiresReselection
+          ? root.location
+          : snapshot.data ?? (snapshot.hasError ? '无法读取名称' : '正在读取名称…');
       final enabled = !widget.library.directoryBusy;
       return ListTile(
         dense: true,
         contentPadding: EdgeInsets.zero,
         title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: Text(
-          widget.status,
+          root.requiresReselection || root.accessible ? root.status : '目录不可访问',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -298,10 +355,17 @@ class _DirectoryRowState extends State<_DirectoryRow> {
           children: [
             IconButton(
               tooltip: '刷新该目录',
-              onPressed: enabled
-                  ? () => widget.library.scan([widget.location])
+              onPressed: enabled && !root.requiresReselection
+                  ? () => widget.library.scan([root.location])
                   : null,
               icon: const Icon(Icons.refresh, size: 20),
+            ),
+            IconButton(
+              tooltip: '重新定位',
+              onPressed: enabled
+                  ? () => showDirectoryRelocation(context, widget.library, root)
+                  : null,
+              icon: const Icon(Icons.drive_file_move_outline, size: 20),
             ),
             IconButton(
               tooltip: '移除该目录',

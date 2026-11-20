@@ -16,6 +16,7 @@ import 'playback/full_player.dart' show fullPlayerRouteName;
 import 'playback/playback_minibar.dart';
 import 'playback/queue_page.dart' show playbackQueueRouteName;
 import 'library/library_page.dart';
+import 'library/backup_dialog.dart';
 import 'library/filter_page.dart';
 import 'library/playlists_page.dart';
 import 'playback/playback_controller.dart';
@@ -109,8 +110,9 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
 
   @override
   void dispose() {
-    if (_desktop)
+    if (_desktop) {
       FocusManager.instance.removeEarlyKeyEventHandler(_spaceToPlay);
+    }
     _routes.dispose();
     _songSelection.dispose();
     super.dispose();
@@ -787,6 +789,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   if (ref.watch(libraryProvider) case final library?) ...[
                     const SizedBox(height: 4),
                     DirectorySettings(library: library),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton.icon(
+                        onPressed: () => showLibraryBackup(
+                          context,
+                          library,
+                          clearPlayback: playback?.clearQueue,
+                        ),
+                        icon: const Icon(Icons.backup_outlined),
+                        label: const Text('备份与恢复'),
+                      ),
+                    ),
                   ],
                   const SizedBox(height: 12),
                   Text('关于', style: theme.textTheme.titleMedium),

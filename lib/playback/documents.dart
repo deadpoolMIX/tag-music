@@ -90,6 +90,23 @@ Future<Uint8List?> _fdCover(int fd) => Isolate.run(
   () => readFileCover(DescriptorFile(AndroidDescriptorSource(fd))),
 );
 
+Future<String> _pathHash(String path, int? size, int? modified) =>
+    Isolate.run(() async {
+      final file = File(path);
+      final before = await file.stat();
+      if ((size != null && before.size != size) ||
+          (modified != null &&
+              before.modified.millisecondsSinceEpoch != modified)) {
+        throw const FileSystemException('扫描后文件已变化');
+      }
+      final digest = await sha256.bind(file.openRead()).first;
+      final after = await file.stat();
+      if (before.size != after.size || before.modified != after.modified) {
+        throw const FileSystemException('计算期间文件已变化');
+      }
+      return digest.toString();
+    });
+
 TrackMetadata readFileMetadata(File source) {
   final data = readMetadata(source);
   // RIFF INFO has no universal charset marker. The parser returns Latin-1;
@@ -146,10 +163,32 @@ class DocumentAccess {
   Future<List<String>> roots() async =>
       await _preferences.getStringList(_rootsKey) ?? [];
 
+  Future<void> clearDirectoryBookmarks() => _preferences.remove(_rootsKey);
+
+  Future<String?> selectMusicDirectory({bool temporary = false}) => android
+      ? channel.invokeMethod<String>('pickDirectory', {'temporary': temporary})
+      : getDirectoryPath(confirmButtonText: '选择音乐文件夹');
+
+  Future<void> persistMusicDirectory(String root) async {
+    if (android) {
+      await channel.invokeMethod<void>('persistMusicDirectory', {'uri': root});
+    }
+  }
+
+  Future<String> musicHash(ProbeTrack track) async => android
+      ? (await channel.invokeMethod<String>('hashMusic', {
+          'uri': track.location,
+          'size': track.size,
+          'modified': track.modified,
+        }))!
+      : _pathHash(track.location, track.size, track.modified);
+
+  Future<void> cancelMusicHash() async {
+    if (android) await channel.invokeMethod<void>('cancelMusicHash');
+  }
+
   Future<String?> pickDirectory() async {
-    final root = android
-        ? await channel.invokeMethod<String>('pickDirectory')
-        : await getDirectoryPath(confirmButtonText: '选择音乐文件夹');
+    final root = await selectMusicDirectory();
     if (root != null) {
       final saved = await roots();
       if (!saved.contains(root)) {
