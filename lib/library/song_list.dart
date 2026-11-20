@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -13,6 +14,7 @@ import 'library_controller.dart';
 import 'track_cover.dart';
 import 'song_information.dart';
 import 'playlist_actions.dart';
+import 'song_selection.dart';
 import 'tags_page.dart';
 
 class SongListPageActivity extends InheritedWidget {
@@ -85,6 +87,7 @@ class _SongListState extends State<SongList> with RouteAware {
   final _selected = <String>{};
   bool _selecting = false;
   bool _active = true;
+  SongSelectionController? _selection;
   RouteObserver<PageRoute<dynamic>>? _observer;
   PageRoute<dynamic>? _route;
   String? _highlight;
@@ -102,6 +105,7 @@ class _SongListState extends State<SongList> with RouteAware {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _selection = SongSelectionScope.of(context);
     _active = SongListPageActivity.isActiveOf(context);
     if (!_active && _selecting) _clearSelection();
     final observer = PageNavigationScope.of(context);
@@ -162,6 +166,7 @@ class _SongListState extends State<SongList> with RouteAware {
   @override
   void dispose() {
     _observer?.unsubscribe(this);
+    _selection?.end(this);
     _timer?.cancel();
     _scroll.dispose();
     _selectionFocus.dispose();
@@ -169,6 +174,7 @@ class _SongListState extends State<SongList> with RouteAware {
   }
 
   void _toggle(String id) {
+    if (!_selecting) _selection?.begin(this);
     setState(() {
       _selecting = true;
       if (!_selected.add(id)) _selected.remove(id);
@@ -179,6 +185,7 @@ class _SongListState extends State<SongList> with RouteAware {
   void _clearSelection() {
     _selected.clear();
     _selecting = false;
+    _selection?.end(this);
     _selectionFocus.unfocus();
   }
 
@@ -213,11 +220,7 @@ class _SongListState extends State<SongList> with RouteAware {
     final token = ++_locateToken;
     final elapsed = Stopwatch()..start();
     _timer?.cancel();
-    await _scroll.animateTo(
-      (index * extent).clamp(0, _scroll.position.maxScrollExtent),
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
-    );
+    _scroll.jumpTo((index * extent).clamp(0, _scroll.position.maxScrollExtent));
     if (!mounted ||
         token != _locateToken ||
         widget.playback.currentSongId != id) {
@@ -237,76 +240,73 @@ class _SongListState extends State<SongList> with RouteAware {
     });
   }
 
-  Widget _toolbar(double maxHeight) {
+  Widget _toolbar() {
     final visibleIds = widget.rows.map((t) => t.song.id).toSet();
     final visibleSelected = _selected.where(visibleIds.contains).length;
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final canEdit = widget.enabled && _selected.isNotEmpty;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-      child: Material(
-        color: colors.secondaryContainer,
-        borderRadius: BorderRadius.circular(14),
-        clipBehavior: Clip.antiAlias,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: maxHeight),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-            child: Wrap(
-              spacing: 6,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    '已选 ${_selected.length} 首',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: colors.onSecondaryContainer,
-                    ),
-                  ),
+    final scrollBehavior = ScrollConfiguration.of(context);
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        scrollBehavior: scrollBehavior.copyWith(
+          scrollbars: false,
+          dragDevices: {...scrollBehavior.dragDevices, PointerDeviceKind.mouse},
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          spacing: 4,
+          children: [
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                '已选 ${_selected.length} 首',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: colors.onSurfaceVariant,
                 ),
-                TextButton(
-                  onPressed:
-                      widget.enabled && visibleSelected < visibleIds.length
-                      ? () => setState(() => _selected.addAll(visibleIds))
-                      : null,
-                  child: const Text('全选'),
-                ),
-                TextButton(
-                  key: const ValueKey('batch-tags'),
-                  onPressed: canEdit
-                      ? () => showTagActions(
-                          context,
-                          widget.library,
-                          _snapshot().map((t) => t.song.id).toSet(),
-                        )
-                      : null,
-                  child: const Text('批量编辑标签'),
-                ),
-                TextButton(
-                  key: const ValueKey('batch-add-playlist'),
-                  onPressed: canEdit
-                      ? () => addToPlaylist(
-                          context,
-                          widget.library,
-                          _snapshot().map((t) => t.song.id).toList(),
-                        )
-                      : null,
-                  child: const Text('添加到歌单'),
-                ),
-                if (widget.onRemove != null)
-                  TextButton(
-                    onPressed: canEdit
-                        ? () => widget.onRemove!(
-                            _snapshot().map((t) => t.song.id).toSet(),
-                          )
-                        : null,
-                    child: const Text('移除所选歌曲'),
-                  ),
-              ],
+              ),
             ),
-          ),
+            TextButton(
+              onPressed: widget.enabled && visibleSelected < visibleIds.length
+                  ? () => setState(() => _selected.addAll(visibleIds))
+                  : null,
+              child: const Text('全选'),
+            ),
+            TextButton(
+              key: const ValueKey('batch-tags'),
+              onPressed: canEdit
+                  ? () => showTagActions(
+                      context,
+                      widget.library,
+                      _snapshot().map((t) => t.song.id).toSet(),
+                    )
+                  : null,
+              child: const Text('批量编辑标签'),
+            ),
+            TextButton(
+              key: const ValueKey('batch-add-playlist'),
+              onPressed: canEdit
+                  ? () => addToPlaylist(
+                      context,
+                      widget.library,
+                      _snapshot().map((t) => t.song.id).toList(),
+                    )
+                  : null,
+              child: const Text('添加到歌单'),
+            ),
+            if (widget.onRemove != null)
+              TextButton(
+                onPressed: canEdit
+                    ? () => widget.onRemove!(
+                        _snapshot().map((t) => t.song.id).toSet(),
+                      )
+                    : null,
+                child: const Text('移除所选歌曲'),
+              ),
+          ],
         ),
       ),
     );
@@ -377,79 +377,79 @@ class _SongListState extends State<SongList> with RouteAware {
           child: Focus(
             focusNode: _selectionFocus,
             skipTraversal: true,
-            child: LayoutBuilder(
-              builder: (context, constraints) => Column(
-                children: [
-                  if (widget.header case final header?)
-                    Offstage(
-                      offstage: _selecting,
-                      child: ExcludeFocus(excluding: _selecting, child: header),
-                    ),
-                  if (_selecting) _toolbar(constraints.maxHeight * .45),
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, listConstraints) {
-                        final desktop =
-                            Theme.of(context).platform ==
-                            TargetPlatform.windows;
-                        final reordering =
-                            widget.reordering &&
-                            !_selecting &&
-                            widget.onReorder != null;
-                        final rowsHeight = widget.rows.length * extent;
-                        final showRail = desktop
-                            ? rowsHeight + (reordering ? 0 : 64) >
-                                  listConstraints.maxHeight
-                            : rowsHeight > listConstraints.maxHeight * 1.75;
-                        // The edge can reuse the row's outer padding without
-                        // covering the menu or reorder handle.
-                        final gutter = showRail ? FastScrollbar.gutter : 0.0;
-                        final scrollKey = PageStorageKey((
-                          widget.scope,
-                          widget.key,
-                        ));
+            child: Column(
+              children: [
+                if (widget.header case final header?)
+                  Offstage(
+                    offstage: _selecting,
+                    child: ExcludeFocus(excluding: _selecting, child: header),
+                  ),
+                if (_selecting) _toolbar(),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, listConstraints) {
+                      final desktop =
+                          Theme.of(context).platform == TargetPlatform.windows;
+                      final reordering =
+                          widget.reordering &&
+                          !_selecting &&
+                          widget.onReorder != null;
+                      final rowsHeight = widget.rows.length * extent;
+                      final bottomPadding = reordering || _selecting
+                          ? 0.0
+                          : 64.0;
+                      final showRail = desktop
+                          ? rowsHeight + bottomPadding >
+                                listConstraints.maxHeight
+                          : rowsHeight > listConstraints.maxHeight * 1.75;
+                      // The edge can reuse the row's outer padding without
+                      // covering the menu or reorder handle.
+                      final gutter = showRail ? FastScrollbar.gutter : 0.0;
+                      final scrollKey = PageStorageKey((
+                        widget.scope,
+                        widget.key,
+                      ));
 
-                        return Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            if (widget.rows.isEmpty)
-                              Center(child: Text(widget.emptyText))
-                            else
-                              CoverScrollRegion(
-                                cache: widget.playback.documents.coverCache,
-                                child: FastScrollbar(
-                                  controller: _scroll,
-                                  visible: showRail,
-                                  child: reordering
-                                      ? ReorderableListView.builder(
-                                          key: scrollKey,
-                                          scrollController: _scroll,
-                                          keyboardDismissBehavior:
-                                              widget.keyboardDismissBehavior,
-                                          itemExtent: extent,
-                                          buildDefaultDragHandles: false,
-                                          itemCount: widget.rows.length,
-                                          padding: EdgeInsets.only(
-                                            right: gutter,
-                                          ),
-                                          itemBuilder: row,
-                                          onReorderItem: widget.onReorder!,
-                                        )
-                                      : ListView.builder(
-                                          key: scrollKey,
-                                          controller: _scroll,
-                                          keyboardDismissBehavior:
-                                              widget.keyboardDismissBehavior,
-                                          itemExtent: extent,
-                                          itemCount: widget.rows.length,
-                                          padding: EdgeInsets.only(
-                                            right: gutter,
-                                            bottom: 64,
-                                          ),
-                                          itemBuilder: row,
+                      return Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          if (widget.rows.isEmpty)
+                            Center(child: Text(widget.emptyText))
+                          else
+                            CoverScrollRegion(
+                              cache: widget.playback.documents.coverCache,
+                              child: FastScrollbar(
+                                controller: _scroll,
+                                visible: showRail,
+                                child: reordering
+                                    ? ReorderableListView.builder(
+                                        key: scrollKey,
+                                        scrollController: _scroll,
+                                        keyboardDismissBehavior:
+                                            widget.keyboardDismissBehavior,
+                                        itemExtent: extent,
+                                        buildDefaultDragHandles: false,
+                                        itemCount: widget.rows.length,
+                                        padding: EdgeInsets.only(right: gutter),
+                                        itemBuilder: row,
+                                        onReorderItem: widget.onReorder!,
+                                      )
+                                    : ListView.builder(
+                                        key: scrollKey,
+                                        controller: _scroll,
+                                        keyboardDismissBehavior:
+                                            widget.keyboardDismissBehavior,
+                                        itemExtent: extent,
+                                        itemCount: widget.rows.length,
+                                        padding: EdgeInsets.only(
+                                          right: gutter,
+                                          bottom: bottomPadding,
                                         ),
-                                ),
+                                        itemBuilder: row,
+                                      ),
                               ),
+                            ),
+                          if (!_selecting)
                             Positioned(
                               right: 12 + gutter,
                               bottom: 12,
@@ -465,13 +465,12 @@ class _SongListState extends State<SongList> with RouteAware {
                                 ),
                               ),
                             ),
-                          ],
-                        );
-                      },
-                    ),
+                        ],
+                      );
+                    },
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),

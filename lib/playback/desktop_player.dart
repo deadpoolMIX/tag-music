@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/desktop_navigation.dart';
 import '../core/desktop_title_bar.dart';
 import '../library/library_controller.dart';
+import '../library/song_selection.dart';
 import '../library/track_cover.dart';
 import 'cover_viewer.dart';
 import 'full_player.dart' show ImmersiveLyrics, PlayerSeek;
@@ -46,6 +47,7 @@ class _DesktopPlaybackFrameState extends ConsumerState<DesktopPlaybackFrame> {
   Widget build(BuildContext context) {
     final playback = ref.watch(playbackProvider);
     final theme = Theme.of(context);
+    final selecting = SongSelectionScope.isSelectingOf(context);
     return ListenableBuilder(
       listenable: Listenable.merge([widget.navigation.activeRoute, playback]),
       child: HeroControllerScope(
@@ -84,11 +86,15 @@ class _DesktopPlaybackFrameState extends ConsumerState<DesktopPlaybackFrame> {
                         : theme.colorScheme.outlineVariant,
                   ),
                   Expanded(child: content!),
-                  Theme(
-                    data: chromeTheme,
-                    child: _DesktopPlaybackBar(
-                      navigation: widget.navigation,
-                      expanded: expanded,
+                  Visibility(
+                    visible: !selecting,
+                    maintainState: true,
+                    child: Theme(
+                      data: chromeTheme,
+                      child: _DesktopPlaybackBar(
+                        navigation: widget.navigation,
+                        expanded: expanded,
+                      ),
                     ),
                   ),
                 ],

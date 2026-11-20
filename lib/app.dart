@@ -24,6 +24,7 @@ import 'library/tags_page.dart';
 import 'library/group_pages.dart';
 import 'library/library_header.dart';
 import 'library/song_list.dart' show SongListPageActivity;
+import 'library/song_selection.dart';
 
 class TagMusicApp extends ConsumerStatefulWidget {
   const TagMusicApp({super.key});
@@ -36,6 +37,7 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
   final _appNavigator = GlobalKey<NavigatorState>();
   final _shell = GlobalKey<_AppShellState>();
   final _routes = DesktopNavigation();
+  final _songSelection = SongSelectionController();
   double _swipeStartX = 0;
   Route<dynamic>? _swipeRoute;
   final _desktop = defaultTargetPlatform == TargetPlatform.windows;
@@ -77,6 +79,7 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
   }
 
   bool _allowsNavigationSwipe(Route<dynamic>? route) =>
+      !_songSelection.isSelecting &&
       route is PageRoute &&
       route.settings.name != fullPlayerRouteName &&
       route.settings.name != coverViewerRouteName &&
@@ -109,6 +112,7 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
     if (_desktop)
       FocusManager.instance.removeEarlyKeyEventHandler(_spaceToPlay);
     _routes.dispose();
+    _songSelection.dispose();
     super.dispose();
   }
 
@@ -124,7 +128,7 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
       navigatorObservers: desktop ? const [] : [_routes],
       scrollBehavior: const _TagMusicScrollBehavior(),
       builder: (context, child) {
-        return PageNavigationScope(
+        final navigation = PageNavigationScope(
           observer: _routes,
           child: CallbackShortcuts(
             bindings: {
@@ -181,6 +185,7 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
                   ),
           ),
         );
+        return SongSelectionScope(notifier: _songSelection, child: navigation);
       },
       title: 'Tag Music',
       debugShowCheckedModeBanner: false,
@@ -489,6 +494,7 @@ class _AppShellState extends ConsumerState<AppShell>
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final desktop = Theme.of(context).platform == TargetPlatform.windows;
+      final selecting = SongSelectionScope.isSelectingOf(context);
       final library = ref.watch(libraryProvider);
       final playback = ref.watch(playbackProvider);
       final menuButton = desktop
@@ -574,7 +580,7 @@ class _AppShellState extends ConsumerState<AppShell>
                   bottom: false,
                   child: Row(
                     children: [
-                      if (desktop)
+                      if (desktop && !selecting)
                         SizedBox(
                           width: constraints.maxWidth >= 1000 ? 190 : 72,
                           child: _navigation(
@@ -582,7 +588,8 @@ class _AppShellState extends ConsumerState<AppShell>
                             _select,
                           ),
                         ),
-                      if (desktop) const VerticalDivider(width: 1),
+                      if (desktop && !selecting)
+                        const VerticalDivider(width: 1),
                       Expanded(
                         child: Column(
                           children: [
@@ -594,7 +601,7 @@ class _AppShellState extends ConsumerState<AppShell>
                                 child: menuButton,
                               ),
                             if (ref.watch(startupWarningProvider)
-                                case final warning?)
+                                case final warning? when !selecting)
                               MaterialBanner(
                                 content: Text(warning),
                                 actions: [
@@ -605,7 +612,7 @@ class _AppShellState extends ConsumerState<AppShell>
                                   ),
                                 ],
                               ),
-                            if (playback != null)
+                            if (playback != null && !selecting)
                               ListenableBuilder(
                                 listenable: playback,
                                 builder: (_, _) => Column(
@@ -645,7 +652,14 @@ class _AppShellState extends ConsumerState<AppShell>
                 ),
               ),
             ),
-            if (!desktop) const PlaybackMinibar(),
+            if (!desktop)
+              Visibility(
+                visible: !selecting,
+                maintainState: true,
+                child: const PlaybackMinibar(),
+              ),
+            if (!desktop && selecting)
+              const SafeArea(top: false, child: SizedBox.shrink()),
           ],
         ),
       );

@@ -72,33 +72,33 @@ class _TagPickerState extends State<_TagPicker> {
               return byName != 0 ? byName : a.id.compareTo(b.id);
             });
       final scheme = Theme.of(context).colorScheme;
+      final textTheme = Theme.of(context).textTheme;
       final enabled = !library.filterDeletingTag;
 
       final compactAction = ButtonStyle(
-        minimumSize: const WidgetStatePropertyAll(Size(48, 28)),
+        minimumSize: const WidgetStatePropertyAll(Size(56, 34)),
         padding: const WidgetStatePropertyAll(
-          EdgeInsets.symmetric(horizontal: 10),
+          EdgeInsets.symmetric(horizontal: 12),
         ),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.standard,
       );
       return CompactAlertDialog(
-        title: Text(widget.title),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        title: Text(widget.title, style: const TextStyle(fontSize: 16)),
         content: SizedBox(
-          width: 420,
+          width: 540,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (chosen.isNotEmpty) ...[
                 if (mixed.isNotEmpty)
-                  Text(
-                    '带 − 的标签仅存在于部分所选歌曲',
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
+                  Text('带 − 的标签仅存在于部分所选歌曲', style: textTheme.labelSmall),
                 Flexible(
                   child: SingleChildScrollView(
                     child: Wrap(
-                      spacing: 4,
+                      spacing: 3,
                       runSpacing: 2,
                       children: [
                         for (final tag in chosen)
@@ -106,51 +106,62 @@ class _TagPickerState extends State<_TagPicker> {
                             message: mixed.contains(tag.id)
                                 ? '部分歌曲已有 ${tag.name}，点击移除'
                                 : '取消选择 ${tag.name}',
-                            child: ActionChip(
-                              visualDensity: VisualDensity.compact,
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                              avatar: mixed.contains(tag.id)
-                                  ? const Icon(Icons.remove, size: 12)
-                                  : null,
-                              label: Text(
-                                tag.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                            child: Material(
                               shape: const StadiumBorder(),
-                              side: BorderSide(
-                                color: scheme.primary,
-                                width: 1.5,
-                                strokeAlign: BorderSide.strokeAlignInside,
-                              ),
-                              backgroundColor: mixed.contains(tag.id)
-                                  ? scheme.surfaceContainerHigh
+                              clipBehavior: Clip.antiAlias,
+                              color: mixed.contains(tag.id)
+                                  ? scheme.secondaryContainer
                                   : scheme.primaryContainer,
-                              labelStyle: TextStyle(
-                                color: scheme.onPrimaryContainer,
+                              child: InkWell(
+                                customBorder: const StadiumBorder(),
+                                onTap: enabled
+                                    ? () => setState(() {
+                                        selected.remove(tag.id);
+                                        mixed.remove(tag.id);
+                                      })
+                                    : null,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                  child: Text(
+                                    mixed.contains(tag.id)
+                                        ? '− ${tag.name}'
+                                        : tag.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: textTheme.labelMedium?.copyWith(
+                                      color: mixed.contains(tag.id)
+                                          ? scheme.onSecondaryContainer
+                                          : scheme.onPrimaryContainer,
+                                    ),
+                                  ),
+                                ),
                               ),
-                              onPressed: enabled
-                                  ? () => setState(() {
-                                      selected.remove(tag.id);
-                                      mixed.remove(tag.id);
-                                    })
-                                  : null,
                             ),
                           ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
               ],
               TextField(
                 key: ValueKey('${widget.prefix}-tag-search'),
+                style: textTheme.bodySmall,
                 onChanged: (value) =>
                     setState(() => query = value.trim().toLowerCase()),
                 decoration: InputDecoration(
                   hintText: '搜索标签',
-                  prefixIcon: const Icon(Icons.search, size: 18),
+                  prefixIcon: const Icon(Icons.search, size: 16),
+                  prefixIconConstraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 26,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 5,
+                  ),
                   filled: true,
                   fillColor: scheme.surfaceContainerLow,
                   border: OutlineInputBorder(
@@ -159,7 +170,7 @@ class _TagPickerState extends State<_TagPicker> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               if (choices.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -180,7 +191,7 @@ class _TagPickerState extends State<_TagPicker> {
                     padding: EdgeInsets.zero,
                     itemCount: (choices.length + 1) ~/ 2,
                     itemBuilder: (context, row) => Row(
-                      spacing: 4,
+                      spacing: 3,
                       children: [
                         for (var column = 0; column < 2; column++)
                           Expanded(
@@ -191,7 +202,7 @@ class _TagPickerState extends State<_TagPicker> {
                                       final tag = choices[row * 2 + column];
                                       return Padding(
                                         padding: const EdgeInsets.only(
-                                          bottom: 2,
+                                          bottom: 1,
                                         ),
                                         child: OutlinedButton(
                                           key: ValueKey(
@@ -212,6 +223,7 @@ class _TagPickerState extends State<_TagPicker> {
                                                 .shrinkWrap,
                                             padding: const EdgeInsets.symmetric(
                                               horizontal: 7,
+                                              vertical: .75,
                                             ),
                                             shape: RoundedRectangleBorder(
                                               borderRadius:
