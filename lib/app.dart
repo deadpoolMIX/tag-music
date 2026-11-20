@@ -652,14 +652,7 @@ class _AppShellState extends ConsumerState<AppShell>
                 ),
               ),
             ),
-            if (!desktop)
-              Visibility(
-                visible: !selecting,
-                maintainState: true,
-                child: const PlaybackMinibar(),
-              ),
-            if (!desktop && selecting)
-              const SafeArea(top: false, child: SizedBox.shrink()),
+            if (!desktop) const PlaybackMinibar(),
           ],
         ),
       );

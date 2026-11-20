@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../library/library_controller.dart';
+import '../library/song_selection.dart';
 import 'playback_controller.dart';
 import 'full_player.dart';
 import '../library/track_cover.dart';
@@ -14,6 +15,10 @@ class PlaybackMinibar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final playback = ref.watch(playbackProvider);
     final library = ref.watch(libraryProvider);
+    if (SongSelectionScope.isSelectingOf(context)) {
+      return const SafeArea(top: false, child: SizedBox.shrink());
+    }
+
     Widget bar() {
       final current = playback?.current;
       final lyric = current != null && playback?.changingTrack == false

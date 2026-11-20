@@ -249,64 +249,66 @@ class _SongListState extends State<SongList> with RouteAware {
     final scrollBehavior = ScrollConfiguration.of(context);
     return Align(
       alignment: AlignmentDirectional.centerStart,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        scrollBehavior: scrollBehavior.copyWith(
+      child: ScrollConfiguration(
+        behavior: scrollBehavior.copyWith(
           scrollbars: false,
           dragDevices: {...scrollBehavior.dragDevices, PointerDeviceKind.mouse},
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          spacing: 4,
-          children: [
-            Semantics(
-              liveRegion: true,
-              child: Text(
-                '已选 ${_selected.length} 首',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: colors.onSurfaceVariant,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 4,
+            children: [
+              Semantics(
+                liveRegion: true,
+                child: Text(
+                  '已选 ${_selected.length} 首',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
               ),
-            ),
-            TextButton(
-              onPressed: widget.enabled && visibleSelected < visibleIds.length
-                  ? () => setState(() => _selected.addAll(visibleIds))
-                  : null,
-              child: const Text('全选'),
-            ),
-            TextButton(
-              key: const ValueKey('batch-tags'),
-              onPressed: canEdit
-                  ? () => showTagActions(
-                      context,
-                      widget.library,
-                      _snapshot().map((t) => t.song.id).toSet(),
-                    )
-                  : null,
-              child: const Text('批量编辑标签'),
-            ),
-            TextButton(
-              key: const ValueKey('batch-add-playlist'),
-              onPressed: canEdit
-                  ? () => addToPlaylist(
-                      context,
-                      widget.library,
-                      _snapshot().map((t) => t.song.id).toList(),
-                    )
-                  : null,
-              child: const Text('添加到歌单'),
-            ),
-            if (widget.onRemove != null)
               TextButton(
+                onPressed: widget.enabled && visibleSelected < visibleIds.length
+                    ? () => setState(() => _selected.addAll(visibleIds))
+                    : null,
+                child: const Text('全选'),
+              ),
+              TextButton(
+                key: const ValueKey('batch-tags'),
                 onPressed: canEdit
-                    ? () => widget.onRemove!(
+                    ? () => showTagActions(
+                        context,
+                        widget.library,
                         _snapshot().map((t) => t.song.id).toSet(),
                       )
                     : null,
-                child: const Text('移除所选歌曲'),
+                child: const Text('批量编辑标签'),
               ),
-          ],
+              TextButton(
+                key: const ValueKey('batch-add-playlist'),
+                onPressed: canEdit
+                    ? () => addToPlaylist(
+                        context,
+                        widget.library,
+                        _snapshot().map((t) => t.song.id).toList(),
+                      )
+                    : null,
+                child: const Text('添加到歌单'),
+              ),
+              if (widget.onRemove != null)
+                TextButton(
+                  onPressed: canEdit
+                      ? () => widget.onRemove!(
+                          _snapshot().map((t) => t.song.id).toSet(),
+                        )
+                      : null,
+                  child: const Text('移除所选歌曲'),
+                ),
+            ],
+          ),
         ),
       ),
     );
