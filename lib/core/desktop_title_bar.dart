@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 class DesktopTitleBar extends StatefulWidget {
   const DesktopTitleBar({super.key});
 
+  static const height = 38.0;
+
   @override
   State<DesktopTitleBar> createState() => _DesktopTitleBarState();
 }
@@ -56,7 +58,7 @@ class _DesktopTitleBarState extends State<DesktopTitleBar> {
     return Material(
       type: MaterialType.transparency,
       child: SizedBox(
-        height: 38,
+        height: DesktopTitleBar.height,
         child: Row(
           children: [
             Expanded(
@@ -69,10 +71,11 @@ class _DesktopTitleBarState extends State<DesktopTitleBar> {
                   child: Row(
                     spacing: 8,
                     children: [
-                      Icon(
-                        Icons.library_music_rounded,
-                        size: 18,
-                        color: colors.primary,
+                      Image.asset(
+                        'assets/windows_app_icon.png',
+                        width: 20,
+                        height: 20,
+                        excludeFromSemantics: true,
                       ),
                       Expanded(
                         child: Text(

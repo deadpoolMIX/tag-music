@@ -19,18 +19,24 @@ class PlayerBackground extends StatefulWidget {
     required this.lyricsVisible,
     required this.builder,
     this.surfaceColor,
+    this.shareBackdrop = false,
     super.key,
   });
 
   final PlaybackController? playback;
   final bool immersive, lyricsVisible;
   final Color? surfaceColor;
+  final bool shareBackdrop;
   final Widget Function(
     BuildContext context,
     Color? controlColor,
     Color lyricsColor,
   )
   builder;
+
+  static Widget sharedBackdropOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<_PlayerBackdropScope>()!
+      .backdrop;
 
   @override
   State<PlayerBackground> createState() => _PlayerBackgroundState();
@@ -51,7 +57,7 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
       _coverKey = key;
       _cover = null;
     }
-    if (widget.immersive && key != null) {
+    if ((widget.immersive || widget.shareBackdrop) && key != null) {
       _cover ??= _loadCover(key);
     }
   }
@@ -71,6 +77,20 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
     final blurred = await _BlurredCover.load(bytes);
     return mounted && _currentKey == key ? (key, blurred) : null;
   }
+
+  Widget _gradient(ColorScheme scheme) => DecoratedBox(
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          scheme.secondaryContainer,
+          scheme.surface,
+          scheme.primaryContainer,
+        ],
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -93,6 +113,48 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
         final lyricsInk = lyricsDarkInk
             ? const Color(0xFF181A1E)
             : Colors.white;
+        if (widget.shareBackdrop) {
+          final fade = playerLayoutFadeDuration(context);
+          final backdrop = Stack(
+            fit: StackFit.expand,
+            children: [
+              _gradient(scheme),
+              AnimatedSwitcher(
+                duration: fade,
+                child: cover == null
+                    ? const SizedBox.expand()
+                    : Image.memory(
+                        cover.bytes,
+                        key: ValueKey(_coverKey),
+                        fit: BoxFit.fill,
+                        excludeFromSemantics: true,
+                      ),
+              ),
+              AnimatedContainer(
+                duration: fade,
+                color: (lyricsDarkInk ? Colors.white : Colors.black).withValues(
+                  alpha: .55,
+                ),
+              ),
+            ],
+          );
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              ColoredBox(color: surface),
+              AnimatedOpacity(
+                opacity: immersive ? 1 : 0,
+                duration: fade,
+                child: IgnorePointer(child: backdrop),
+              ),
+              _PlayerBackdropScope(
+                backdrop: backdrop,
+                appearance: (scheme, cover, fade),
+                child: widget.builder(context, null, lyricsInk),
+              ),
+            ],
+          );
+        }
         final lightSystemIcons = lyrics
             ? !lyricsDarkInk
             : !immersive || cover == null
@@ -118,19 +180,7 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
                           excludeFromSemantics: true,
                         )
                       : coverReady || _coverKey == null
-                      ? DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                scheme.secondaryContainer,
-                                scheme.surface,
-                                scheme.primaryContainer,
-                              ],
-                            ),
-                          ),
-                        )
+                      ? _gradient(scheme)
                       : const SizedBox.expand(),
                 ),
               ),
@@ -159,6 +209,21 @@ class _PlayerBackgroundState extends State<PlayerBackground> {
       },
     );
   }
+}
+
+class _PlayerBackdropScope extends InheritedWidget {
+  const _PlayerBackdropScope({
+    required this.backdrop,
+    required this.appearance,
+    required super.child,
+  });
+
+  final Widget backdrop;
+  final (ColorScheme, _BlurredCover?, Duration) appearance;
+
+  @override
+  bool updateShouldNotify(_PlayerBackdropScope oldWidget) =>
+      oldWidget.appearance != appearance;
 }
 
 class _BlurredCover {

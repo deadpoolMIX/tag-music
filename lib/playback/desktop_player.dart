@@ -18,6 +18,7 @@ import 'queue_page.dart';
 import 'sleep_timer_sheet.dart';
 
 const _playerLayer = '/desktop/player';
+const _titleDividerHeight = 1.0;
 
 /// The content navigator can change pages without replacing the playback bar.
 class DesktopPlaybackFrame extends ConsumerStatefulWidget {
@@ -64,6 +65,7 @@ class _DesktopPlaybackFrameState extends ConsumerState<DesktopPlaybackFrame> {
           immersive: expanded,
           lyricsVisible: true,
           surfaceColor: theme.colorScheme.surface,
+          shareBackdrop: true,
           builder: (context, _, lyricsColor) {
             final chromeTheme = !expanded
                 ? theme
@@ -75,8 +77,12 @@ class _DesktopPlaybackFrameState extends ConsumerState<DesktopPlaybackFrame> {
               child: Column(
                 children: [
                   Theme(data: chromeTheme, child: const DesktopTitleBar()),
-                  if (!expanded)
-                    Divider(height: 1, color: theme.colorScheme.outlineVariant),
+                  Divider(
+                    height: _titleDividerHeight,
+                    color: expanded
+                        ? Colors.transparent
+                        : theme.colorScheme.outlineVariant,
+                  ),
                   Expanded(child: content!),
                   Theme(
                     data: chromeTheme,
@@ -123,13 +129,16 @@ class _DesktopPlaybackBar extends ConsumerWidget {
       navigation.back();
       return;
     }
+    final duration = playerLayoutFadeDuration(context);
     pushAppPage(
       context,
       () => PageRouteBuilder<void>(
         settings: const RouteSettings(name: _playerLayer),
-        transitionDuration: Duration.zero,
-        reverseTransitionDuration: Duration.zero,
+        transitionDuration: duration,
+        reverseTransitionDuration: duration,
         pageBuilder: (_, _, _) => const _DesktopPlayerLayer(),
+        transitionsBuilder: (_, animation, _, child) =>
+            FadeTransition(opacity: animation, child: child),
       ),
     );
   }
@@ -348,28 +357,15 @@ class _DesktopPlaybackBar extends ConsumerWidget {
                               ],
                             );
                           }
-                          final wing = (width * .20).clamp(144.0, 260.0);
                           return Row(
                             spacing: 12,
                             children: [
-                              SizedBox(width: wing, child: identity),
-                              Expanded(
-                                child: Center(
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      maxWidth: 900,
-                                    ),
-                                    child: controls,
-                                  ),
-                                ),
-                              ),
                               SizedBox(
-                                width: wing,
-                                child: Align(
-                                  alignment: Alignment.centerRight,
-                                  child: auxiliary,
-                                ),
+                                width: (width * .18).clamp(138.0, 246.0),
+                                child: identity,
                               ),
+                              Expanded(child: controls),
+                              auxiliary,
                             ],
                           );
                         },
@@ -437,16 +433,18 @@ class _DesktopPlayerLayer extends ConsumerWidget {
     final lyricsColor = _DesktopPlayerPalette.lyricsOf(context);
     return ListenableBuilder(
       listenable: playback,
-      builder: (context, _) => ClipRect(
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 14, end: 0),
-          curve: Curves.easeOutCubic,
-          duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 180),
-          builder: (context, offset, child) =>
-              Transform.translate(offset: Offset(0, offset), child: child),
-          child: SafeArea(
+      builder: (context, _) => Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned(
+            // Crop the full-window backdrop to the area between the bars.
+            top: -DesktopTitleBar.height - _titleDividerHeight,
+            left: 0,
+            right: 0,
+            height: MediaQuery.sizeOf(context).height,
+            child: PlayerBackground.sharedBackdropOf(context),
+          ),
+          SafeArea(
             bottom: false,
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -490,7 +488,7 @@ class _DesktopPlayerLayer extends ConsumerWidget {
               },
             ),
           ),
-        ),
+        ],
       ),
     );
   }

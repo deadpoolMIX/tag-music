@@ -144,33 +144,55 @@ class _PlayerSeekState extends State<PlayerSeek> {
         ),
       ),
     );
-    Widget time(Duration value, TextAlign alignment) => Text(
-      enabled ? formatPosition(value) : '--:--',
-      style: PlayerSeek._timeStyle,
+    final elapsedLabel = enabled ? formatPosition(position) : '--:--';
+    final totalLabel = enabled ? formatPosition(state.duration) : '--:--';
+    final timeStyle = widget.inlineTimes
+        ? PlayerSeek._timeStyle.copyWith(
+            fontFeatures: const [ui.FontFeature.tabularFigures()],
+          )
+        : PlayerSeek._timeStyle;
+    Widget time(String label, TextAlign alignment) => Text(
+      label,
+      style: timeStyle,
       textAlign: alignment,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
     );
-    final elapsed = time(position, TextAlign.start);
-    final total = time(state.duration, TextAlign.end);
+    final elapsed = time(elapsedLabel, TextAlign.start);
+    final total = time(totalLabel, TextAlign.end);
     if (widget.inlineTimes) {
-      return Row(
-        spacing: 12,
-        children: [
-          Flexible(child: elapsed),
-          Expanded(
-            flex: 5,
-            child: enabled
-                ? slider
-                : GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    excludeFromSemantics: true,
-                    onTap: () {},
-                    child: slider,
-                  ),
-          ),
-          Flexible(child: total),
-        ],
+      final measure = TextPainter(
+        text: TextSpan(
+          text: totalLabel,
+          style: DefaultTextStyle.of(context).style.merge(timeStyle),
+        ),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      final labelWidth = measure.width.ceilToDouble();
+      measure.dispose();
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          // Equal timer slots keep the track centered on the transport buttons.
+          final width = math.min(labelWidth, constraints.maxWidth * .22);
+          return Row(
+            spacing: math.min(12, constraints.maxWidth * .05),
+            children: [
+              SizedBox(width: width, child: elapsed),
+              Expanded(
+                child: enabled
+                    ? slider
+                    : GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        excludeFromSemantics: true,
+                        onTap: () {},
+                        child: slider,
+                      ),
+              ),
+              SizedBox(width: width, child: total),
+            ],
+          );
+        },
       );
     }
     return Column(

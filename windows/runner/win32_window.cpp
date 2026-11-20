@@ -1,7 +1,9 @@
 #include "win32_window.h"
 
+#include <commctrl.h>
 #include <dwmapi.h>
 #include <flutter_windows.h>
+#include <windowsx.h>
 
 #include "resource.h"
 
@@ -35,6 +37,47 @@ using EnableNonClientDpiScaling = BOOL __stdcall(HWND hwnd);
 // scale factor
 int Scale(int source, double scale_factor) {
   return static_cast<int>(source * scale_factor);
+}
+
+LRESULT ResizeHitTest(HWND window, LPARAM lparam) {
+  if (IsZoomed(window)) {
+    return HTCLIENT;
+  }
+
+  RECT bounds;
+  if (!GetWindowRect(window, &bounds)) {
+    return HTCLIENT;
+  }
+
+  const UINT dpi = GetDpiForWindow(window);
+  const int padding = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+  const int width = GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi) + padding;
+  const int height = GetSystemMetricsForDpi(SM_CYSIZEFRAME, dpi) + padding;
+  const int x = GET_X_LPARAM(lparam);
+  const int y = GET_Y_LPARAM(lparam);
+  const bool left = x < bounds.left + width;
+  const bool right = x >= bounds.right - width;
+  if (y < bounds.top + height) {
+    return left ? HTTOPLEFT : right ? HTTOPRIGHT : HTTOP;
+  }
+  if (y >= bounds.bottom - height) {
+    return left ? HTBOTTOMLEFT : right ? HTBOTTOMRIGHT : HTBOTTOM;
+  }
+  return left ? HTLEFT : right ? HTRIGHT : HTCLIENT;
+}
+
+LRESULT CALLBACK ResizeFromFlutterView(HWND window, UINT message, WPARAM wparam,
+                                     LPARAM lparam, UINT_PTR subclass_id,
+                                     DWORD_PTR) {
+  if (message == WM_NCHITTEST &&
+      ResizeHitTest(GetParent(window), lparam) != HTCLIENT) {
+    // Pass just the resize edges through to the top-level window.
+    return HTTRANSPARENT;
+  }
+  if (message == WM_NCDESTROY) {
+    RemoveWindowSubclass(window, ResizeFromFlutterView, subclass_id);
+  }
+  return DefSubclassProc(window, message, wparam, lparam);
 }
 
 // Dynamically loads the |EnableNonClientDpiScaling| from the User32 module.
@@ -144,6 +187,9 @@ bool Win32Window::Create(const std::wstring& title,
     return false;
   }
 
+  SetWindowPos(window, nullptr, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE |
+                   SWP_FRAMECHANGED);
   UpdateTheme(window);
 
   return OnCreate();
@@ -167,6 +213,25 @@ LRESULT CALLBACK Win32Window::WndProc(HWND const window,
     EnableFullDpiSupportIfAvailable(window);
     that->window_handle_ = window;
   } else if (Win32Window* that = GetThisFromHandle(window)) {
+    if (message == WM_NCCALCSIZE) {
+      // Make the complete frame client-owned and omit the system caption.
+      RECT* client = wparam ? &reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam)->rgrc[0]
+                            : reinterpret_cast<RECT*>(lparam);
+      if (IsZoomed(window)) {
+        MONITORINFO monitor = {};
+        monitor.cbSize = sizeof(monitor);
+        RECT visible;
+        if (GetMonitorInfo(MonitorFromRect(client, MONITOR_DEFAULTTONEAREST),
+                           &monitor) &&
+            IntersectRect(&visible, client, &monitor.rcWork)) {
+          *client = visible;
+        }
+      }
+      return 0;
+    }
+    if (message == WM_NCHITTEST) {
+      return ResizeHitTest(window, lparam);
+    }
     return that->MessageHandler(window, message, wparam, lparam);
   }
 
@@ -241,6 +306,7 @@ Win32Window* Win32Window::GetThisFromHandle(HWND const window) noexcept {
 void Win32Window::SetChildContent(HWND content) {
   child_content_ = content;
   SetParent(content, window_handle_);
+  SetWindowSubclass(content, ResizeFromFlutterView, 1, 0);
   RECT frame = GetClientArea();
 
   MoveWindow(content, frame.left, frame.top, frame.right - frame.left,
