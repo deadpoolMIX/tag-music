@@ -150,6 +150,10 @@ class LibraryController extends ChangeNotifier {
   }
 
   List<LibraryTrack> tracks = [];
+  Map<String, int> _playCounts = {};
+  final _playCountRevision = ValueNotifier(0);
+  Listenable get playCountChanges => _playCountRevision;
+  int playCount(String songId) => _playCounts[songId] ?? 0;
   List<LibraryTrack>? _availabilitySource;
   Map<String, LibraryTrack> _availableById = const {};
   Map<String, LibraryTrack> get _availableTracksById {
@@ -233,6 +237,52 @@ class LibraryController extends ChangeNotifier {
             .toList();
     _sortTracks(rows, sort, descending);
     return _visibleCache = List.unmodifiable(rows);
+  }
+
+  List<LibraryTrack> playedTracks({
+    LibrarySort? order,
+    required bool descending,
+  }) {
+    final rows = tracks.where((track) => playCount(track.song.id) > 0).toList();
+    if (order case final field?) {
+      _sortTracks(rows, field, descending);
+    } else {
+      rows.sort((left, right) {
+        final count = playCount(left.song.id)
+            .compareTo(playCount(right.song.id));
+        if (count != 0) return descending ? -count : count;
+        final title = left.title.toLowerCase().compareTo(
+          right.title.toLowerCase(),
+        );
+        return title != 0 ? title : left.song.id.compareTo(right.song.id);
+      });
+    }
+    return rows;
+  }
+
+  Future<void> recordCompletedPlay(String songId) async {
+    if (_closed || restoringBackup) return;
+    final updated = await db.customWriteReturning(
+      '''
+      INSERT INTO song_play_counts (song_id, play_count)
+      SELECT id, 1 FROM songs WHERE id = ?
+      ON CONFLICT(song_id) DO UPDATE SET play_count = play_count + 1
+      RETURNING play_count
+      ''',
+      variables: [Variable(songId)],
+      updates: {db.songPlayCounts},
+    );
+    if (_closed || restoringBackup || updated.isEmpty) return;
+    _playCounts[songId] = updated.single.read<int>('play_count');
+    _playCountRevision.value++;
+  }
+
+  Future<void> _loadPlayCounts() async {
+    _playCounts = {
+      for (final row in await db.select(db.songPlayCounts).get())
+        row.songId: row.playCount,
+    };
+    if (!_closed) _playCountRevision.value++;
   }
 
   List<LibraryTrack> selectedTracks(Set<String> ids) {
@@ -331,6 +381,7 @@ class LibraryController extends ChangeNotifier {
     }
     await playlistsStore.ensureFavorites();
     await reload();
+    await _loadPlayCounts();
     await _loadFilter();
   }
 
@@ -384,6 +435,7 @@ class LibraryController extends ChangeNotifier {
       );
       try {
         await reload(publish: false);
+        await _loadPlayCounts();
         await _loadFilter();
         return true;
       } catch (error, stack) {
@@ -991,6 +1043,7 @@ class LibraryController extends ChangeNotifier {
     await _filterWrites;
     await scheduledBackup.close();
     await db.close();
+    _playCountRevision.dispose();
     super.dispose();
   }
 }

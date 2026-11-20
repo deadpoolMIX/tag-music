@@ -135,6 +135,39 @@ void main() {
     },
   );
 
+  test('mixed shuffle spreads minimum and maximum counts across the queue', () {
+    final counts = {
+      for (var i = 0; i < 20; i++)
+        '$i': i < 4
+            ? 0
+            : i < 15
+            ? 5
+            : 20,
+    };
+    final source = ['selected', ...counts.keys];
+    final value = PlaybackQueue(random: Random(53))
+      ..playCountForSong = ((id) => counts[id] ?? 0)
+      ..setMode(PlaybackMode.mixedShuffle)
+      ..replace(source.map(song).toList(), 0);
+
+    expect(id(value.current), 'selected');
+    final ordinary = [for (var i = 0; i < 20; i++) id(value.next())!];
+    expect(ordinary, unorderedEquals(counts.keys));
+    for (final block in [ordinary.take(10), ordinary.skip(10)]) {
+      expect(block.where((id) => counts[id] == 0), hasLength(2));
+      expect(block.where((id) => counts[id] == 20), isNotEmpty);
+    }
+
+    // A new round ranks the same queue using the current counts.
+    counts.updateAll((id, _) => int.parse(id) < 16 ? 10 : 0);
+    counts['selected'] = 10;
+    final nextRound = [for (var i = 0; i < 21; i++) id(value.next())!];
+    expect(nextRound, unorderedEquals(source));
+    for (final block in [nextRound.take(10), nextRound.skip(10).take(10)]) {
+      expect(block.where((id) => counts[id] == 0), hasLength(2));
+    }
+  });
+
   test('shuffle follows visible FIFO insertion even after previous', () {
     final value = queue(['start', 'X', 'Y', 'Z']);
     value.add([song('A')]);

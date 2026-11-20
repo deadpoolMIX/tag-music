@@ -10,6 +10,7 @@ import 'package:tag_music/library/filter_page.dart';
 import 'package:tag_music/library/filter_rule.dart';
 import 'package:tag_music/library/library_controller.dart';
 import 'package:tag_music/library/library_page.dart';
+import 'package:tag_music/library/play_counts_page.dart';
 import 'package:tag_music/library/playlists_page.dart';
 import 'package:tag_music/library/tags_page.dart';
 import 'package:tag_music/playback/playback_controller.dart';
@@ -20,6 +21,7 @@ import 'settings_test.dart' show MemorySettings;
 
 const _targets = [
   (AppDestination.songs, '歌曲'),
+  (AppDestination.playCounts, '播放次数'),
   (AppDestination.filter, '筛选'),
   (AppDestination.playlists, '歌单'),
   (AppDestination.albums, '专辑'),
@@ -87,7 +89,7 @@ Future<void> _openNavigation(
 
 void _expectNavigationOrder(WidgetTester tester, {required bool compact}) {
   final controls = _navigationControls();
-  expect(controls, findsNWidgets(7));
+  expect(controls, findsNWidgets(_targets.length));
   expect(
     tester.widgetList<Tooltip>(controls).map((widget) => widget.message),
     _targets.map((target) => target.$2),
@@ -134,6 +136,7 @@ void _expectDestination(WidgetTester tester, AppDestination destination) {
   expect(_branch(destination), findsOneWidget);
   final (Type? page, Finder content) = switch (destination) {
     AppDestination.songs => (LibraryPage, find.text('歌曲 synthetic-kept.mp3')),
+    AppDestination.playCounts => (PlayCountsPage, find.byTooltip('歌曲排序')),
     AppDestination.filter => (
       FilterPage,
       find.byKey(const ValueKey('save-smart-playlist')),
@@ -202,13 +205,17 @@ Future<void> _withApp(
   Size screen,
   Future<void> Function(LibraryController library) exercise, {
   String? warning,
+  List<String> extraSongs = const [],
 }) async {
   tester.view.physicalSize = screen;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   final documents = FakeDocuments()
-    ..files['/synthetic/r6/navigation'] = [entry(_query)];
+    ..files['/synthetic/r6/navigation'] = [
+      entry(_query),
+      ...extraSongs.map((name) => entry(name)),
+    ];
   final library = LibraryController(
     LibraryDatabase(NativeDatabase.memory()),
     documents,
@@ -257,13 +264,54 @@ void main() {
     );
   });
 
+  testWidgets(
+    'play counts lists played songs and resets sorting on reentry',
+    (tester) => _withApp(tester, const Size(1280, 800), (library) async {
+      const platform = TargetPlatform.windows;
+      const destination = AppDestination.playCounts;
+      final mode = find.byKey(const ValueKey('playback-mode')).hitTestable();
+      expect(tester.widget<IconButton>(mode).tooltip, '随机播放');
+      await tester.tap(mode);
+      await tester.pumpAndSettle();
+      expect(tester.widget<IconButton>(mode).tooltip, '混合随机');
+      final byName = {
+        for (final track in library.tracks) track.song.identity: track.song.id,
+      };
+      await tester.runAsync(() async {
+        await library.recordCompletedPlay(byName[_query]!);
+        await library.recordCompletedPlay(byName[_query]!);
+        await library.recordCompletedPlay(byName['another']!);
+      });
+      await _select(tester, platform, destination);
+      Finder inPage(String label) => _within(destination, find.text(label));
+      final high = inPage('2 次');
+      final low = inPage('1 次');
+      expect(inPage('歌曲 unplayed.mp3'), findsNothing);
+      expect(tester.getTopLeft(high).dy, lessThan(tester.getTopLeft(low).dy));
+      await tester.tap(_within(destination, find.byTooltip('歌曲排序')));
+      await tester.pumpAndSettle();
+      for (final label in ['歌名', '歌手', '修改时间', '播放次数']) {
+        expect(find.widgetWithText(ListTile, label), findsOneWidget);
+      }
+      await tester.tap(find.widgetWithText(ChoiceChip, '少到多'));
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(650, 180));
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(low).dy, lessThan(tester.getTopLeft(high).dy));
+      await _select(tester, platform, AppDestination.songs);
+      await _select(tester, platform, destination);
+      expect(tester.getTopLeft(high).dy, lessThan(tester.getTopLeft(low).dy));
+    }, extraSongs: ['another', 'unplayed']),
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
   for (final (platform, screen) in [
     (TargetPlatform.android, const Size(390, 844)),
     (TargetPlatform.windows, const Size(1280, 800)),
     (TargetPlatform.windows, const Size(720, 800)),
   ]) {
     testWidgets(
-      '$platform $screen orders and clicks all seven real destinations',
+      '$platform $screen orders and clicks every navigation destination',
       (tester) => _withApp(tester, screen, (_) async {
         _expectDestination(tester, AppDestination.songs);
         for (final target in [..._targets.skip(1), _targets.first]) {

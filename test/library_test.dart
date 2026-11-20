@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tag_music/library/database.dart';
+import 'package:tag_music/library/library_backup.dart';
 import 'package:tag_music/library/library_controller.dart';
 import 'package:tag_music/playback/documents.dart';
 
@@ -188,41 +191,120 @@ void main() {
     );
   });
 
-  test('database reopens with schema v5, stable UUIDs and saved roots without rescanning', () async {
-    final dir = await Directory.systemTemp.createTemp('tag-music-db-');
-    final file = File('${dir.path}/library.sqlite');
-    final first = LibraryController(
-      LibraryDatabase(NativeDatabase(file)),
-      access,
-    );
-    access.files['a'] = [entry('中文')];
-    await first.initialize();
-    await first.scan();
-    final uuid = first.tracks.single.song.id;
-    await first.shutdown();
-    access.files.clear();
-    final second = LibraryController(
-      LibraryDatabase(NativeDatabase(file)),
-      access,
-    );
-    try {
-      await second.initialize();
-      expect(second.tracks.single.song.id, uuid);
-      expect(second.roots.single.location, 'a');
-      expect(
-        (await second.db.customSelect('PRAGMA user_version').getSingle())
-            .read<int>('user_version'),
-        5,
+  test(
+    'database reopens with schema v6, stable UUIDs, plays and saved roots',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('tag-music-db-');
+      final file = File('${dir.path}/library.sqlite');
+      final first = LibraryController(
+        LibraryDatabase(NativeDatabase(file)),
+        access,
+      );
+      access.files['a'] = [entry('中文')];
+      await first.initialize();
+      await first.scan();
+      final uuid = first.tracks.single.song.id;
+      await first.recordCompletedPlay(uuid);
+      await first.shutdown();
+      access.files.clear();
+      final second = LibraryController(
+        LibraryDatabase(NativeDatabase(file)),
+        access,
+      );
+      try {
+        await second.initialize();
+        expect(second.tracks.single.song.id, uuid);
+        expect(second.playCount(uuid), 1);
+        expect(second.roots.single.location, 'a');
+        expect(
+          (await second.db.customSelect('PRAGMA user_version').getSingle())
+              .read<int>('user_version'),
+          6,
+        );
+        expect(
+          (await second.db.customSelect('PRAGMA foreign_key_check').get()),
+          isEmpty,
+        );
+      } finally {
+        await second.shutdown();
+        await dir.delete(recursive: true);
+      }
+    },
+  );
+
+  test(
+    'backup snapshots save plays and legacy snapshots preserve matching counts',
+    () async {
+      access.files['a'] = [entry('有播放记录'), entry('从未播放')];
+      await library.initialize();
+      await library.scan();
+      final played = library.tracks.singleWhere(
+        (track) => track.song.identity == '有播放记录',
+      );
+      final initial = await LibraryBackup.export(library.db);
+      final legacy = jsonDecode(utf8.decode(initial)) as Map<String, dynamic>;
+      final data = legacy['data'] as Map<String, dynamic>;
+      for (final row in (data['songs'] as List).cast<Map<String, dynamic>>()) {
+        row.remove('playCount');
+      }
+      legacy['checksum'] = sha256
+          .convert(utf8.encode(jsonEncode(data)))
+          .toString();
+      final oldBackup = await LibraryBackup.decode(
+        Uint8List.fromList(utf8.encode(jsonEncode(legacy))),
+      );
+
+      await Future.wait([
+        library.recordCompletedPlay(played.song.id),
+        library.recordCompletedPlay(played.song.id),
+        library.recordCompletedPlay('不存在'),
+      ]);
+      access.files['a'] = [entry('从未播放')];
+      await library.scan();
+      final row = library.playedTracks(descending: true).single;
+      expect(row.song.id, played.song.id);
+      expect(row.available, isFalse);
+      final recentBackup = await LibraryBackup.decode(
+        await LibraryBackup.export(library.db),
+      );
+      expect(recentBackup.playCounts[played.song.id], 2);
+
+      final directory = await Directory.systemTemp.createTemp(
+        'tag-music-counts-',
+      );
+      final recovery = File('${directory.path}/recovery.tagmusic');
+      addTearDown(() => directory.delete(recursive: true));
+      final zeroBackup = await LibraryBackup.decode(initial);
+      await oldBackup.restore(
+        library.db,
+        recoveryFile: recovery,
+        trustedLocations: true,
       );
       expect(
-        (await second.db.customSelect('PRAGMA foreign_key_check').get()),
-        isEmpty,
+        (await library.db.select(library.db.songPlayCounts).get())
+            .single
+            .playCount,
+        2,
       );
-    } finally {
-      await second.shutdown();
-      await dir.delete(recursive: true);
-    }
-  });
+      await zeroBackup.restore(
+        library.db,
+        recoveryFile: recovery,
+        trustedLocations: true,
+      );
+      expect(await library.db.select(library.db.songPlayCounts).get(), isEmpty);
+      await recentBackup.restore(
+        library.db,
+        recoveryFile: recovery,
+        trustedLocations: true,
+      );
+      expect(
+        (await library.db.select(library.db.songPlayCounts).get())
+            .single
+            .playCount,
+        2,
+      );
+    },
+  );
 
   test('10000-song database scan, search and sort benchmark (synthetic identities)', () async {
     access.files['a'] = [for (var i = 0; i < 10000; i++) entry('歌曲$i')];
@@ -262,7 +344,7 @@ void main() {
     }
   });
 
-  test('schema v5 matches checked-in SQLite DDL baseline', () async {
+  test('schema v6 matches checked-in SQLite DDL baseline', () async {
     final rows = await library.db
         .customSelect(
           "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type, name",
@@ -277,7 +359,7 @@ void main() {
       await File(output)
           .writeAsString(const JsonEncoder.withIndent('  ').convert(schema));
     }
-    final baseline = File('docs/database-schema/v5.json');
+    final baseline = File('docs/database-schema/v6.json');
     if (await baseline.exists()) {
       expect(
         schema,

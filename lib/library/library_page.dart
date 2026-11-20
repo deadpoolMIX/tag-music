@@ -8,6 +8,7 @@ import 'database.dart';
 import 'library_search_page.dart';
 import 'relocation_dialog.dart';
 import 'song_list.dart';
+import 'song_sort.dart';
 export 'track_cover.dart';
 
 class LibraryPage extends StatelessWidget {
@@ -20,52 +21,6 @@ class LibraryPage extends StatelessWidget {
   final LibraryController library;
   final PlaybackController playback;
   final Widget? menuButton;
-
-  Future<void> _sort(BuildContext context) => showModalBottomSheet<void>(
-    context: context,
-    builder: (context) => SafeArea(
-      child: ListenableBuilder(
-        listenable: library,
-        builder: (context, _) => SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(padding: EdgeInsets.all(8), child: Text('歌曲排序')),
-              for (final option in [
-                (LibrarySort.title, '歌名'),
-                (LibrarySort.artist, '歌手'),
-                (LibrarySort.modified, '修改时间'),
-              ])
-                ListTile(
-                  dense: true,
-                  title: Text(option.$2),
-                  selected: library.sort == option.$1,
-                  trailing: library.sort == option.$1
-                      ? const Icon(Icons.check)
-                      : null,
-                  onTap: () => library.filter(order: option.$1),
-                ),
-              Wrap(
-                children: [
-                  ChoiceChip(
-                    label: const Text('升序'),
-                    selected: !library.descending,
-                    onSelected: (_) => library.filter(reverse: false),
-                  ),
-                  const SizedBox(width: 12),
-                  ChoiceChip(
-                    label: const Text('降序'),
-                    selected: library.descending,
-                    onSelected: (_) => library.filter(reverse: true),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -103,10 +58,11 @@ class LibraryPage extends StatelessWidget {
             ),
             Row(
               children: [
-                IconButton(
-                  tooltip: '歌曲排序',
-                  onPressed: () => _sort(context),
-                  icon: const Icon(Icons.sort),
+                SongSortButton(
+                  order: library.sort,
+                  descending: library.descending,
+                  onChanged: (order, descending) =>
+                      library.filter(order: order, reverse: descending),
                 ),
                 IconButton(
                   tooltip: '刷新所有目录',

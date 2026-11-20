@@ -53,6 +53,7 @@ class SongList extends StatefulWidget {
     this.onReorder,
     this.onRemove,
     this.scope = 'library',
+    this.showPlayCounts = false,
     this.emptyText = '没有匹配的歌曲',
     this.onLocated,
     this.resetScrollKey,
@@ -70,6 +71,7 @@ class SongList extends StatefulWidget {
   final void Function(int, int)? onReorder;
   final Future<void> Function(Set<String>)? onRemove;
   final String scope;
+  final bool showPlayCounts;
   final String emptyText;
 
   /// A query change can reset scrolling without discarding hidden selections.
@@ -344,6 +346,9 @@ class _SongListState extends State<SongList> with RouteAware {
           extent: extent,
           reorderIndex: widget.reordering && !_selecting ? index : null,
           queueKey: ValueKey('enqueue-${widget.scope}-${track.song.id}'),
+          playCount: widget.showPlayCounts
+              ? widget.library.playCount(track.song.id)
+              : null,
           onSelect: () => _toggle(track.song.id),
           onTap: () {
             if (_selecting) {
@@ -496,6 +501,7 @@ class SongRow extends StatelessWidget {
     this.extent = 60,
     this.reorderIndex,
     this.queueKey,
+    this.playCount,
     super.key,
   });
   final LibraryTrack track;
@@ -507,6 +513,7 @@ class SongRow extends StatelessWidget {
   final double extent;
   final int? reorderIndex;
   final Key? queueKey;
+  final int? playCount;
 
   @override
   Widget build(BuildContext context) {
@@ -600,6 +607,11 @@ class SongRow extends StatelessWidget {
                     ),
                   if (playing)
                     Icon(Icons.graphic_eq, size: 16, color: scheme.primary),
+                  if (playCount case final count?)
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(start: 8),
+                      child: Text('$count 次'),
+                    ),
                   SizedBox(
                     width: 48,
                     height: 48,

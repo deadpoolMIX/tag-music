@@ -22,6 +22,7 @@ const playbackModeNames = {
   PlaybackMode.repeatAll: '列表循环',
   PlaybackMode.repeatOne: '单曲循环',
   PlaybackMode.shuffle: '随机播放',
+  PlaybackMode.mixedShuffle: '混合随机',
 };
 
 class PlaybackControls extends StatelessWidget {
@@ -172,6 +173,7 @@ class PlaybackModeButton extends StatelessWidget {
         PlaybackMode.repeatAll => Icons.repeat,
         PlaybackMode.repeatOne => Icons.repeat_one,
         PlaybackMode.shuffle => Icons.shuffle,
+        PlaybackMode.mixedShuffle => Icons.shuffle_on_outlined,
       }),
       onPressed: () {
         final modes = PlaybackMode.values;

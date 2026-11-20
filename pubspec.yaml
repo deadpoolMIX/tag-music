@@ -1,7 +1,7 @@
 name: tag_music
 description: 双端本地音乐播放器。
 publish_to: none
-version: 0.8.0+71
+version: 0.9.0+83
 
 environment:
   sdk: '>=3.13.0 <4.0.0'

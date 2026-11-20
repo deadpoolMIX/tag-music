@@ -160,7 +160,7 @@ void main() {
           expect(
             (await db.customSelect('PRAGMA user_version').getSingle())
                 .read<int>('user_version'),
-            5,
+            6,
           );
           final repository = FilterRepository(db);
           expect((await repository.load()).rule.isEmpty, isTrue);

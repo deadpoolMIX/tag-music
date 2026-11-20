@@ -211,7 +211,9 @@ class _BackupDialogState extends State<_BackupDialog> {
                     '${preview.tags.length} 个标签 · ${preview.playlists.length} 个歌单',
                   ),
                   const SizedBox(height: 8),
-                  const Text('恢复会替换当前曲库、标签、歌单和筛选，并清空播放队列。应用会先保存当前管理数据。'),
+                  const Text(
+                    '恢复会替换当前曲库、标签、歌单、筛选和备份中有记录的播放次数，并清空播放队列。应用会先保存当前管理数据。',
+                  ),
                   if (!_local) const Text('当前曲库中没有的音乐位置需要重新定位。'),
                 ],
                 if (_busy) const LinearProgressIndicator(),

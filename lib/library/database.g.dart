@@ -1466,6 +1466,225 @@ class SongLocationsCompanion extends UpdateCompanion<SongLocation> {
   }
 }
 
+class $SongPlayCountsTable extends SongPlayCounts
+    with TableInfo<$SongPlayCountsTable, SongPlayCount> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SongPlayCountsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _songIdMeta = const VerificationMeta('songId');
+  @override
+  late final GeneratedColumn<String> songId = GeneratedColumn<String>(
+    'song_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES songs (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _playCountMeta = const VerificationMeta(
+    'playCount',
+  );
+  @override
+  late final GeneratedColumn<int> playCount = GeneratedColumn<int>(
+    'play_count',
+    aliasedName,
+    false,
+    check: () => const CustomExpression<bool>('"play_count" > 0'),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [songId, playCount];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'song_play_counts';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SongPlayCount> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('song_id')) {
+      context.handle(
+        _songIdMeta,
+        songId.isAcceptableOrUnknown(data['song_id']!, _songIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_songIdMeta);
+    }
+    if (data.containsKey('play_count')) {
+      context.handle(
+        _playCountMeta,
+        playCount.isAcceptableOrUnknown(data['play_count']!, _playCountMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_playCountMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {songId};
+  @override
+  SongPlayCount map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SongPlayCount(
+      songId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}song_id'],
+      )!,
+      playCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}play_count'],
+      )!,
+    );
+  }
+
+  @override
+  $SongPlayCountsTable createAlias(String alias) {
+    return $SongPlayCountsTable(attachedDatabase, alias);
+  }
+}
+
+class SongPlayCount extends DataClass implements Insertable<SongPlayCount> {
+  final String songId;
+  final int playCount;
+  const SongPlayCount({required this.songId, required this.playCount});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['song_id'] = Variable<String>(songId);
+    map['play_count'] = Variable<int>(playCount);
+    return map;
+  }
+
+  SongPlayCountsCompanion toCompanion(bool nullToAbsent) {
+    return SongPlayCountsCompanion(
+      songId: Value(songId),
+      playCount: Value(playCount),
+    );
+  }
+
+  factory SongPlayCount.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SongPlayCount(
+      songId: serializer.fromJson<String>(json['songId']),
+      playCount: serializer.fromJson<int>(json['playCount']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'songId': serializer.toJson<String>(songId),
+      'playCount': serializer.toJson<int>(playCount),
+    };
+  }
+
+  SongPlayCount copyWith({String? songId, int? playCount}) => SongPlayCount(
+    songId: songId ?? this.songId,
+    playCount: playCount ?? this.playCount,
+  );
+  SongPlayCount copyWithCompanion(SongPlayCountsCompanion data) {
+    return SongPlayCount(
+      songId: data.songId.present ? data.songId.value : this.songId,
+      playCount: data.playCount.present ? data.playCount.value : this.playCount,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SongPlayCount(')
+          ..write('songId: $songId, ')
+          ..write('playCount: $playCount')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(songId, playCount);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SongPlayCount &&
+          other.songId == this.songId &&
+          other.playCount == this.playCount);
+}
+
+class SongPlayCountsCompanion extends UpdateCompanion<SongPlayCount> {
+  final Value<String> songId;
+  final Value<int> playCount;
+  final Value<int> rowid;
+  const SongPlayCountsCompanion({
+    this.songId = const Value.absent(),
+    this.playCount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SongPlayCountsCompanion.insert({
+    required String songId,
+    required int playCount,
+    this.rowid = const Value.absent(),
+  }) : songId = Value(songId),
+       playCount = Value(playCount);
+  static Insertable<SongPlayCount> custom({
+    Expression<String>? songId,
+    Expression<int>? playCount,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (songId != null) 'song_id': songId,
+      if (playCount != null) 'play_count': playCount,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SongPlayCountsCompanion copyWith({
+    Value<String>? songId,
+    Value<int>? playCount,
+    Value<int>? rowid,
+  }) {
+    return SongPlayCountsCompanion(
+      songId: songId ?? this.songId,
+      playCount: playCount ?? this.playCount,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (songId.present) {
+      map['song_id'] = Variable<String>(songId.value);
+    }
+    if (playCount.present) {
+      map['play_count'] = Variable<int>(playCount.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SongPlayCountsCompanion(')
+          ..write('songId: $songId, ')
+          ..write('playCount: $playCount, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $TagsTable extends Tags with TableInfo<$TagsTable, Tag> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -2973,6 +3192,7 @@ abstract class _$LibraryDatabase extends GeneratedDatabase {
   late final $SongsTable songs = $SongsTable(this);
   late final $LibraryRootsTable libraryRoots = $LibraryRootsTable(this);
   late final $SongLocationsTable songLocations = $SongLocationsTable(this);
+  late final $SongPlayCountsTable songPlayCounts = $SongPlayCountsTable(this);
   late final $TagsTable tags = $TagsTable(this);
   late final $SongTagsTable songTags = $SongTagsTable(this);
   late final $CurrentFiltersTable currentFilters = $CurrentFiltersTable(this);
@@ -2986,6 +3206,7 @@ abstract class _$LibraryDatabase extends GeneratedDatabase {
     songs,
     libraryRoots,
     songLocations,
+    songPlayCounts,
     tags,
     songTags,
     currentFilters,
@@ -2994,6 +3215,13 @@ abstract class _$LibraryDatabase extends GeneratedDatabase {
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'songs',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('song_play_counts', kind: UpdateKind.delete)],
+    ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'songs',
@@ -3067,6 +3295,25 @@ final class $$SongsTableReferences
     ).filter((f) => f.songId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_songLocationsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$SongPlayCountsTable, List<SongPlayCount>>
+  _songPlayCountsRefsTable(_$LibraryDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.songPlayCounts,
+        aliasName: 'songs__id__song_play_counts__song_id',
+      );
+
+  $$SongPlayCountsTableProcessedTableManager get songPlayCountsRefs {
+    final manager = $$SongPlayCountsTableTableManager(
+      $_db,
+      $_db.songPlayCounts,
+    ).filter((f) => f.songId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_songPlayCountsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -3196,6 +3443,31 @@ class $$SongsTableFilterComposer
           }) => $$SongLocationsTableFilterComposer(
             $db: $db,
             $table: $db.songLocations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> songPlayCountsRefs(
+    Expression<bool> Function($$SongPlayCountsTableFilterComposer f) f,
+  ) {
+    final $$SongPlayCountsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.songPlayCounts,
+      getReferencedColumn: (t) => t.songId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SongPlayCountsTableFilterComposer(
+            $db: $db,
+            $table: $db.songPlayCounts,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -3402,6 +3674,31 @@ class $$SongsTableAnnotationComposer
     return f(composer);
   }
 
+  Expression<T> songPlayCountsRefs<T extends Object>(
+    Expression<T> Function($$SongPlayCountsTableAnnotationComposer a) f,
+  ) {
+    final $$SongPlayCountsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.songPlayCounts,
+      getReferencedColumn: (t) => t.songId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SongPlayCountsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.songPlayCounts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> songTagsRefs<T extends Object>(
     Expression<T> Function($$SongTagsTableAnnotationComposer a) f,
   ) {
@@ -3468,6 +3765,7 @@ class $$SongsTableTableManager
           Song,
           PrefetchHooks Function({
             bool songLocationsRefs,
+            bool songPlayCountsRefs,
             bool songTagsRefs,
             bool playlistSongsRefs,
           })
@@ -3554,6 +3852,7 @@ class $$SongsTableTableManager
           prefetchHooksCallback:
               ({
                 songLocationsRefs = false,
+                songPlayCountsRefs = false,
                 songTagsRefs = false,
                 playlistSongsRefs = false,
               }) {
@@ -3561,6 +3860,7 @@ class $$SongsTableTableManager
                   db: db,
                   explicitlyWatchedTables: [
                     if (songLocationsRefs) db.songLocations,
+                    if (songPlayCountsRefs) db.songPlayCounts,
                     if (songTagsRefs) db.songTags,
                     if (playlistSongsRefs) db.playlistSongs,
                   ],
@@ -3583,6 +3883,26 @@ class $$SongsTableTableManager
                                 table,
                                 p0,
                               ).songLocationsRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'song_id',
+                          typedResults: items,
+                        ),
+                      if (songPlayCountsRefs)
+                        await $_getPrefetchedDataByColumns<
+                          Song,
+                          $SongsTable,
+                          SongPlayCount,
+                          $SongPlayCountsTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$SongsTableReferences
+                              ._songPlayCountsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$SongsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).songPlayCountsRefs,
                           currentColumn: 'id',
                           referencedColumn: 'song_id',
                           typedResults: items,
@@ -3649,6 +3969,7 @@ typedef $$SongsTableProcessedTableManager =
       Song,
       PrefetchHooks Function({
         bool songLocationsRefs,
+        bool songPlayCountsRefs,
         bool songTagsRefs,
         bool playlistSongsRefs,
       })
@@ -4371,6 +4692,271 @@ typedef $$SongLocationsTableProcessedTableManager =
       (SongLocation, $$SongLocationsTableReferences),
       SongLocation,
       PrefetchHooks Function({bool songId, bool root})
+    >;
+typedef $$SongPlayCountsTableCreateCompanionBuilder =
+    SongPlayCountsCompanion Function({
+      required String songId,
+      required int playCount,
+      Value<int> rowid,
+    });
+typedef $$SongPlayCountsTableUpdateCompanionBuilder =
+    SongPlayCountsCompanion Function({
+      Value<String> songId,
+      Value<int> playCount,
+      Value<int> rowid,
+    });
+
+final class $$SongPlayCountsTableReferences
+    extends
+        BaseReferences<_$LibraryDatabase, $SongPlayCountsTable, SongPlayCount> {
+  $$SongPlayCountsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $SongsTable _songIdTable(_$LibraryDatabase db) =>
+      db.songs.createAlias('song_play_counts__song_id__songs__id');
+
+  $$SongsTableProcessedTableManager get songId {
+    final $_column = $_itemColumn<String>('song_id')!;
+
+    final manager = $$SongsTableTableManager(
+      $_db,
+      $_db.songs,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_songIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$SongPlayCountsTableFilterComposer
+    extends Composer<_$LibraryDatabase, $SongPlayCountsTable> {
+  $$SongPlayCountsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get playCount => $composableBuilder(
+    column: $table.playCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$SongsTableFilterComposer get songId {
+    final $$SongsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.songId,
+      referencedTable: $db.songs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SongsTableFilterComposer(
+            $db: $db,
+            $table: $db.songs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SongPlayCountsTableOrderingComposer
+    extends Composer<_$LibraryDatabase, $SongPlayCountsTable> {
+  $$SongPlayCountsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get playCount => $composableBuilder(
+    column: $table.playCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$SongsTableOrderingComposer get songId {
+    final $$SongsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.songId,
+      referencedTable: $db.songs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SongsTableOrderingComposer(
+            $db: $db,
+            $table: $db.songs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SongPlayCountsTableAnnotationComposer
+    extends Composer<_$LibraryDatabase, $SongPlayCountsTable> {
+  $$SongPlayCountsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get playCount =>
+      $composableBuilder(column: $table.playCount, builder: (column) => column);
+
+  $$SongsTableAnnotationComposer get songId {
+    final $$SongsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.songId,
+      referencedTable: $db.songs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SongsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.songs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SongPlayCountsTableTableManager
+    extends
+        RootTableManager<
+          _$LibraryDatabase,
+          $SongPlayCountsTable,
+          SongPlayCount,
+          $$SongPlayCountsTableFilterComposer,
+          $$SongPlayCountsTableOrderingComposer,
+          $$SongPlayCountsTableAnnotationComposer,
+          $$SongPlayCountsTableCreateCompanionBuilder,
+          $$SongPlayCountsTableUpdateCompanionBuilder,
+          (SongPlayCount, $$SongPlayCountsTableReferences),
+          SongPlayCount,
+          PrefetchHooks Function({bool songId})
+        > {
+  $$SongPlayCountsTableTableManager(
+    _$LibraryDatabase db,
+    $SongPlayCountsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SongPlayCountsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SongPlayCountsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SongPlayCountsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> songId = const Value.absent(),
+                Value<int> playCount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SongPlayCountsCompanion(
+                songId: songId,
+                playCount: playCount,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String songId,
+                required int playCount,
+                Value<int> rowid = const Value.absent(),
+              }) => SongPlayCountsCompanion.insert(
+                songId: songId,
+                playCount: playCount,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$SongPlayCountsTable, SongPlayCount>(table),
+                  $$SongPlayCountsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({songId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (songId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.songId,
+                        referencedTable: $$SongPlayCountsTableReferences
+                            ._songIdTable(db),
+                        referencedColumn: $$SongPlayCountsTableReferences
+                            ._songIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$SongPlayCountsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$LibraryDatabase,
+      $SongPlayCountsTable,
+      SongPlayCount,
+      $$SongPlayCountsTableFilterComposer,
+      $$SongPlayCountsTableOrderingComposer,
+      $$SongPlayCountsTableAnnotationComposer,
+      $$SongPlayCountsTableCreateCompanionBuilder,
+      $$SongPlayCountsTableUpdateCompanionBuilder,
+      (SongPlayCount, $$SongPlayCountsTableReferences),
+      SongPlayCount,
+      PrefetchHooks Function({bool songId})
     >;
 typedef $$TagsTableCreateCompanionBuilder = TagsCompanion Function({
   required String id,
@@ -5882,6 +6468,8 @@ class $LibraryDatabaseManager {
       $$LibraryRootsTableTableManager(_db, _db.libraryRoots);
   $$SongLocationsTableTableManager get songLocations =>
       $$SongLocationsTableTableManager(_db, _db.songLocations);
+  $$SongPlayCountsTableTableManager get songPlayCounts =>
+      $$SongPlayCountsTableTableManager(_db, _db.songPlayCounts);
   $$TagsTableTableManager get tags => $$TagsTableTableManager(_db, _db.tags);
   $$SongTagsTableTableManager get songTags =>
       $$SongTagsTableTableManager(_db, _db.songTags);

@@ -97,6 +97,8 @@ Future<void> main() async {
     );
     await library.initialize();
     playback?.resolveSong = library.resolveSong;
+    playback?.recordCompletedPlay = library.recordCompletedPlay;
+    playback?.queue.playCountForSong = library.playCount;
   } catch (e) {
     await library?.shutdown();
     library = null;

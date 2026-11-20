@@ -17,11 +17,11 @@ import 'library_test.dart' show FakeDocuments, entry;
 class FailLibraryMigration extends Migrator {
   FailLibraryMigration(super.database);
   @override
-  Future<void> addColumn(TableInfo table, GeneratedColumn column) {
-    if (table.actualTableName == 'library_roots') {
+  Future<void> createTable(TableInfo table) async {
+    await super.createTable(table);
+    if (table.actualTableName == 'song_play_counts') {
       throw const FileSystemException('simulated late migration write failure');
     }
-    return super.addColumn(table, column);
   }
 }
 
@@ -208,7 +208,7 @@ void main() {
     });
   });
 
-  for (final version in [1, 2, 3, 4]) {
+  for (final version in [1, 2, 3, 4, 5]) {
     test(
       'v$version migration preserves exact old rows, reopens and supports playlists',
       () async {
@@ -255,7 +255,7 @@ void main() {
               ],
             );
           }
-          if (version == 4) {
+          if (version >= 4) {
             old.execute(
               "INSERT INTO playlists(id,name,name_key,kind) VALUES ('old-list','旧歌单','旧歌单','regular')",
             );
@@ -269,7 +269,7 @@ void main() {
             'song_locations',
             if (version >= 2) ...['tags', 'song_tags'],
             if (version >= 3) 'current_filters',
-            if (version == 4) ...['playlists', 'playlist_songs'],
+            if (version >= 4) ...['playlists', 'playlist_songs'],
           ]) {
             before[name] = old
                 .select('SELECT * FROM $name')
@@ -294,8 +294,9 @@ void main() {
           expect(
             (await migrated.customSelect('PRAGMA user_version').getSingle())
                 .read<int>('user_version'),
-            5,
+            6,
           );
+          expect(await migrated.select(migrated.songPlayCounts).get(), isEmpty);
           expect(
             await migrated.customSelect('PRAGMA foreign_key_check').get(),
             isEmpty,
@@ -323,7 +324,7 @@ void main() {
               )
               .get();
           final baseline = jsonDecode(
-            await File('docs/database-schema/v5.json').readAsString(),
+            await File('docs/database-schema/v6.json').readAsString(),
           );
           expect(ddl.map((r) => r.data).toList(), baseline['schema']);
         } finally {

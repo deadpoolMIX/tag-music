@@ -268,9 +268,12 @@ void main() {
   test(
     'asynchronous decoder failures advance then stop without cycling bad items',
     () async {
+      final counts = <String>[];
+      controller.recordCompletedPlay = (songId) async => counts.add(songId);
       await controller.setMode(PlaybackMode.repeatAll);
       await controller.playSongs([song('A'), song('B'), song('C')], 0);
       player.stream.failures.add('A failed');
+      player.stream.endings.add(true);
       await drain();
       expect(controller.currentSongId, 'B');
       expect(controller.error, isNull);
@@ -285,6 +288,7 @@ void main() {
       expect(controller.error, contains('C failed'));
       expect(documents.descriptors, isEmpty);
       expect(documents.peakDescriptors, 1);
+      expect(counts, isEmpty);
     },
   );
 
@@ -292,12 +296,17 @@ void main() {
     test(
       '$mode completion dispatches once and respects single repeat priority',
       () async {
+        final counts = <String>[];
+        controller.recordCompletedPlay = (songId) async => counts.add(songId);
         await controller.setMode(mode);
         await controller.playSongs([song('A'), song('B')], 0);
         await controller.addToQueue([song('priority')]);
+        await controller.seek(const Duration(seconds: 8));
+        expect(counts, isEmpty);
         player.end();
         player.stream.endings.add(true);
         await drain();
+        expect(counts, ['A']);
         expect(player.opens, hasLength(2));
         expect(
           controller.currentSongId,
@@ -305,8 +314,12 @@ void main() {
         );
         if (mode == PlaybackMode.repeatOne) {
           expect(controller.queue.priorityIds, hasLength(1));
+          player.end();
+          await drain();
+          expect(counts, ['A', 'A']);
           await controller.next();
           expect(controller.currentSongId, 'priority');
+          expect(counts, ['A', 'A']);
         }
         expect(documents.peakDescriptors, 1);
       },

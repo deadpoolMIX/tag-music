@@ -16,6 +16,7 @@ import 'playback/full_player.dart' show fullPlayerRouteName;
 import 'playback/playback_minibar.dart';
 import 'playback/queue_page.dart' show playbackQueueRouteName;
 import 'library/library_page.dart';
+import 'library/play_counts_page.dart';
 import 'library/backup_dialog.dart';
 import 'library/filter_page.dart';
 import 'library/playlists_page.dart';
@@ -322,6 +323,7 @@ class _TagMusicScrollBehavior extends MaterialScrollBehavior {
 
 enum AppDestination {
   songs,
+  playCounts,
   filter,
   playlists,
   albums,
@@ -332,6 +334,7 @@ enum AppDestination {
 
 const _destinations = [
   (Icons.library_music_outlined, '歌曲'),
+  (Icons.bar_chart, '播放次数'),
   (Icons.filter_alt_outlined, '筛选'),
   (Icons.queue_music_outlined, '歌单'),
   (Icons.album_outlined, '专辑'),
@@ -518,6 +521,16 @@ class _AppShellState extends ConsumerState<AppShell>
               library == null || playback == null
                   ? unavailable()
                   : LibraryPage(
+                      library: library,
+                      playback: playback,
+                      menuButton: menuButton,
+                    ),
+            AppDestination.playCounts =>
+              _selected != destination
+                  ? const SizedBox.shrink()
+                  : library == null || playback == null
+                  ? unavailable()
+                  : PlayCountsPage(
                       library: library,
                       playback: playback,
                       menuButton: menuButton,

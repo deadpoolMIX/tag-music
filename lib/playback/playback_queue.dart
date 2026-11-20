@@ -5,7 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import 'documents.dart';
 
-enum PlaybackMode { sequential, repeatAll, repeatOne, shuffle }
+enum PlaybackMode { sequential, repeatAll, repeatOne, shuffle, mixedShuffle }
 
 /// A library UUID plus display/location snapshot. Location is resolved again
 /// before opening; membership does not follow later library/filter changes.
@@ -25,6 +25,7 @@ class QueueEntry {
 class PlaybackQueue {
   PlaybackQueue({Random? random}) : _random = random ?? Random();
   final Random _random;
+  int Function(String songId)? playCountForSong;
   List<QueueEntry> _entries = [];
   final List<String> _priority = [];
   final Set<String> _visited = {};
@@ -42,6 +43,8 @@ class PlaybackQueue {
   bool get canNext => _entries.isNotEmpty;
   bool get _wraps =>
       _mode == PlaybackMode.repeatAll || _mode == PlaybackMode.repeatOne;
+  bool get _shuffles =>
+      _mode == PlaybackMode.shuffle || _mode == PlaybackMode.mixedShuffle;
 
   void replace(List<QueueSong> songs, int target) {
     if (songs.isNotEmpty && (target < 0 || target >= songs.length)) {
@@ -74,21 +77,88 @@ class PlaybackQueue {
     _visited
       ..clear()
       ..addAll([?_currentId]);
-    if (_mode == PlaybackMode.shuffle && current != null) {
+    if (_shuffles && current != null) {
       final selected = current!;
       final pending = {for (final entry in _entries) entry.entryId: entry};
       final priority = _priority.toSet();
-      final rest =
-          _entries
-              .where(
-                (entry) =>
-                    entry.entryId != selected.entryId &&
-                    !priority.contains(entry.entryId),
-              )
-              .toList()
-            ..shuffle(_random);
-      _entries = [selected, ..._priority.map((id) => pending[id]!), ...rest];
+      final rest = _entries
+          .where(
+            (entry) =>
+                entry.entryId != selected.entryId &&
+                !priority.contains(entry.entryId),
+          )
+          .toList();
+      _entries = [
+        selected,
+        ..._priority.map((id) => pending[id]!),
+        ..._shuffle(rest),
+      ];
     }
+  }
+
+  List<QueueEntry> _shuffle(List<QueueEntry> entries) {
+    entries.shuffle(_random);
+    final countForSong = playCountForSong;
+    if (_mode == PlaybackMode.shuffle ||
+        countForSong == null ||
+        entries.length < 2) {
+      return entries;
+    }
+
+    final ranked = [
+      for (final entry in entries)
+        (entry: entry, count: countForSong(entry.song.songId)),
+    ];
+    if (ranked.every((row) => row.count == ranked.first.count)) return entries;
+    ranked.sort((left, right) => left.count.compareTo(right.count));
+    final lowest = ranked.first.count;
+    final highest = ranked.last.count;
+    final quarter = (entries.length + 3) ~/ 4;
+
+    // Reserve across the round so ordinary random picks cannot exhaust a group
+    // before its later slots. The initial shuffle randomizes equal counts.
+    final lessPlayed =
+        ranked
+            .take(quarter)
+            .where((row) => row.count < highest)
+            .take((entries.length + 2) ~/ 5)
+            .map((row) => row.entry)
+            .toList()
+          ..shuffle(_random);
+    final frequent =
+        ranked.reversed
+            .take(quarter)
+            .where((row) => row.count > lowest)
+            .map((row) => row.entry)
+            .toList()
+          ..shuffle(_random);
+    final frequentSlots = (entries.length + 5) ~/ 10;
+    if (frequent.length > frequentSlots) {
+      frequent.removeRange(frequentSlots, frequent.length);
+    }
+    final reserved = {...lessPlayed, ...frequent};
+    final ordinary =
+        entries.where((entry) => !reserved.contains(entry)).toList()
+          ..shuffle(_random);
+
+    final result = <QueueEntry>[];
+    while (result.length < entries.length) {
+      final size = min(10, entries.length - result.length);
+      final block = [
+        for (
+          var slot = 0;
+          slot < (size + 2) ~/ 5 && lessPlayed.isNotEmpty;
+          slot++
+        )
+          lessPlayed.removeLast(),
+        if ((size + 5) ~/ 10 > 0 && frequent.isNotEmpty) frequent.removeLast(),
+      ];
+      while (block.length < size) {
+        block.add(ordinary.removeLast());
+      }
+      result.addAll(block..shuffle(_random));
+    }
+    return result;
   }
 
   /// Insert behind the existing FIFO priority block, never in front of it.
@@ -116,10 +186,7 @@ class PlaybackQueue {
 
   QueueEntry? select(String entryId) {
     if (!_entries.any((e) => e.entryId == entryId)) return null;
-    return _choose(
-      entryId,
-      base: _mode == PlaybackMode.shuffle || !_priority.contains(entryId),
-    );
+    return _choose(entryId, base: _shuffles || !_priority.contains(entryId));
   }
 
   QueueEntry _choose(String id, {required bool base}) {
@@ -154,13 +221,22 @@ class PlaybackQueue {
     final priority = _priority
         .where((id) => !excluded.contains(id))
         .firstOrNull;
-    if (_mode != PlaybackMode.shuffle && priority != null) {
+    if (!_shuffles && priority != null) {
       return _choose(priority, base: false);
     }
     var candidates = _linearCandidates(excluded);
-    if (candidates.isEmpty && (_wraps || _mode == PlaybackMode.shuffle)) {
+    if (candidates.isEmpty && (_wraps || _shuffles)) {
       _visited.clear();
       if (_mode == PlaybackMode.shuffle) _entries.shuffle(_random);
+      if (_mode == PlaybackMode.mixedShuffle) {
+        final playable = _entries.where(
+          (entry) => !excluded.contains(entry.entryId),
+        );
+        _entries = [
+          ..._shuffle(playable.toList()),
+          ..._entries.where((entry) => excluded.contains(entry.entryId)),
+        ];
+      }
       candidates = _entries
           .map((e) => e.entryId)
           .where((id) => !excluded.contains(id))
@@ -194,7 +270,7 @@ class PlaybackQueue {
     _priority
       ..clear()
       ..addAll(orderedIds.where(pending.contains));
-    if (_mode == PlaybackMode.shuffle) {
+    if (_shuffles) {
       _baseId = _currentId;
       _visited
         ..clear()
@@ -220,10 +296,7 @@ class PlaybackQueue {
     }
     if (wasCurrent) {
       final id = _entries[min(at, _entries.length - 1)].entryId;
-      _choose(
-        id,
-        base: _mode == PlaybackMode.shuffle || !_priority.contains(id),
-      );
+      _choose(id, base: _shuffles || !_priority.contains(id));
     }
   }
 }

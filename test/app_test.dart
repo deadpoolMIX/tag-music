@@ -15,6 +15,8 @@ import 'settings_test.dart' show MemorySettings;
 import 'library_test.dart' show FakeDocuments, entry;
 import 'playlists_page_test.dart' show PlaylistPlayback;
 
+const _destinations = ['歌曲', '播放次数', '筛选', '歌单', '专辑', '歌手', '标签', '设置'];
+
 void main() {
   setUp(() {
     PackageInfo.setMockInitialValues(
@@ -58,14 +60,14 @@ void main() {
     expect(navigationStack, findsOneWidget);
     expect(
       tester.widget<IndexedStack>(navigationStack).index,
-      ['歌曲', '筛选', '歌单', '专辑', '歌手', '标签', '设置'].indexOf(label),
+      _destinations.indexOf(label),
     );
   }
 
   for (final platform in [TargetPlatform.android, TargetPlatform.windows]) {
     for (final screen in [const Size(390, 844), const Size(1280, 800)]) {
       testWidgets(
-        '$platform $screen keeps seven destinations and fixed minibar, settings theme and diagnostics',
+        '$platform $screen keeps all destinations and fixed minibar, settings theme and diagnostics',
         (tester) async {
           await size(tester, screen);
           await tester.pumpWidget(
@@ -93,7 +95,7 @@ void main() {
               before,
             );
           }
-          final labels = ['歌曲', '筛选', '歌单', '专辑', '歌手', '标签', '设置'];
+          final labels = _destinations;
           if (platform == TargetPlatform.windows && screen.width < 1000) {
             for (final label in labels) {
               expect(find.byTooltip(label), findsOneWidget);

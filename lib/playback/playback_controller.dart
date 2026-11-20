@@ -52,13 +52,21 @@ class PlaybackController extends ChangeNotifier {
         _publish();
         if (completed &&
             !_playbackFailed &&
-            !changingTrack &&
+            _startedSelection == _selection &&
             _playIntent &&
             _completionHandled != _selection) {
           final selection = _selection;
+          final songId = currentSongId;
           _completionHandled = selection;
           unawaited(
             _serial(() async {
+              if (songId != null) {
+                try {
+                  await recordCompletedPlay?.call(songId);
+                } catch (error, stack) {
+                  debugPrint('无法保存播放次数：$error\n$stack');
+                }
+              }
               if (_selection == selection && _playIntent) {
                 await _advance(natural: true);
               }
@@ -188,6 +196,7 @@ class PlaybackController extends ChangeNotifier {
   final DocumentAccess documents;
   final PlaybackQueue queue;
   FutureOr<ProbeTrack?> Function(String songId)? resolveSong;
+  Future<void> Function(String songId)? recordCompletedPlay;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   List<ProbeTrack> _tracks = const [];
   List<ProbeTrack> get tracks => _tracks;
@@ -237,6 +246,7 @@ class PlaybackController extends ChangeNotifier {
   bool _closed = false;
   bool _playbackFailed = false;
   int _selection = 0;
+  int? _startedSelection;
   int _completionHandled = -1;
   bool _playIntent = false;
   bool _diagnosticQueue = false;
@@ -603,9 +613,12 @@ class PlaybackController extends ChangeNotifier {
       throw _AudioFocusDenied();
     }
     error = null;
-    if (player.state.completed) await player.seek(Duration.zero);
+    if (player.state.completed) {
+      _selection++;
+      await player.seek(Duration.zero);
+    }
     _playIntent = true;
-    _completionHandled = -1;
+    _startedSelection = _selection;
     await player.play();
   }
 

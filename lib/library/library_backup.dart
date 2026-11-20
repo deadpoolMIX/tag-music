@@ -29,6 +29,7 @@ class LibraryBackup {
     required this.filters,
     required this.playlists,
     required this.playlistSongs,
+    this.playCounts = const {},
   });
 
   final List<Song> songs;
@@ -39,6 +40,8 @@ class LibraryBackup {
   final List<CurrentFilter> filters;
   final List<Playlist> playlists;
   final List<PlaylistSong> playlistSongs;
+  // A missing entry is from a snapshot created before playback counts existed.
+  final Map<String, int> playCounts;
 
   static Future<LibraryBackup> _capture(LibraryDatabase db) async =>
       LibraryBackup(
@@ -50,6 +53,10 @@ class LibraryBackup {
         filters: await db.select(db.currentFilters).get(),
         playlists: await db.select(db.playlists).get(),
         playlistSongs: await db.select(db.playlistSongs).get(),
+        playCounts: {
+          for (final row in await db.select(db.songPlayCounts).get())
+            row.songId: row.playCount,
+        },
       );
 
   static Future<Uint8List> export(LibraryDatabase db) async =>
@@ -80,6 +87,13 @@ class LibraryBackup {
       for (final row in current.songs) row.id: row.identity,
     };
     final importedIdentities = {for (final row in songs) row.id: row.identity};
+    final restoredCounts = <SongPlayCount>[];
+    for (final song in songs) {
+      final count = playCounts[song.id] ?? current.playCounts[song.id] ?? 0;
+      if (count > 0) {
+        restoredCounts.add(SongPlayCount(songId: song.id, playCount: count));
+      }
+    }
 
     await db.delete(db.playlistSongs).go();
     await db.delete(db.playlists).go();
@@ -92,6 +106,7 @@ class LibraryBackup {
 
     await db.batch((batch) {
       batch.insertAll(db.songs, songs);
+      batch.insertAll(db.songPlayCounts, restoredCounts);
       batch.insertAll(
         db.libraryRoots,
         trustedLocations
@@ -170,7 +185,14 @@ Future<Uint8List> _encode(LibraryBackup backup) =>
 
 Uint8List _encodeBackup(LibraryBackup backup) {
   final data = <String, dynamic>{
-    'songs': backup.songs.map((row) => row.toJson()).toList(),
+    'songs': backup.songs
+        .map(
+          (row) => {
+            ...row.toJson(),
+            'playCount': backup.playCounts[row.id] ?? 0,
+          },
+        )
+        .toList(),
     'roots': backup.roots.map((row) => row.toJson()).toList(),
     'locations': backup.locations.map((row) => row.toJson()).toList(),
     'tags': backup.tags.map((row) => row.toJson()).toList(),
@@ -200,6 +222,15 @@ LibraryBackup _decodeBackup(Uint8List bytes) {
         (data[key] as List)
             .map((item) => parse(item as Map<String, dynamic>))
             .toList();
+    final playCounts = <String, int>{};
+    for (final row in (data['songs'] as List).cast<Map<String, dynamic>>()) {
+      if (!row.containsKey('playCount')) continue;
+      final count = row['playCount'];
+      if (count is! int || count < 0) {
+        throw const FormatException('备份的播放次数无效');
+      }
+      playCounts[row['id'] as String] = count;
+    }
     final backup = LibraryBackup(
       songs: rows('songs', Song.fromJson),
       roots: rows('roots', LibraryRoot.fromJson),
@@ -209,6 +240,7 @@ LibraryBackup _decodeBackup(Uint8List bytes) {
       filters: rows('filters', CurrentFilter.fromJson),
       playlists: rows('playlists', Playlist.fromJson),
       playlistSongs: rows('playlistSongs', PlaylistSong.fromJson),
+      playCounts: playCounts,
     );
     final tags = {for (final row in backup.tags) row.id};
     for (final row in backup.filters) {

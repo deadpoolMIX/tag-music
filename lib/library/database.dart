@@ -42,6 +42,15 @@ class SongLocations extends Table {
   Set<Column> get primaryKey => {songId, root};
 }
 
+class SongPlayCounts extends Table {
+  TextColumn get songId =>
+      text().references(Songs, #id, onDelete: KeyAction.cascade)();
+  IntColumn get playCount =>
+      integer().check(const CustomExpression<bool>('"play_count" > 0'))();
+  @override
+  Set<Column> get primaryKey => {songId};
+}
+
 class Tags extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
@@ -103,6 +112,7 @@ class PlaylistSongs extends Table {
     Songs,
     LibraryRoots,
     SongLocations,
+    SongPlayCounts,
     Tags,
     SongTags,
     CurrentFilters,
@@ -122,7 +132,7 @@ class LibraryDatabase extends _$LibraryDatabase {
             ),
       );
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
@@ -132,7 +142,7 @@ class LibraryDatabase extends _$LibraryDatabase {
       );
     },
     onUpgrade: (m, from, to) => transaction(() async {
-      if (from >= 1 && from <= 4 && to == 5) {
+      if (from >= 1 && from < 5) {
         if (from < 2) {
           await m.createTable(tags);
           await m.createTable(songTags);
@@ -147,6 +157,9 @@ class LibraryDatabase extends _$LibraryDatabase {
         }
         await m.addColumn(songs, songs.fileSha256);
         await m.addColumn(libraryRoots, libraryRoots.requiresReselection);
+      }
+      if (from >= 1 && from < 6 && to == 6) {
+        await m.createTable(songPlayCounts);
         return;
       }
       throw StateError('不支持的数据库升级 $from → $to');
