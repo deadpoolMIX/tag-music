@@ -5,6 +5,7 @@ import 'library_controller.dart';
 
 const ruleExplanation = '前两框结果合并，再扣除排除标签。前两框都空时，从全部可用歌曲中排除。';
 const _titles = ['全部具备', '任一具备', '排除标签'];
+const _compactTitles = ['全部', '任一', '排除'];
 const _hints = ['同时有这些标签', '至少有其中一个标签', '有任一标签就排除'];
 
 Set<String> _ids(FilterRule rule, int box) => switch (box) {
@@ -20,6 +21,7 @@ class RuleEditor extends StatelessWidget {
     required this.rule,
     required this.onChanged,
     this.enabled = true,
+    this.compact = false,
     this.prefix = 'filter',
     super.key,
   });
@@ -27,6 +29,7 @@ class RuleEditor extends StatelessWidget {
   final FilterRule rule;
   final ValueChanged<FilterRule> onChanged;
   final bool enabled;
+  final bool compact;
   final String prefix;
 
   void _replace(int box, Iterable<String> ids) => onChanged(
@@ -36,6 +39,51 @@ class RuleEditor extends StatelessWidget {
       excludedTagIds: box == 2 ? ids : rule.excludedTagIds,
     ),
   );
+
+  void _pickTags(BuildContext context, int box) => showDialog<void>(
+    context: context,
+    builder: (_) => _RuleTagPicker(
+      library: library,
+      box: box,
+      prefix: prefix,
+      initial: _ids(rule, box),
+      onChanged: (ids) => _replace(box, ids),
+    ),
+  );
+
+  Widget _compactBox(BuildContext context, int box) {
+    final ids = _ids(rule, box);
+    final names = library.tags
+        .where((tag) => ids.contains(tag.id))
+        .map((tag) => tag.name)
+        .join('、');
+    return OutlinedButton(
+      key: ValueKey('$prefix-pick-$box'),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      onPressed: enabled ? () => _pickTags(context, box) : null,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _compactTitles[box],
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (names.isNotEmpty)
+            Text(
+              names,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+        ],
+      ),
+    );
+  }
 
   Widget _box(BuildContext context, int box) {
     final ids = _ids(rule, box);
@@ -72,18 +120,7 @@ class RuleEditor extends StatelessWidget {
               children: [
                 TextButton.icon(
                   key: ValueKey('$prefix-pick-$box'),
-                  onPressed: enabled
-                      ? () => showDialog<void>(
-                          context: context,
-                          builder: (_) => _RuleTagPicker(
-                            library: library,
-                            box: box,
-                            prefix: prefix,
-                            initial: ids,
-                            onChanged: (ids) => _replace(box, ids),
-                          ),
-                        )
-                      : null,
+                  onPressed: enabled ? () => _pickTags(context, box) : null,
                   icon: const Icon(Icons.add),
                   label: const Text('选择标签'),
                 ),
@@ -103,20 +140,31 @@ class RuleEditor extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final boxes = [for (var i = 0; i < 3; i++) _box(context, i)];
-      return constraints.maxWidth >= 840
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [for (final box in boxes) Expanded(child: box)],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: boxes,
-            );
-    },
-  );
+  Widget build(BuildContext context) => compact
+      ? IntrinsicHeight(
+          child: Row(
+            spacing: 6,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < 3; i++)
+                Expanded(child: _compactBox(context, i)),
+            ],
+          ),
+        )
+      : LayoutBuilder(
+          builder: (context, constraints) {
+            final boxes = [for (var i = 0; i < 3; i++) _box(context, i)];
+            return constraints.maxWidth >= 840
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [for (final box in boxes) Expanded(child: box)],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: boxes,
+                  );
+          },
+        );
 }
 
 class _RuleTagPicker extends StatefulWidget {

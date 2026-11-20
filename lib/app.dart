@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -14,21 +15,49 @@ import 'library/library_controller.dart';
 import 'library/tags_page.dart';
 import 'library/group_pages.dart';
 
-final _appNavigator = GlobalKey<NavigatorState>();
-
-class TagMusicApp extends ConsumerWidget {
+class TagMusicApp extends ConsumerStatefulWidget {
   const TagMusicApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => MaterialApp(
+  ConsumerState<TagMusicApp> createState() => _TagMusicAppState();
+}
+
+class _TagMusicAppState extends ConsumerState<TagMusicApp> {
+  final _appNavigator = GlobalKey<NavigatorState>();
+  final _shell = GlobalKey<_AppShellState>();
+  final _routes = _TopRouteObserver();
+  double _swipeStartX = 0;
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
     navigatorKey: _appNavigator,
-    builder: (context, child) => CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.escape): () =>
-            _appNavigator.currentState?.maybePop(),
-      },
-      child: child!,
-    ),
+    navigatorObservers: [_routes],
+    builder: (context, child) {
+      final desktop = Theme.of(context).platform == TargetPlatform.windows;
+      return CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.escape): () =>
+              _appNavigator.currentState?.maybePop(),
+        },
+        child: desktop
+            ? child!
+            : GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                supportedDevices: const {PointerDeviceKind.touch},
+                excludeFromSemantics: true,
+                dragStartBehavior: DragStartBehavior.down,
+                onHorizontalDragStart: (details) =>
+                    _swipeStartX = details.globalPosition.dx,
+                onHorizontalDragEnd: (details) {
+                  if (details.globalPosition.dx - _swipeStartX >= 56 &&
+                      _routes.top is PageRoute) {
+                    _shell.currentState?._openNavigation();
+                  }
+                },
+                child: child,
+              ),
+      );
+    },
     title: 'Tag Music',
     debugShowCheckedModeBanner: false,
     locale: const Locale('zh', 'CN'),
@@ -37,7 +66,7 @@ class TagMusicApp extends ConsumerWidget {
     themeMode: ref.watch(themeProvider),
     theme: _theme(Brightness.light),
     darkTheme: _theme(Brightness.dark),
-    home: const AppShell(),
+    home: AppShell(key: _shell),
   );
 
   ThemeData _theme(Brightness brightness) => ThemeData(
@@ -48,6 +77,15 @@ class TagMusicApp extends ConsumerWidget {
     ),
     fontFamily: 'Microsoft YaHei',
   );
+}
+
+class _TopRouteObserver extends NavigatorObserver {
+  Route<dynamic>? top;
+
+  @override
+  void didChangeTop(Route<dynamic> topRoute, Route<dynamic>? previousTopRoute) {
+    top = topRoute;
+  }
 }
 
 enum AppDestination {
@@ -79,7 +117,53 @@ class AppShell extends ConsumerStatefulWidget {
 class _AppShellState extends ConsumerState<AppShell>
     with WidgetsBindingObserver {
   AppDestination _selected = AppDestination.songs;
-  final _scaffold = GlobalKey<ScaffoldState>();
+
+  Future<void> _openNavigation() async {
+    final navigator = Navigator.of(context, rootNavigator: true);
+    var swipeStartX = 0.0;
+    final destination = await showGeneralDialog<AppDestination>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black26,
+      pageBuilder: (drawerContext, _, _) => Align(
+        alignment: Alignment.centerLeft,
+        child: GestureDetector(
+          dragStartBehavior: DragStartBehavior.down,
+          onHorizontalDragStart: (details) =>
+              swipeStartX = details.globalPosition.dx,
+          onHorizontalDragEnd: (details) {
+            if (swipeStartX - details.globalPosition.dx >= 56) {
+              Navigator.of(drawerContext).pop();
+            }
+          },
+          child: Drawer(
+            width: MediaQuery.sizeOf(drawerContext).width * .52,
+            child: _navigation(
+              false,
+              (destination) => Navigator.of(drawerContext).pop(destination),
+            ),
+          ),
+        ),
+      ),
+      transitionBuilder: (_, animation, _, child) => SlideTransition(
+        position: animation.drive(
+          Tween(
+            begin: const Offset(-1, 0),
+            end: Offset.zero,
+          ).chain(CurveTween(curve: Curves.easeOutCubic)),
+        ),
+        child: child,
+      ),
+    );
+    if (!mounted || destination == null) return;
+    navigator.popUntil((route) => route.isFirst);
+    _select(destination);
+  }
+
+  void _select(AppDestination destination) =>
+      setState(() => _selected = destination);
+
   @override
   void initState() {
     super.initState();
@@ -99,62 +183,60 @@ class _AppShellState extends ConsumerState<AppShell>
     super.dispose();
   }
 
-  Widget _navigation(bool compact, {bool drawer = false}) => SafeArea(
-    child: SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          children: [
-            for (final destination in AppDestination.values) ...[
-              if (destination == AppDestination.settings)
-                const Divider(height: 28),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Material(
-                  color: destination == _selected
-                      ? Theme.of(context).colorScheme.secondaryContainer
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
-                  child: Tooltip(
-                    message: _destinations[destination.index].$2,
-                    child: InkWell(
+  Widget _navigation(bool compact, ValueChanged<AppDestination> onSelect) =>
+      SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              children: [
+                for (final destination in AppDestination.values) ...[
+                  if (destination == AppDestination.settings)
+                    const Divider(height: 28),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Material(
+                      color: destination == _selected
+                          ? Theme.of(context).colorScheme.secondaryContainer
+                          : Colors.transparent,
                       borderRadius: BorderRadius.circular(14),
-                      onTap: () {
-                        setState(() => _selected = destination);
-                        if (drawer) Navigator.of(context).pop();
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _destinations[destination.index].$1,
-                              semanticLabel: compact
-                                  ? _destinations[destination.index].$2
-                                  : null,
-                            ),
-                            if (!compact) ...[
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Text(
-                                  _destinations[destination.index].$2,
+                      child: Tooltip(
+                        message: _destinations[destination.index].$2,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () => onSelect(destination),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _destinations[destination.index].$1,
+                                  semanticLabel: compact
+                                      ? _destinations[destination.index].$2
+                                      : null,
                                 ),
-                              ),
-                            ],
-                          ],
+                                if (!compact) ...[
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Text(
+                                      _destinations[destination.index].$2,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ),
-            ],
-          ],
+                ],
+              ],
+            ),
+          ),
         ),
-      ),
-    ),
-  );
+      );
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
@@ -176,8 +258,7 @@ class _AppShellState extends ConsumerState<AppShell>
                         : IconButton(
                             key: const ValueKey('open-navigation'),
                             tooltip: '打开导航菜单',
-                            onPressed: () =>
-                                _scaffold.currentState?.openDrawer(),
+                            onPressed: _openNavigation,
                             icon: const Icon(Icons.menu),
                           ),
                   ),
@@ -217,101 +298,92 @@ class _AppShellState extends ConsumerState<AppShell>
         body: Column(
           children: [
             Expanded(
-              child: Scaffold(
-                key: _scaffold,
-                drawer: desktop
-                    ? null
-                    : Drawer(
-                        width: constraints.maxWidth * .52,
-                        child: _navigation(false, drawer: true),
-                      ),
-                drawerScrimColor: Colors.black26,
-                body: SafeArea(
-                  bottom: false,
-                  child: Row(
-                    children: [
-                      if (desktop)
-                        SizedBox(
-                          width: constraints.maxWidth >= 1000 ? 190 : 72,
-                          child: _navigation(constraints.maxWidth < 1000),
+              child: SafeArea(
+                bottom: false,
+                child: Row(
+                  children: [
+                    if (desktop)
+                      SizedBox(
+                        width: constraints.maxWidth >= 1000 ? 190 : 72,
+                        child: _navigation(
+                          constraints.maxWidth < 1000,
+                          _select,
                         ),
-                      if (desktop) const VerticalDivider(width: 1),
-                      Expanded(
-                        child: Column(
-                          children: [
-                            if (!desktop &&
-                                (_selected != AppDestination.songs ||
-                                    library == null ||
-                                    playback == null))
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: IconButton(
-                                  key: const ValueKey('open-navigation'),
-                                  tooltip: '打开导航菜单',
-                                  onPressed: () =>
-                                      _scaffold.currentState?.openDrawer(),
-                                  icon: const Icon(Icons.menu),
-                                ),
+                      ),
+                    if (desktop) const VerticalDivider(width: 1),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          if (!desktop &&
+                              (_selected != AppDestination.songs ||
+                                  library == null ||
+                                  playback == null))
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: IconButton(
+                                key: const ValueKey('open-navigation'),
+                                tooltip: '打开导航菜单',
+                                onPressed: _openNavigation,
+                                icon: const Icon(Icons.menu),
                               ),
-                            if (ref.watch(startupWarningProvider)
-                                case final warning?)
-                              MaterialBanner(
-                                content: Text(warning),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => setState(
-                                      () => _selected = AppDestination.settings,
-                                    ),
-                                    child: const Text('查看设置'),
+                            ),
+                          if (ref.watch(startupWarningProvider)
+                              case final warning?)
+                            MaterialBanner(
+                              content: Text(warning),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => setState(
+                                    () => _selected = AppDestination.settings,
                                   ),
-                                ],
-                              ),
-                            if (playback != null)
-                              ListenableBuilder(
-                                listenable: playback,
-                                builder: (_, _) => Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (playback.error != null ||
-                                        playback.playbackNotice != null)
-                                      Text(
-                                        playback.error ??
-                                            playback.playbackNotice!,
-                                        key: const ValueKey('playback-error'),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    if (!playback.notificationsEnabled)
-                                      Text(
-                                        playback.notificationMessage ??
-                                            '允许播放通知后，可在通知栏和锁屏控制音乐。',
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    if (!playback.notificationsEnabled)
-                                      TextButton(
-                                        onPressed: playback
-                                            .requestNotificationPermission,
-                                        child: const Text('开启播放通知'),
-                                      ),
-                                  ],
+                                  child: const Text('查看设置'),
                                 ),
-                              ),
-                            Expanded(
-                              child: IndexedStack(
-                                index: _selected.index,
+                              ],
+                            ),
+                          if (playback != null)
+                            ListenableBuilder(
+                              listenable: playback,
+                              builder: (_, _) => Column(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  for (final destination
-                                      in AppDestination.values)
-                                    branch(destination),
+                                  if (playback.error != null ||
+                                      playback.playbackNotice != null)
+                                    Text(
+                                      playback.error ??
+                                          playback.playbackNotice!,
+                                      key: const ValueKey('playback-error'),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  if (!playback.notificationsEnabled)
+                                    Text(
+                                      playback.notificationMessage ??
+                                          '允许播放通知后，可在通知栏和锁屏控制音乐。',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  if (!playback.notificationsEnabled)
+                                    TextButton(
+                                      onPressed: playback
+                                          .requestNotificationPermission,
+                                      child: const Text('开启播放通知'),
+                                    ),
                                 ],
                               ),
                             ),
-                          ],
-                        ),
+                          Expanded(
+                            child: IndexedStack(
+                              index: _selected.index,
+                              children: [
+                                for (final destination in AppDestination.values)
+                                  branch(destination),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
