@@ -73,6 +73,9 @@ class _TagPickerState extends State<_TagPicker> {
             });
       final scheme = Theme.of(context).colorScheme;
       final textTheme = Theme.of(context).textTheme;
+      final screen = MediaQuery.of(context);
+      final availableHeight = (screen.size.height - screen.viewInsets.vertical)
+          .clamp(0.0, screen.size.height);
       final enabled = !library.filterDeletingTag;
 
       final compactAction = ButtonStyle(
@@ -95,7 +98,8 @@ class _TagPickerState extends State<_TagPicker> {
               if (chosen.isNotEmpty) ...[
                 if (mixed.isNotEmpty)
                   Text('带 − 的标签仅存在于部分所选歌曲', style: textTheme.labelSmall),
-                Flexible(
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: availableHeight * .16),
                   child: SingleChildScrollView(
                     child: Wrap(
                       spacing: 3,
@@ -185,7 +189,6 @@ class _TagPickerState extends State<_TagPicker> {
                 )
               else
                 Flexible(
-                  flex: 3,
                   child: ListView.builder(
                     shrinkWrap: true,
                     padding: EdgeInsets.zero,
