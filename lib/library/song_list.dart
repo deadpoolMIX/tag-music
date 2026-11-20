@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../core/reorder_handle.dart';
 import '../playback/playback_controller.dart';
 import 'library_controller.dart';
+import 'song_list_scrollbar.dart';
 import 'track_cover.dart';
 import 'song_information.dart';
 import 'playlist_actions.dart';
@@ -53,6 +54,8 @@ class SongList extends StatefulWidget {
 }
 
 class _SongListState extends State<SongList> {
+  static const double _rowRightPadding = 8;
+
   final _scroll = ScrollController();
   final _selectionFocus = FocusNode(debugLabel: 'song-list-selection');
   final _selected = <String>{};
@@ -396,8 +399,11 @@ class _SongListState extends State<SongList> {
                       final longList =
                           widget.rows.length * extent >
                           listConstraints.maxHeight * 1.75;
-                      final gutter = longList ? 22.0 : 0.0;
-                      final scheme = Theme.of(context).colorScheme;
+                      // The edge can reuse the row's outer padding without
+                      // covering the menu or reorder handle.
+                      final gutter = longList
+                          ? SongListScrollbar.dragWidth - _rowRightPadding
+                          : 0.0;
                       final reordering =
                           widget.reordering &&
                           !_selecting &&
@@ -415,29 +421,9 @@ class _SongListState extends State<SongList> {
                           else
                             CoverScrollRegion(
                               cache: widget.playback.documents.coverCache,
-                              child: RawScrollbar(
+                              child: SongListScrollbar(
                                 controller: _scroll,
-                                thumbVisibility: longList,
-                                trackVisibility: longList,
-                                interactive: longList,
-                                notificationPredicate: (notification) =>
-                                    longList && notification.depth == 0,
-                                scrollbarOrientation:
-                                    ScrollbarOrientation.right,
-                                thickness: 6,
-                                radius: const Radius.circular(3),
-                                trackRadius: const Radius.circular(3),
-                                thumbColor: scheme.primary.withValues(
-                                  alpha: .75,
-                                ),
-                                trackColor: scheme.outlineVariant.withValues(
-                                  alpha: .38,
-                                ),
-                                trackBorderColor: Colors.transparent,
-                                minThumbLength: 36,
-                                crossAxisMargin: 7,
-                                mainAxisMargin: 6,
-                                padding: EdgeInsets.zero,
+                                visible: longList,
                                 child: ScrollConfiguration(
                                   behavior: ScrollConfiguration.of(context)
                                       .copyWith(scrollbars: false),
@@ -545,7 +531,10 @@ class SongRow extends StatelessWidget {
           child: SizedBox(
             height: extent,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.only(
+                left: 8,
+                right: _SongListState._rowRightPadding,
+              ),
               child: Row(
                 children: [
                   SizedBox(
