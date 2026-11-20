@@ -11,6 +11,7 @@ import '../core/reorder_handle.dart';
 import '../library/library_controller.dart';
 import '../library/playlist_actions.dart';
 import '../library/song_information.dart';
+import '../library/tags_page.dart' show showTagActions;
 import '../library/track_cover.dart';
 import 'playback_controller.dart';
 import 'playback_queue.dart' show QueueEntry;
@@ -27,21 +28,34 @@ const playbackModeNames = {
 class PlaybackControls extends StatelessWidget {
   const PlaybackControls({
     required this.playback,
+    this.tagLibrary,
     this.onToggleLayout,
     this.large = false,
     this.immersiveColor,
+    this.blockBackgroundTap = false,
     super.key,
   });
   final PlaybackController playback;
+  final LibraryController? tagLibrary;
   final VoidCallback? onToggleLayout;
   final bool large;
   final Color? immersiveColor;
+  final bool blockBackgroundTap;
 
-  @override
-  Widget build(BuildContext context) => Wrap(
+  Widget _buttonArea(Widget child) => blockBackgroundTap
+      ? GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          excludeFromSemantics: true,
+          // Even disabled buttons should leave the desktop player layer alone.
+          onTap: () {},
+          child: child,
+        )
+      : child;
+
+  Widget _transport(double spacing) => Wrap(
     alignment: WrapAlignment.center,
     crossAxisAlignment: WrapCrossAlignment.center,
-    spacing: large ? 24 : 0,
+    spacing: spacing,
     children: [
       IconButton(
         tooltip: '上一首',
@@ -68,6 +82,91 @@ class PlaybackControls extends StatelessWidget {
       ),
     ],
   );
+
+  @override
+  Widget build(BuildContext context) {
+    final library = tagLibrary;
+    if (library == null) return _buttonArea(_transport(large ? 24 : 0));
+    final tagWidth = large ? 48.0 : 36.0;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final balanced = width >= (large ? 256 : 184);
+        final spacing = large && width >= 304 ? 24.0 : 0.0;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (balanced) SizedBox(width: tagWidth),
+            Flexible(child: _buttonArea(_transport(spacing))),
+            _buttonArea(
+              SizedBox(
+                width: tagWidth,
+                child: IconButton(
+                  key: const ValueKey('player-add-tag'),
+                  tooltip: '添加标签',
+                  color: immersiveColor,
+                  disabledColor: immersiveColor?.withValues(alpha: .38),
+                  onPressed: playback.currentSongId == null
+                      ? null
+                      : () {
+                          final songId = playback.currentSongId;
+                          if (songId != null) {
+                            showTagActions(context, library, {
+                              songId,
+                            }, title: '添加标签');
+                          }
+                        },
+                  icon: Builder(
+                    builder: (context) => CustomPaint(
+                      size: Size.square(large ? 24 : 20),
+                      painter: _PlaybackTagIcon(
+                        IconTheme.of(context).color ??
+                            Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PlaybackTagIcon extends CustomPainter {
+  const _PlaybackTagIcon(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 24, size.height / 24);
+    final outline = Path()
+      ..moveTo(4, 4)
+      ..lineTo(12, 4)
+      ..lineTo(21, 13)
+      ..lineTo(13, 21)
+      ..lineTo(4, 12)
+      ..close();
+    final ink = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(outline, ink);
+    canvas.drawCircle(
+      const Offset(8.5, 8.5),
+      1.15,
+      ink..style = PaintingStyle.fill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_PlaybackTagIcon oldDelegate) =>
+      color != oldDelegate.color;
 }
 
 class PlaybackModeButton extends StatelessWidget {

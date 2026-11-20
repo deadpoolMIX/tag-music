@@ -54,7 +54,7 @@ class LibraryController extends ChangeNotifier {
   int _filterWriteRevision = 0;
   Future<void>? _filterWrites;
   List<LibraryTrack>? _matchedCache;
-  List<LibraryTrack>? _filteredCache;
+  final _filteredCache = <(LibrarySort, bool), List<LibraryTrack>>{};
   bool get filterSaving => _filterWritesPending > 0;
 
   List<LibraryTrack> get filterMatches => _matchedCache ??= List.unmodifiable(
@@ -67,8 +67,17 @@ class LibraryController extends ChangeNotifier {
           ),
   );
 
-  List<LibraryTrack> get filtered {
-    if (_filteredCache != null) return _filteredCache!;
+  List<LibraryTrack> get filtered => filterResults(
+    order: filterPreferences.sort,
+    descending: filterPreferences.descending,
+  );
+
+  List<LibraryTrack> filterResults({
+    required LibrarySort order,
+    required bool descending,
+  }) {
+    final key = (order, descending);
+    if (_filteredCache[key] case final cached?) return cached;
     final needle = filterQuery.trim().toLowerCase();
     final rows = filterMatches
         .where(
@@ -82,18 +91,18 @@ class LibraryController extends ChangeNotifier {
               ].any((value) => value.toLowerCase().contains(needle)),
         )
         .toList();
-    _sortTracks(rows, filterPreferences.sort, filterPreferences.descending);
-    return _filteredCache = List.unmodifiable(rows);
+    _sortTracks(rows, order, descending);
+    return _filteredCache[key] = List.unmodifiable(rows);
   }
 
   void _invalidateFilter() {
     _matchedCache = null;
-    _filteredCache = null;
+    _filteredCache.clear();
   }
 
   void searchFilter(String text) {
     filterQuery = text;
-    _filteredCache = null;
+    _filteredCache.clear();
     _publish();
   }
 

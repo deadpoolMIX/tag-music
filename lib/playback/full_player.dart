@@ -686,6 +686,7 @@ class _PlayerBody extends StatelessWidget {
   Widget _controls(BuildContext context) {
     final transport = PlaybackControls(
       playback: playback,
+      tagLibrary: library,
       onToggleLayout: playback.toggleLayout,
       large: true,
       immersiveColor: controlColor,
@@ -774,8 +775,7 @@ class _PlayerBody extends StatelessWidget {
       final controls = _controls(context);
       final wide = width >= 760 && height >= 320;
       final short =
-          height < 355 ||
-          MediaQuery.textScalerOf(context).scale(16) > 26;
+          height < 355 || MediaQuery.textScalerOf(context).scale(16) > 26;
       final Widget content;
       if (wide && !short) {
         content = Row(
@@ -819,9 +819,7 @@ class _PlayerBody extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(horizontal, 8, horizontal, 10),
         child: Center(
           child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: wide ? 1080 : 560,
-            ),
+            constraints: BoxConstraints(maxWidth: wide ? 1080 : 560),
             child: content,
           ),
         ),

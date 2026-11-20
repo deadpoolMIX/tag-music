@@ -62,8 +62,9 @@ Future<void> _editName(
 Future<void> showTagActions(
   BuildContext context,
   LibraryController library,
-  Set<String> songIds,
-) async {
+  Set<String> songIds, {
+  String? title,
+}) async {
   if (songIds.isEmpty) return;
   final totals = <String, int>{};
   for (final songId in songIds) {
@@ -79,7 +80,9 @@ Future<void> showTagActions(
   final result = await showTagPicker(
     context,
     library,
-    title: songIds.length == 1 ? '编辑歌曲标签' : '为 ${songIds.length} 首歌曲编辑标签',
+    title:
+        title ??
+        (songIds.length == 1 ? '编辑歌曲标签' : '为 ${songIds.length} 首歌曲编辑标签'),
     prefix: 'song-tags',
     initial: selected,
     initialMixed: mixed,

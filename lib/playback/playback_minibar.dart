@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../library/library_controller.dart';
 import '../library/song_selection.dart';
+import 'playback_bar_gestures.dart';
 import 'playback_controller.dart';
 import 'full_player.dart';
 import '../library/track_cover.dart';
@@ -24,6 +25,9 @@ class PlaybackMinibar extends ConsumerWidget {
       final lyric = current != null && playback?.changingTrack == false
           ? playback?.currentLyric
           : null;
+      final openPlayer = playback == null
+          ? null
+          : () => openFullPlayer(context);
       final title = Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -51,63 +55,65 @@ class PlaybackMinibar extends ConsumerWidget {
         color: Theme.of(context).colorScheme.surfaceContainer,
         child: SafeArea(
           top: false,
-          child: Row(
-            children: [
-              Expanded(
-                child: Tooltip(
-                  message: '打开完整播放器',
-                  child: InkWell(
-                    onTap: playback == null
-                        ? null
-                        : () => openFullPlayer(context),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      child: Row(
-                        children: [
-                          if (current != null && playback != null) ...[
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: TrackCover(
-                                documents: playback.documents,
-                                track: current,
-                                size: 44,
-                                currentArtwork: true,
+          child: PlaybackBarGestures(
+            playback: playback,
+            onOpenPlayer: openPlayer,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Tooltip(
+                    message: '打开完整播放器',
+                    child: InkWell(
+                      onTap: openPlayer,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          children: [
+                            if (current != null && playback != null) ...[
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: TrackCover(
+                                  documents: playback.documents,
+                                  track: current,
+                                  size: 44,
+                                  currentArtwork: true,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
+                              const SizedBox(width: 12),
+                            ],
+                            Expanded(child: title),
                           ],
-                          Expanded(child: title),
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              if (playback != null)
-                PlaybackToggleButton(
-                  playback: playback,
-                  filled: false,
-                  enabled: !playback.busy,
-                )
-              else
-                const IconButton(
-                  key: ValueKey('play-pause'),
-                  tooltip: '播放',
-                  onPressed: null,
-                  icon: Icon(Icons.play_arrow),
+                if (playback != null)
+                  PlaybackToggleButton(
+                    playback: playback,
+                    filled: false,
+                    enabled: !playback.busy,
+                  )
+                else
+                  const IconButton(
+                    key: ValueKey('play-pause'),
+                    tooltip: '播放',
+                    onPressed: null,
+                    icon: Icon(Icons.play_arrow),
+                  ),
+                IconButton(
+                  key: const ValueKey('open-playback-queue'),
+                  tooltip: '播放队列',
+                  onPressed: playback == null
+                      ? null
+                      : () => showPlaybackQueue(context, playback, library),
+                  icon: const Icon(Icons.queue_music),
                 ),
-              IconButton(
-                key: const ValueKey('open-playback-queue'),
-                tooltip: '播放队列',
-                onPressed: playback == null
-                    ? null
-                    : () => showPlaybackQueue(context, playback, library),
-                icon: const Icon(Icons.queue_music),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );

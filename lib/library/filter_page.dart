@@ -42,8 +42,8 @@ class FilterPage extends StatelessWidget {
     if (confirmed == true) {
       await library.updateFilter(
         rule: FilterRule(),
-        order: LibrarySort.title,
-        reverse: false,
+        order: LibrarySort.modified,
+        reverse: true,
         reset: true,
       );
     }
@@ -53,8 +53,15 @@ class FilterPage extends StatelessWidget {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: library,
     builder: (context, _) {
-      final preferences = library.filterPreferences;
-      final rows = library.filtered;
+      final preferences = FilterPreferences(
+        rule: library.filterPreferences.rule,
+        sort: LibrarySort.modified,
+        descending: true,
+      );
+      final rows = library.filterResults(
+        order: preferences.sort,
+        descending: preferences.descending,
+      );
       final loadError = library.filterLoadError;
       final saveError = library.filterSaveError;
       final enabled = loadError == null && !library.filterDeletingTag;
@@ -112,7 +119,9 @@ class FilterPage extends StatelessWidget {
           scope: 'filter',
           library: library,
           playback: playback,
-          source: library.matchingTracks(preferences),
+          source: library.filterQuery.trim().isEmpty
+              ? rows
+              : library.matchingTracks(preferences),
           rows: rows,
           enabled: enabled,
           emptyText: loadError == null ? '没有匹配的歌曲' : '',

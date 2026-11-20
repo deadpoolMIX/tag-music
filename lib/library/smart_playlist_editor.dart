@@ -117,10 +117,7 @@ class _SmartEditorState extends State<_SmartEditor> {
                   DropdownButton<LibrarySort>(
                     isDense: true,
                     key: const ValueKey('smart-sort'),
-                    value: preferences.sort == LibrarySort.modified
-                        ? null
-                        : preferences.sort,
-                    hint: const Text('修改时间（已保存）'),
+                    value: preferences.sort,
                     onChanged: saving ? null : (sort) => _change(sort: sort),
                     items: [
                       for (final entry in {
@@ -128,6 +125,7 @@ class _SmartEditorState extends State<_SmartEditor> {
                         LibrarySort.artist: '歌手',
                         LibrarySort.album: '专辑',
                         LibrarySort.name: '文件名',
+                        LibrarySort.modified: '修改时间',
                       }.entries)
                         DropdownMenuItem(
                           value: entry.key,

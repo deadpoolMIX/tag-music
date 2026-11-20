@@ -10,6 +10,7 @@ import '../library/song_selection.dart';
 import '../library/track_cover.dart';
 import 'cover_viewer.dart';
 import 'full_player.dart' show ImmersiveLyrics, PlayerSeek;
+import 'playback_bar_gestures.dart';
 import 'playback_controller.dart';
 import 'playback_status.dart';
 import 'player_actions.dart';
@@ -204,37 +205,38 @@ class _DesktopPlaybackBar extends ConsumerWidget {
     );
   }
 
-  Widget _transport(BuildContext context, PlaybackController? playback) =>
-      Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (playback != null)
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              excludeFromSemantics: true,
-              // Disabled transport buttons must not toggle the player layer.
-              onTap: () {},
-              child: PlaybackControls(playback: playback),
-            )
-          else
-            const IconButton.filled(
-              tooltip: '播放',
-              onPressed: null,
-              icon: Icon(Icons.play_arrow),
-            ),
-          if (playback != null)
-            SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                trackHeight: 3,
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-              ),
-              child: PlayerSeek(playback: playback, inlineTimes: true),
-            )
-          else
-            const SizedBox(height: 26),
-        ],
-      );
+  Widget _transport(
+    BuildContext context,
+    PlaybackController? playback,
+    LibraryController? library,
+  ) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      if (playback != null)
+        PlaybackControls(
+          playback: playback,
+          tagLibrary: library,
+          blockBackgroundTap: true,
+        )
+      else
+        const IconButton.filled(
+          tooltip: '播放',
+          onPressed: null,
+          icon: Icon(Icons.play_arrow),
+        ),
+      if (playback != null)
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            trackHeight: 3,
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+          ),
+          child: PlayerSeek(playback: playback, inlineTimes: true),
+        )
+      else
+        const SizedBox(height: 26),
+    ],
+  );
 
   Widget _auxiliary(
     BuildContext context,
@@ -304,7 +306,7 @@ class _DesktopPlaybackBar extends ConsumerWidget {
                 ),
             ],
           );
-          final controls = _transport(context, playback);
+          final controls = _transport(context, playback, library);
           final auxiliary = _auxiliary(context, playback, library);
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
@@ -318,67 +320,71 @@ class _DesktopPlaybackBar extends ConsumerWidget {
                         globalPosition: details.globalPosition,
                         includeClose: false,
                       ),
-            child: SafeArea(
-              top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Divider(
-                    height: 1,
-                    color: expanded
-                        ? Colors.transparent
-                        : theme.colorScheme.outlineVariant,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-                    child: IconButtonTheme(
-                      data: IconButtonThemeData(
-                        style: IconButton.styleFrom(
-                          iconSize: 20,
-                          minimumSize: const Size.square(36),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            child: PlaybackBarGestures(
+              playback: playback,
+              onOpenPlayer: expanded ? null : toggle,
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Divider(
+                      height: 1,
+                      color: expanded
+                          ? Colors.transparent
+                          : theme.colorScheme.outlineVariant,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                      child: IconButtonTheme(
+                        data: IconButtonThemeData(
+                          style: IconButton.styleFrom(
+                            iconSize: 20,
+                            minimumSize: const Size.square(36),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
                         ),
-                      ),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final width = constraints.maxWidth;
-                          if (width < 640) {
-                            return Column(
-                              mainAxisSize: MainAxisSize.min,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final width = constraints.maxWidth;
+                            if (width < 640) {
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (width < 320) ...[
+                                    identity,
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: auxiliary,
+                                    ),
+                                  ] else
+                                    Row(
+                                      children: [
+                                        Expanded(child: identity),
+                                        auxiliary,
+                                      ],
+                                    ),
+                                  controls,
+                                ],
+                              );
+                            }
+                            return Row(
+                              spacing: 12,
                               children: [
-                                if (width < 320) ...[
-                                  identity,
-                                  Align(
-                                    alignment: Alignment.centerRight,
-                                    child: auxiliary,
-                                  ),
-                                ] else
-                                  Row(
-                                    children: [
-                                      Expanded(child: identity),
-                                      auxiliary,
-                                    ],
-                                  ),
-                                controls,
+                                SizedBox(
+                                  width: (width * .18).clamp(138.0, 246.0),
+                                  child: identity,
+                                ),
+                                Expanded(child: controls),
+                                auxiliary,
                               ],
                             );
-                          }
-                          return Row(
-                            spacing: 12,
-                            children: [
-                              SizedBox(
-                                width: (width * .18).clamp(138.0, 246.0),
-                                child: identity,
-                              ),
-                              Expanded(child: controls),
-                              auxiliary,
-                            ],
-                          );
-                        },
+                          },
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           );
