@@ -38,6 +38,36 @@ class SongListPageActivity extends InheritedWidget {
       active != oldWidget.active;
 }
 
+class PlayAllButton extends StatelessWidget {
+  const PlayAllButton({
+    required this.playback,
+    required this.tracks,
+    this.tooltip = '播放全部',
+    this.enabled = true,
+    super.key,
+  });
+
+  final PlaybackController? playback;
+  final List<LibraryTrack> tracks;
+  final String tooltip;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final player = playback;
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: !enabled || player == null || !tracks.any((t) => t.available)
+          ? null
+          : () => player.playSongs([
+              for (final track in tracks)
+                if (track.available) track.queueSong,
+            ], 0),
+      icon: const Icon(Icons.play_arrow_rounded),
+    );
+  }
+}
+
 /// Every owner supplies its complete ordered membership, separately from search.
 /// Selection and scrolling belong to this mounted page, never the controller.
 class SongList extends StatefulWidget {

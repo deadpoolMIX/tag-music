@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/compact_dialog.dart';
 import '../core/desktop_navigation.dart';
+import '../core/marquee_title.dart';
 import '../library/group_pages.dart';
 import '../library/library_controller.dart';
 import '../library/playlist_actions.dart';
@@ -421,28 +422,52 @@ class _PlayerHeading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final style = theme.textTheme.bodyMedium?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-    );
-    final title = playbackTitle(playback);
-    final source = library;
-    final artists = playback.changingTrack
-        ? const <String>[]
-        : artistNames(playback.metadata?.artist);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _PlayerTitle(text: title, style: theme.textTheme.titleLarge!),
-        if (artists.isEmpty)
-          Text(
+        MarqueeTitle(
+          text: playbackTitle(playback),
+          style: theme.textTheme.titleLarge!,
+          pause: const Duration(seconds: 1),
+        ),
+        PlayerArtistLine(
+          playback: playback,
+          library: library,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class PlayerArtistLine extends StatelessWidget {
+  const PlayerArtistLine({
+    required this.playback,
+    required this.library,
+    this.style,
+    super.key,
+  });
+  final PlaybackController playback;
+  final LibraryController? library;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final source = library;
+    final artists = playback.changingTrack
+        ? const <String>[]
+        : artistNames(playback.metadata?.artist);
+    return artists.isEmpty
+        ? Text(
             playbackArtist(playback),
             style: style,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           )
-        else
-          SingleChildScrollView(
+        : SingleChildScrollView(
             key: ValueKey(playback.queue.current?.entryId),
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -468,126 +493,7 @@ class _PlayerHeading extends StatelessWidget {
                 ],
               ],
             ),
-          ),
-      ],
-    );
-  }
-}
-
-class _PlayerTitle extends StatelessWidget {
-  const _PlayerTitle({required this.text, required this.style});
-  final String text;
-  final TextStyle style;
-
-  @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final title = Text(
-        text,
-        style: style,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      );
-      if (MediaQuery.disableAnimationsOf(context) ||
-          constraints.maxWidth <= 0) {
-        return title;
-      }
-      final painter = TextPainter(
-        text: TextSpan(text: text, style: style),
-        textDirection: Directionality.of(context),
-        textScaler: MediaQuery.textScalerOf(context),
-        locale: Localizations.maybeLocaleOf(context),
-        maxLines: 1,
-      )..layout();
-      final titleWidth = painter.width;
-      final titleHeight = painter.height;
-      painter.dispose();
-      return titleWidth <= constraints.maxWidth
-          ? title
-          : SizedBox(
-              height: titleHeight,
-              child: _MarqueeTitle(
-                key: ValueKey((text, titleWidth, constraints.maxWidth)),
-                text: text,
-                style: style,
-                distance: titleWidth + 40,
-              ),
-            );
-    },
-  );
-}
-
-class _MarqueeTitle extends StatefulWidget {
-  const _MarqueeTitle({
-    required this.text,
-    required this.style,
-    required this.distance,
-    super.key,
-  });
-
-  final String text;
-  final TextStyle style;
-  final double distance;
-
-  @override
-  State<_MarqueeTitle> createState() => _MarqueeTitleState();
-}
-
-class _MarqueeTitleState extends State<_MarqueeTitle>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _offset;
-
-  @override
-  void initState() {
-    super.initState();
-    const pause = 1000.0;
-    final travel = widget.distance / 34 * 1000;
-    _controller = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: (pause + travel).round()),
-    )..repeat();
-    _offset = TweenSequence<double>([
-      TweenSequenceItem(tween: ConstantTween(0.0), weight: pause),
-      TweenSequenceItem(
-        tween: Tween(begin: 0.0, end: widget.distance),
-        weight: travel,
-      ),
-    ]).animate(_controller);
-  }
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    label: widget.text,
-    excludeSemantics: true,
-    child: ClipRect(
-      child: OverflowBox(
-        alignment: Alignment.centerLeft,
-        minWidth: 0,
-        maxWidth: double.infinity,
-        child: AnimatedBuilder(
-          animation: _offset,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            spacing: 40,
-            children: [
-              Text(widget.text, style: widget.style, maxLines: 1),
-              Text(widget.text, style: widget.style, maxLines: 1),
-            ],
-          ),
-          builder: (_, child) => Transform.translate(
-            offset: Offset(-_offset.value, 0),
-            child: child,
-          ),
-        ),
-      ),
-    ),
-  );
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+          );
   }
 }
 

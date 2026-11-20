@@ -6,6 +6,7 @@ import '../playback/playback_controller.dart';
 import '../playback/queue_actions.dart';
 import 'database.dart';
 import 'library_controller.dart';
+import 'library_header.dart';
 import 'playlist_actions.dart';
 import 'filter_rule.dart';
 import 'group_pages.dart';
@@ -30,7 +31,6 @@ class PlaylistsPage extends StatefulWidget {
 
 class _PlaylistsPageState extends State<PlaylistsPage> {
   String? openedId;
-  String query = '';
   bool reorderingMode = false;
   bool busy = false;
   bool descending = false;
@@ -114,185 +114,123 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
       } catch (error) {
         ruleError = '无法读取智能歌单：$error';
       }
-      final needle = query.trim().toLowerCase();
-      final rows = all
-          .where(
-            (t) =>
-                needle.isEmpty ||
-                [
-                  t.title,
-                  t.song.name,
-                  t.song.artist ?? '',
-                  t.song.album ?? '',
-                ].any((value) => value.toLowerCase().contains(needle)),
-          )
-          .toList();
-      final reordering = !smart && needle.isEmpty && reorderingMode && !busy;
+      final reordering = !smart && reorderingMode && !busy;
       final desktop = DesktopNavigation.maybeOf(context) != null;
-      final detail = LayoutBuilder(
-        builder: (context, constraints) => SongList(
-          onBack: desktop
-              ? null
-              : () {
-                  if (!busy) _closePlaylist();
-                },
-          header: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: constraints.maxHeight * .65),
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        ?widget.menuButton,
-                        IconButton(
-                          tooltip: '返回歌单',
-                          onPressed: busy ? null : _closePlaylist,
-                          icon: const Icon(Icons.arrow_back),
-                        ),
-                        Expanded(
-                          child: Text(
-                            list.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                        ),
-                        PopupMenuButton<String>(
-                          enabled: !busy,
-                          tooltip: '歌单操作',
-                          onSelected: (action) {
-                            if (action == 'rename') {
-                              savePlaylist(
-                                context,
-                                library,
-                                const [],
-                                rename: list,
-                              );
-                            }
-                            if (action == 'delete') _delete(list);
-                            if (action == 'edit') {
-                              _editSmart(list);
-                            }
-                          },
-                          itemBuilder: (_) => [
-                            if (smart)
-                              const PopupMenuItem(
-                                value: 'edit',
-                                child: Text('编辑规则'),
-                              ),
-                            const PopupMenuItem(
-                              value: 'rename',
-                              child: Text('改名'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Text('删除'),
-                            ),
-                          ],
-                        ),
-                      ],
+      final detail = SongList(
+        onBack: desktop
+            ? null
+            : () {
+                if (!busy) _closePlaylist();
+              },
+        header: Column(
+          children: [
+            LibraryHeader(
+              menuButton: widget.menuButton ?? const AppNavigationButton(),
+              heading: Text(
+                list.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              actions: [
+                if (!smart)
+                  IconButton(
+                    key: const ValueKey('playlist-reorder'),
+                    tooltip: reorderingMode ? '结束排序' : '调整顺序',
+                    isSelected: reorderingMode,
+                    onPressed: busy
+                        ? null
+                        : () =>
+                              setState(() => reorderingMode = !reorderingMode),
+                    icon: const Icon(Icons.reorder),
+                    selectedIcon: const Icon(Icons.check),
+                  ),
+                if (!smart)
+                  IconButton(
+                    key: const ValueKey('playlist-add-songs'),
+                    tooltip: '添加歌曲',
+                    onPressed: busy
+                        ? null
+                        : () => pickPlaylistSongs(context, library, list.id),
+                    icon: const Icon(Icons.playlist_add),
+                  ),
+                Text('${all.length}首'),
+                PopupMenuButton<String>(
+                  enabled: !busy,
+                  tooltip: '歌单操作',
+                  onSelected: (action) {
+                    switch (action) {
+                      case 'enqueue':
+                        enqueueSongs(
+                          context,
+                          widget.playback,
+                          all
+                              .where((track) => track.available)
+                              .map((track) => track.queueSong)
+                              .toList(),
+                        );
+                      case 'rename':
+                        savePlaylist(context, library, const [], rename: list);
+                      case 'delete':
+                        _delete(list);
+                      case 'edit':
+                        _editSmart(list);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'enqueue',
+                      enabled: all.any((track) => track.available),
+                      child: const Text('添加到播放队列'),
                     ),
-                    TextFormField(
-                      initialValue: query,
-                      key: ValueKey('playlist-search-${list.id}'),
-                      decoration: const InputDecoration(
-                        hintText: '搜索歌单歌曲',
-                        prefixIcon: Icon(Icons.search, size: 18),
-                      ),
-                      onChanged: (value) => setState(() {
-                        query = value;
-                        // Searching changes the displayed membership. End
-                        // reorder mode so later clearing the query preserves
-                        // any selection made in the search results.
-                        if (value.trim().isNotEmpty) reorderingMode = false;
-                      }),
-                    ),
-                    Wrap(
-                      spacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text('${rows.length} / ${all.length} 首'),
-                        QueueAddButton(
-                          key: const ValueKey('enqueue-playlist'),
-                          playback: widget.playback,
-                          songs: busy
-                              ? const []
-                              : rows
-                                    .where((t) => t.available)
-                                    .map((t) => t.queueSong)
-                                    .toList(),
-                        ),
-                        if (!smart)
-                          TextButton.icon(
-                            key: const ValueKey('playlist-add-songs'),
-                            onPressed: busy
-                                ? null
-                                : () => pickPlaylistSongs(
-                                    context,
-                                    library,
-                                    list.id,
-                                  ),
-                            icon: const Icon(Icons.add),
-                            label: const Text('添加歌曲'),
-                          ),
-                        if (!smart)
-                          TextButton(
-                            key: const ValueKey('playlist-reorder'),
-                            onPressed: busy || needle.isNotEmpty
-                                ? null
-                                : () => setState(
-                                    () => reorderingMode = !reorderingMode,
-                                  ),
-                            child: Text(reorderingMode ? '结束排序' : '调整顺序'),
-                          ),
-                      ],
-                    ),
-                    Text(
-                      smart
-                          ? '规则和排序独立保存，结果随曲库和标签变化。'
-                          : needle.isEmpty
-                          ? '拖动歌曲调整顺序；多选可批量移除'
-                          : '搜索中不能重排歌曲',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    if (ruleError != null)
-                      Text(
-                        ruleError,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    if (busy) const LinearProgressIndicator(),
+                    if (smart)
+                      const PopupMenuItem(value: 'edit', child: Text('编辑规则')),
+                    const PopupMenuItem(value: 'rename', child: Text('改名')),
+                    const PopupMenuItem(value: 'delete', child: Text('删除')),
                   ],
                 ),
-              ),
+                PlayAllButton(
+                  playback: widget.playback,
+                  tracks: all,
+                  enabled: !busy && ruleError == null,
+                  tooltip: '播放歌单',
+                ),
+              ],
             ),
-          ),
-          scope: 'playlist',
-          emptyText: ruleError != null
-              ? '修复规则后显示结果'
-              : all.isEmpty
-              ? (smart ? '没有匹配的可用歌曲' : '空歌单，添加歌曲后即可播放')
-              : '没有匹配的歌曲',
-          key: ValueKey('playlist-songs-${list.id}'),
-          library: library,
-          playback: widget.playback,
-          source: all,
-          rows: rows,
-          enabled: !busy && ruleError == null,
-          reordering: reordering,
-          onRemove: smart
-              ? null
-              : (ids) =>
-                    _change(() => library.removePlaylistSongs(list.id, ids)),
-          onReorder: (oldIndex, newIndex) {
-            final ids = all.map((t) => t.song.id).toList();
-            ids.insert(newIndex, ids.removeAt(oldIndex));
-            _change(() => library.reorderPlaylist(list.id, ids));
-          },
+            if (smart)
+              Text(
+                '规则和排序独立保存，结果随曲库和标签变化。',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            if (ruleError != null)
+              Text(
+                ruleError,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            if (busy) const LinearProgressIndicator(),
+          ],
         ),
+        scope: 'playlist',
+        emptyText: ruleError != null
+            ? '修复规则后显示结果'
+            : smart
+            ? '没有匹配的可用歌曲'
+            : '空歌单，添加歌曲后即可播放',
+        key: ValueKey('playlist-songs-${list.id}'),
+        library: library,
+        playback: widget.playback,
+        source: all,
+        rows: all,
+        enabled: !busy && ruleError == null,
+        reordering: reordering,
+        onRemove: smart
+            ? null
+            : (ids) => _change(() => library.removePlaylistSongs(list.id, ids)),
+        onReorder: (oldIndex, newIndex) {
+          final ids = all.map((t) => t.song.id).toList();
+          ids.insert(newIndex, ids.removeAt(oldIndex));
+          _change(() => library.reorderPlaylist(list.id, ids));
+        },
       );
       return desktop
           ? PopScope(canPop: !widget.active || !busy, child: detail)
@@ -308,7 +246,6 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
       if (next == null) FocusScope.of(context).unfocus();
       setState(() {
         openedId = next;
-        query = '';
         reorderingMode = false;
       });
     }
@@ -318,14 +255,6 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
       show(id);
     } else {
       history.visit(context, this, openedId, id, show, returning: returning);
-    }
-  }
-
-  String _count(LibraryController library, Playlist list) {
-    try {
-      return '${library.playlistTracks(list.id).length} 首';
-    } catch (_) {
-      return '规则不可读取';
     }
   }
 
@@ -347,18 +276,29 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
       storageKey: 'playlist-overview',
       descending: descending,
       onSort: () => setState(() => descending = !descending),
-      itemCount: lists.length,
+      items: lists,
+      nameOf: (list) => list.name,
+      searchHint: '搜索歌单',
       emptyText: '保存喜欢的歌曲顺序，或创建空歌单',
-      itemBuilder: (_, i) {
-        final list = lists[i];
+      itemBuilder: (_, list) {
+        List<LibraryTrack>? tracks;
+        try {
+          tracks = library.playlistTracks(list.id);
+        } on FormatException {
+          // Keep the row and let the detail page offer rule repair.
+        }
+        final count = tracks == null ? '规则不可读取' : '${tracks.length} 首';
         return ListTile(
           key: ValueKey('playlist-${list.id}'),
           leading: Icon(
             list.kind == 'smart' ? Icons.auto_awesome : Icons.queue_music,
           ),
           title: Text(list.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-          subtitle: Text(
-            '${list.kind == 'smart' ? '智能歌单' : '普通歌单'} · ${_count(library, list)}',
+          subtitle: Text('${list.kind == 'smart' ? '智能歌单' : '普通歌单'} · $count'),
+          trailing: PlayAllButton(
+            playback: widget.playback,
+            tracks: tracks ?? const [],
+            tooltip: '播放歌单',
           ),
           onTap: () => _openPlaylist(list.id),
         );

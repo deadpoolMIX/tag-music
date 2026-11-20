@@ -134,6 +134,7 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
       builder: (context, child) {
         final navigation = PageNavigationScope(
           observer: _routes,
+          openMenu: () => _shell.currentState?._openNavigation(),
           child: CallbackShortcuts(
             bindings: {
               const SingleActivator(LogicalKeyboardKey.escape): desktop
@@ -363,7 +364,9 @@ class _AppShellState extends ConsumerState<AppShell>
       scaffold.openDrawer();
       return;
     }
-    final navigator = Navigator.of(context, rootNavigator: true);
+    final history = DesktopNavigation.maybeOf(context);
+    final navigator =
+        history?.navigator ?? Navigator.of(context, rootNavigator: true);
     var swipeStartX = 0.0;
     final destination = await showGeneralDialog<AppDestination>(
       context: context,
@@ -382,7 +385,10 @@ class _AppShellState extends ConsumerState<AppShell>
             }
           },
           child: Drawer(
-            width: MediaQuery.sizeOf(drawerContext).width * .52,
+            width: (MediaQuery.sizeOf(drawerContext).width * .52).clamp(
+              0.0,
+              history == null ? double.infinity : 280.0,
+            ),
             child: _navigation(
               false,
               (destination) => Navigator.of(drawerContext).pop(destination),
@@ -517,70 +523,76 @@ class _AppShellState extends ConsumerState<AppShell>
       Widget unavailable() => const Center(child: Text('曲库尚未就绪'));
       Widget branch(AppDestination destination) => KeyedSubtree(
         key: ValueKey(destination),
-        child: SongListPageActivity(
-          active: _selected == destination,
-          child: switch (destination) {
-            AppDestination.songs =>
-              library == null || playback == null
-                  ? unavailable()
-                  : LibraryPage(
-                      library: library,
-                      playback: playback,
-                      menuButton: menuButton,
-                    ),
-            AppDestination.playCounts =>
-              _selected != destination
-                  ? const SizedBox.shrink()
-                  : library == null || playback == null
-                  ? unavailable()
-                  : PlayCountsPage(
-                      library: library,
-                      playback: playback,
-                      menuButton: menuButton,
-                    ),
-            AppDestination.filter =>
-              library == null || playback == null
-                  ? unavailable()
-                  : FilterPage(
-                      library: library,
-                      playback: playback,
-                      menuButton: menuButton,
-                    ),
-            AppDestination.playlists =>
-              library == null || playback == null
-                  ? unavailable()
-                  : PlaylistsPage(
-                      library: library,
-                      playback: playback,
-                      active: _selected == AppDestination.playlists,
-                      menuButton: menuButton,
-                    ),
-            AppDestination.tags =>
-              library == null || playback == null
-                  ? unavailable()
-                  : TagsPage(
-                      library: library,
-                      playback: playback,
-                      active: _selected == AppDestination.tags,
-                      menuButton: menuButton,
-                    ),
-            AppDestination.songEditor => SongEditorPage(
-              library: library,
-              playback: playback,
-              menuButton: menuButton,
+        child: TickerMode(
+          enabled: _selected == destination,
+          child: ExcludeFocus(
+            excluding: _selected != destination,
+            child: SongListPageActivity(
+              active: _selected == destination,
+              child: switch (destination) {
+                AppDestination.songs =>
+                  library == null || playback == null
+                      ? unavailable()
+                      : LibraryPage(
+                          library: library,
+                          playback: playback,
+                          menuButton: menuButton,
+                        ),
+                AppDestination.playCounts =>
+                  _selected != destination
+                      ? const SizedBox.shrink()
+                      : library == null || playback == null
+                      ? unavailable()
+                      : PlayCountsPage(
+                          library: library,
+                          playback: playback,
+                          menuButton: menuButton,
+                        ),
+                AppDestination.filter =>
+                  library == null || playback == null
+                      ? unavailable()
+                      : FilterPage(
+                          library: library,
+                          playback: playback,
+                          menuButton: menuButton,
+                        ),
+                AppDestination.playlists =>
+                  library == null || playback == null
+                      ? unavailable()
+                      : PlaylistsPage(
+                          library: library,
+                          playback: playback,
+                          active: _selected == AppDestination.playlists,
+                          menuButton: menuButton,
+                        ),
+                AppDestination.tags =>
+                  library == null || playback == null
+                      ? unavailable()
+                      : TagsPage(
+                          library: library,
+                          playback: playback,
+                          active: _selected == AppDestination.tags,
+                          menuButton: menuButton,
+                        ),
+                AppDestination.songEditor => SongEditorPage(
+                  library: library,
+                  playback: playback,
+                  menuButton: menuButton,
+                ),
+                AppDestination.settings => SettingsPage(menuButton: menuButton),
+                AppDestination.albums || AppDestination.artists =>
+                  library == null || playback == null
+                      ? unavailable()
+                      : MetadataGroupsPage(
+                          library: library,
+                          playback: playback,
+                          albums: destination == AppDestination.albums,
+                          active: _selected == destination,
+                          menuButton: menuButton,
+                        ),
+              },
             ),
-            AppDestination.settings => SettingsPage(menuButton: menuButton),
-            AppDestination.albums || AppDestination.artists =>
-              library == null || playback == null
-                  ? unavailable()
-                  : MetadataGroupsPage(
-                      library: library,
-                      playback: playback,
-                      albums: destination == AppDestination.albums,
-                      active: _selected == destination,
-                      menuButton: menuButton,
-                    ),
-          },
+          ),
         ),
       );
       return Scaffold(
@@ -589,15 +601,17 @@ class _AppShellState extends ConsumerState<AppShell>
             Expanded(
               child: Scaffold(
                 key: _scaffold,
-                drawer: desktop
-                    ? null
-                    : Drawer(
-                        width: constraints.maxWidth * .52,
-                        child: _navigation(false, (destination) {
-                          _select(destination);
-                          _scaffold.currentState?.closeDrawer();
-                        }),
-                      ),
+                drawerEnableOpenDragGesture: !desktop,
+                drawer: Drawer(
+                  width: (constraints.maxWidth * .52).clamp(
+                    0.0,
+                    desktop ? 280.0 : double.infinity,
+                  ),
+                  child: _navigation(false, (destination) {
+                    _select(destination);
+                    _scaffold.currentState?.closeDrawer();
+                  }),
+                ),
                 drawerScrimColor: Colors.black26,
                 body: SafeArea(
                   bottom: false,

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../core/compact_dialog.dart';
-import '../core/desktop_navigation.dart';
 import '../playback/playback_controller.dart';
 import 'library_controller.dart';
 import 'database.dart';
-import 'library_search_page.dart';
+import 'library_header.dart';
+import 'library_search.dart';
 import 'relocation_dialog.dart';
 import 'song_list.dart';
 import 'song_sort.dart';
@@ -26,87 +26,76 @@ class LibraryPage extends StatelessWidget {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: library,
     builder: (context, _) {
-      final rows = library.visible;
-      return SongList(
-        header: Column(
-          children: [
-            Row(
+      final all = library.visible;
+      return LibrarySearch(
+        hintText: '搜索歌曲、歌手、专辑或文件名',
+        heading: Text('歌曲', style: Theme.of(context).textTheme.titleLarge),
+        buttonKey: const ValueKey('open-library-search'),
+        fieldKey: const ValueKey('library-search'),
+        builder: (context, query, heading, searchButton) {
+          final rows = searchSongRows(all, query);
+          return SongList(
+            header: Column(
               children: [
-                ?menuButton,
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    '歌曲',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
+                LibraryHeader(
+                  menuButton: menuButton,
+                  heading: heading,
+                  actions: [
+                    searchButton,
+                    PlayAllButton(playback: playback, tracks: all),
+                  ],
                 ),
-                IconButton(
-                  key: const ValueKey('open-library-search'),
-                  tooltip: '搜索全曲库',
-                  onPressed: () => pushAppPage(
-                    context,
-                    () => MaterialPageRoute<void>(
-                      builder: (_) => LibrarySearchPage(
-                        library: library,
-                        playback: playback,
-                      ),
+                Row(
+                  children: [
+                    SongSortButton(
+                      order: library.sort,
+                      descending: library.descending,
+                      onChanged: (order, descending) =>
+                          library.filter(order: order, reverse: descending),
                     ),
-                  ),
-                  icon: const Icon(Icons.search),
+                    IconButton(
+                      tooltip: '刷新所有目录',
+                      onPressed:
+                          library.directoryBusy ||
+                              !library.roots.any(
+                                (root) => !root.requiresReselection,
+                              )
+                          ? null
+                          : () => library.scan(),
+                      icon: const Icon(Icons.refresh),
+                    ),
+                    IconButton(
+                      tooltip: library.showMissing ? '返回可播放歌曲' : '查看失联歌曲',
+                      isSelected: library.showMissing,
+                      onPressed: () =>
+                          library.filter(missing: !library.showMissing),
+                      icon: const Icon(Icons.link_off),
+                    ),
+                    const Spacer(),
+                    Text(
+                      library.showMissing
+                          ? '${rows.length} 首失联'
+                          : '${rows.length}首',
+                    ),
+                    const SizedBox(width: 16),
+                  ],
                 ),
+                LibraryStatus(library: library),
               ],
             ),
-            Row(
-              children: [
-                SongSortButton(
-                  order: library.sort,
-                  descending: library.descending,
-                  onChanged: (order, descending) =>
-                      library.filter(order: order, reverse: descending),
-                ),
-                IconButton(
-                  tooltip: '刷新所有目录',
-                  onPressed:
-                      library.directoryBusy ||
-                          !library.roots.any(
-                            (root) => !root.requiresReselection,
-                          )
-                      ? null
-                      : () => library.scan(),
-                  icon: const Icon(Icons.refresh),
-                ),
-                IconButton(
-                  tooltip: library.showMissing ? '返回可播放歌曲' : '查看失联歌曲',
-                  isSelected: library.showMissing,
-                  onPressed: () =>
-                      library.filter(missing: !library.showMissing),
-                  icon: const Icon(Icons.link_off),
-                ),
-                const Spacer(),
-                Text(
-                  library.showMissing
-                      ? '${rows.length} 首失联'
-                      : '${rows.length}首',
-                ),
-                const SizedBox(width: 16),
-              ],
-            ),
-            LibraryStatus(library: library),
-          ],
-        ),
-        emptyText: library.showMissing
-            ? '没有失联歌曲'
-            : library.roots.isEmpty
-            ? '添加音乐文件夹，建立本机曲库'
-            : '没有匹配的歌曲',
-        library: library,
-        playback: playback,
-        source: library.searchTracks(
-          '',
-          order: library.sort,
-          descending: library.descending,
-        ),
-        rows: rows,
+            emptyText: library.showMissing
+                ? '没有失联歌曲'
+                : library.roots.isEmpty
+                ? '添加音乐文件夹，建立本机曲库'
+                : '没有匹配的歌曲',
+            library: library,
+            playback: playback,
+            source: all,
+            rows: rows,
+            resetScrollKey: query,
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          );
+        },
       );
     },
   );

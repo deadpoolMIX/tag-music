@@ -6,6 +6,7 @@ import '../playback/cover_cache.dart';
 import '../playback/playback_controller.dart';
 import 'library_controller.dart';
 import 'library_header.dart';
+import 'library_search.dart';
 import 'song_list.dart';
 import 'track_cover.dart';
 
@@ -30,10 +31,6 @@ Future<void> openArtistTracks(
         child: ListenableBuilder(
           listenable: library,
           builder: (context, _) => _GroupSongs(
-            header: AppBar(
-              primary: false,
-              title: Text(artist, maxLines: 1, overflow: TextOverflow.ellipsis),
-            ),
             name: artist,
             albums: false,
             library: library,
@@ -57,7 +54,7 @@ class _GroupSongs extends StatelessWidget {
     required this.library,
     required this.playback,
     required this.rows,
-    this.header,
+    this.menuButton,
     this.onBack,
   });
 
@@ -66,7 +63,7 @@ class _GroupSongs extends StatelessWidget {
   final LibraryController library;
   final PlaybackController playback;
   final List<LibraryTrack> rows;
-  final Widget? header;
+  final Widget? menuButton;
   final VoidCallback? onBack;
 
   @override
@@ -78,18 +75,25 @@ class _GroupSongs extends StatelessWidget {
     rows: rows,
     scope: albums ? 'album' : 'artist',
     emptyText: '没有歌曲',
-    header: header,
+    header: SongGroupHeader(
+      name: name ?? (albums ? '未知专辑' : '未知歌手'),
+      menuButton: menuButton,
+      tracks: rows,
+      playback: playback,
+    ),
     onBack: onBack,
   );
 }
 
 /// A compact, consistently ordered list for library groups.
-class GroupList extends StatefulWidget {
+class GroupList<T> extends StatefulWidget {
   const GroupList({
     required this.storageKey,
     required this.descending,
     required this.onSort,
-    required this.itemCount,
+    required this.items,
+    required this.nameOf,
+    required this.searchHint,
     required this.itemBuilder,
     required this.emptyText,
     this.menuButton,
@@ -101,8 +105,10 @@ class GroupList extends StatefulWidget {
   final String storageKey;
   final bool descending;
   final VoidCallback onSort;
-  final int itemCount;
-  final IndexedWidgetBuilder itemBuilder;
+  final List<T> items;
+  final String Function(T) nameOf;
+  final String searchHint;
+  final Widget Function(BuildContext, T) itemBuilder;
   final String emptyText;
   final Widget? menuButton;
   final Widget? heading;
@@ -110,10 +116,10 @@ class GroupList extends StatefulWidget {
   final CoverCache? coverCache;
 
   @override
-  State<GroupList> createState() => _GroupListState();
+  State<GroupList<T>> createState() => _GroupListState<T>();
 }
 
-class _GroupListState extends State<GroupList> {
+class _GroupListState<T> extends State<GroupList<T>> {
   final _scroll = ScrollController();
 
   @override
@@ -123,55 +129,77 @@ class _GroupListState extends State<GroupList> {
   }
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      LibraryHeader(
-        menuButton: widget.menuButton,
-        heading: widget.heading,
-        actions: [
-          TextButton.icon(
-            onPressed: widget.onSort,
-            icon: Icon(
-              widget.descending ? Icons.arrow_downward : Icons.arrow_upward,
-              size: 16,
-            ),
-            label: Text(widget.descending ? '名称降序' : '名称升序'),
-          ),
-          ?widget.trailing,
-        ],
-      ),
-      Expanded(
-        child: widget.itemCount == 0
-            ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text(widget.emptyText, textAlign: TextAlign.center),
+  Widget build(BuildContext context) => LibrarySearch(
+    hintText: widget.searchHint,
+    heading: widget.heading,
+    onQueryChanged: () {
+      if (_scroll.hasClients) _scroll.jumpTo(0);
+    },
+    builder: (context, query, heading, searchButton) {
+      final items = query.isEmpty
+          ? widget.items
+          : widget.items
+                .where(
+                  (item) => widget.nameOf(item).toLowerCase().contains(query),
+                )
+                .toList();
+      return Column(
+        children: [
+          LibraryHeader(
+            menuButton: widget.menuButton,
+            heading: heading,
+            actions: [
+              TextButton.icon(
+                onPressed: widget.onSort,
+                icon: Icon(
+                  widget.descending ? Icons.arrow_downward : Icons.arrow_upward,
+                  size: 16,
                 ),
-              )
-            : ListTileTheme(
-                dense: true,
-                minVerticalPadding: 8,
-                contentPadding: const EdgeInsets.fromLTRB(
-                  16,
-                  0,
-                  FastScrollbar.rowEndPadding,
-                  0,
-                ),
-                child: _list(),
+                label: Text(widget.descending ? '名称降序' : '名称升序'),
               ),
-      ),
-    ],
+              searchButton,
+              ?widget.trailing,
+            ],
+          ),
+          Expanded(
+            child: items.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        query.isEmpty ? widget.emptyText : '没有匹配的结果',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  )
+                : ListTileTheme(
+                    dense: true,
+                    minVerticalPadding: 8,
+                    contentPadding: const EdgeInsets.fromLTRB(
+                      16,
+                      0,
+                      FastScrollbar.rowEndPadding,
+                      0,
+                    ),
+                    child: _list(items),
+                  ),
+          ),
+        ],
+      );
+    },
   );
 
-  Widget _list() {
+  Widget _list(List<T> items) {
     final list = FastScrollbar(
       controller: _scroll,
       child: ListView.builder(
         key: PageStorageKey(widget.storageKey),
         controller: _scroll,
         padding: const EdgeInsets.only(right: FastScrollbar.gutter),
-        itemCount: widget.itemCount,
-        itemBuilder: widget.itemBuilder,
+        itemCount: items.length,
+        itemBuilder: (context, index) =>
+            widget.itemBuilder(context, items[index]),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       ),
     );
     final cache = widget.coverCache;
@@ -202,7 +230,7 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
   bool opened = false;
   String? selected;
 
-  void _viewGroup(bool open, String? name, {bool returning = false}) {
+  void _viewGroup(bool open, String? name) {
     void show((bool, String?) view) {
       if (!mounted) return;
       setState(() {
@@ -215,14 +243,7 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
     if (history == null) {
       show((open, name));
     } else {
-      history.visit(
-        context,
-        this,
-        (opened, selected),
-        (open, name),
-        show,
-        returning: returning,
-      );
+      history.visit(context, this, (opened, selected), (open, name), show);
     }
   }
 
@@ -250,28 +271,7 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
         final rows = groups[selected] ?? <LibraryTrack>[];
         final desktop = DesktopNavigation.maybeOf(context) != null;
         return _GroupSongs(
-          header: Row(
-            children: [
-              ?widget.menuButton,
-              IconButton(
-                tooltip: '返回分组',
-                onPressed: () => _viewGroup(false, selected, returning: true),
-                icon: const Icon(Icons.arrow_back),
-              ),
-              Expanded(
-                child: Text(
-                  selected ?? unknown,
-                  style: Theme.of(context).textTheme.titleLarge,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text('${rows.length} 首'),
-              ),
-            ],
-          ),
+          menuButton: widget.menuButton,
           onBack: desktop || !widget.active
               ? null
               : () => _viewGroup(false, selected),
@@ -309,10 +309,11 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
         coverCache: widget.albums ? widget.library.documents.coverCache : null,
         descending: descending,
         onSort: () => setState(() => descending = !descending),
-        itemCount: keys.length,
+        items: keys,
+        nameOf: (key) => key ?? unknown,
+        searchHint: widget.albums ? '搜索专辑' : '搜索歌手',
         emptyText: '暂无歌曲',
-        itemBuilder: (_, index) {
-          final key = keys[index];
+        itemBuilder: (_, key) {
           final tracks = groups[key]!;
           final coverTracks = widget.albums
               ? tracks

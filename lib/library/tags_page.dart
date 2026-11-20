@@ -6,6 +6,7 @@ import '../core/desktop_navigation.dart';
 import 'library_controller.dart';
 import '../playback/playback_controller.dart';
 import 'group_pages.dart';
+import 'library_header.dart';
 import 'song_list.dart';
 import 'tag_picker.dart';
 
@@ -123,7 +124,7 @@ class _TagsPageState extends State<TagsPage> {
   String? openedId;
   bool descending = false;
 
-  void _openTag(String? id, {bool returning = false}) {
+  void _openTag(String? id) {
     void show(String? next) {
       if (mounted) setState(() => openedId = next);
     }
@@ -132,7 +133,7 @@ class _TagsPageState extends State<TagsPage> {
     if (history == null) {
       show(id);
     } else {
-      history.visit(context, this, openedId, id, show, returning: returning);
+      history.visit(context, this, openedId, id, show);
     }
   }
 
@@ -180,27 +181,11 @@ class _TagsPageState extends State<TagsPage> {
       if (tag != null) {
         final rows = library.tracksForTag(tag.id);
         final desktop = DesktopNavigation.maybeOf(context) != null;
-        final header = Row(
-          children: [
-            ?widget.menuButton,
-            IconButton(
-              tooltip: '返回标签',
-              onPressed: () => _openTag(null, returning: true),
-              icon: const Icon(Icons.arrow_back),
-            ),
-            Expanded(
-              child: Text(
-                tag.name,
-                style: Theme.of(context).textTheme.titleLarge,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text('${rows.length} 首'),
-            ),
-          ],
+        final header = SongGroupHeader(
+          name: tag.name,
+          tracks: rows,
+          playback: widget.playback,
+          menuButton: widget.menuButton,
         );
         final playback = widget.playback;
         if (playback == null) {
@@ -243,14 +228,14 @@ class _TagsPageState extends State<TagsPage> {
           onPressed: () => _editName(context, library),
           icon: const Icon(Icons.add),
         ),
-        heading: const SizedBox.shrink(),
         storageKey: 'tags-overview',
         descending: descending,
         onSort: () => setState(() => descending = !descending),
-        itemCount: tags.length,
+        items: tags,
+        nameOf: (tag) => tag.name,
+        searchHint: '搜索标签',
         emptyText: '尚无标签。创建后可在曲库为歌曲添加标签。',
-        itemBuilder: (_, index) {
-          final tag = tags[index];
+        itemBuilder: (_, tag) {
           return ListTile(
             key: ValueKey('tag-${tag.id}'),
             leading: const Icon(Icons.sell_outlined),

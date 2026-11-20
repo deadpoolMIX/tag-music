@@ -84,6 +84,12 @@ class FilterPage extends StatelessWidget {
                         : null,
                     icon: const Icon(Icons.bookmark_add_outlined),
                   ),
+                  PlayAllButton(
+                    playback: playback,
+                    tracks: rows,
+                    tooltip: '播放筛选结果',
+                    enabled: enabled,
+                  ),
                 ],
               ),
               ConstrainedBox(

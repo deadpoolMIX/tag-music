@@ -1,79 +1,102 @@
-import 'dart:async';
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-import '../playback/documents.dart';
 import 'library_controller.dart';
 
-/// Own the editing session independently of scan results and player updates.
+List<LibraryTrack> searchSongRows(List<LibraryTrack> tracks, String query) =>
+    query.isEmpty
+    ? tracks
+    : tracks.where((track) => track.matchesSearch(query)).toList();
+
+/// Replace the heading in place while keeping the page and its actions mounted.
 class LibrarySearch extends StatefulWidget {
   const LibrarySearch({
-    required this.library,
-    required this.documents,
+    required this.hintText,
+    required this.builder,
+    this.heading,
+    this.buttonKey,
+    this.fieldKey,
+    this.onQueryChanged,
     super.key,
   });
-  final LibraryController library;
-  final DocumentAccess documents;
+
+  final String hintText;
+  final Widget Function(
+    BuildContext context,
+    String query,
+    Widget? heading,
+    Widget searchButton,
+  )
+  builder;
+  final Widget? heading;
+  final Key? buttonKey;
+  final Key? fieldKey;
+  final VoidCallback? onQueryChanged;
+
   @override
   State<LibrarySearch> createState() => _LibrarySearchState();
 }
 
 class _LibrarySearchState extends State<LibrarySearch> {
-  late final _editing = TextEditingController(text: widget.library.query);
-  final _focus = FocusNode(debugLabel: 'library-search');
-  Timer? _diagnostic;
+  final _editing = TextEditingController();
+  final _focus = FocusNode();
+  bool _open = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _focus.addListener(_focusChanged);
+  void _start() {
+    setState(() => _open = true);
+    _focus.requestFocus();
   }
 
-  void _focusChanged() {
-    _diagnostic?.cancel();
-    _diagnostic = Timer(const Duration(milliseconds: 350), () async {
-      if (!mounted) return;
-      try {
-        debugPrint(
-          'R2 ${jsonEncode({'event': 'searchInput', 'focused': _focus.hasFocus, 'native': await widget.documents.diagnostics()})}',
-        );
-      } catch (e) {
-        debugPrint('R2 searchInput diagnostics: $e');
-      }
+  void _close() {
+    _focus.unfocus();
+    setState(() {
+      _open = false;
+      _editing.clear();
     });
+    widget.onQueryChanged?.call();
   }
 
   @override
   void dispose() {
-    _diagnostic?.cancel();
-    _focus.removeListener(_focusChanged);
     _focus.dispose();
     _editing.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => TextField(
-    key: const ValueKey('library-search'),
-    controller: _editing,
-    focusNode: _focus,
-    keyboardType: TextInputType.text,
-    textInputAction: TextInputAction.search,
-    onChanged: (v) => widget.library.filter(text: v),
-    decoration: InputDecoration(
-      isDense: true,
-      prefixIcon: const Icon(Icons.search),
-      hintText: '搜索歌曲、歌手、专辑或文件名',
-      suffixIcon: IconButton(
-        tooltip: '清空搜索',
-        onPressed: () {
-          _editing.clear();
-          widget.library.filter(text: '');
-          _focus.requestFocus();
-        },
-        icon: const Icon(Icons.clear),
+  Widget build(BuildContext context) {
+    final field = _open
+        ? CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.escape): _close,
+            },
+            child: TextField(
+              key: widget.fieldKey,
+              controller: _editing,
+              focusNode: _focus,
+              onChanged: (_) {
+                setState(() {});
+                widget.onQueryChanged?.call();
+              },
+              onSubmitted: (_) => _focus.unfocus(),
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: widget.hintText,
+              ),
+            ),
+          )
+        : widget.heading;
+    return widget.builder(
+      context,
+      _editing.text.trim().toLowerCase(),
+      field,
+      IconButton(
+        key: widget.buttonKey,
+        tooltip: _open ? '关闭搜索' : widget.hintText,
+        onPressed: _open ? _close : _start,
+        icon: Icon(_open ? Icons.close : Icons.search),
       ),
-    ),
-  );
+    );
+  }
 }

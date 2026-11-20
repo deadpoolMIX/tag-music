@@ -37,6 +37,12 @@ class LibraryTrack {
     modified: song.modified,
   );
   QueueSong get queueSong => QueueSong(songId: song.id, track: probe);
+
+  bool matchesSearch(String query) =>
+      title.toLowerCase().contains(query) ||
+      song.name.toLowerCase().contains(query) ||
+      song.artist?.toLowerCase().contains(query) == true ||
+      song.album?.toLowerCase().contains(query) == true;
 }
 
 class LibraryController extends ChangeNotifier {
@@ -87,16 +93,7 @@ class LibraryController extends ChangeNotifier {
     if (_filteredCache[key] case final cached?) return cached;
     final needle = filterQuery.trim().toLowerCase();
     final rows = filterMatches
-        .where(
-          (t) =>
-              needle.isEmpty ||
-              [
-                t.title,
-                t.song.name,
-                t.song.artist ?? '',
-                t.song.album ?? '',
-              ].any((value) => value.toLowerCase().contains(needle)),
-        )
+        .where((t) => needle.isEmpty || t.matchesSearch(needle))
         .toList();
     _sortTracks(rows, order, descending);
     return _filteredCache[key] = List.unmodifiable(rows);
@@ -228,16 +225,7 @@ class LibraryController extends ChangeNotifier {
         (showMissing
                 ? tracks.where((track) => !track.available)
                 : availableTracks)
-            .where(
-              (t) =>
-                  needle.isEmpty ||
-                  [
-                    t.title,
-                    t.song.name,
-                    t.song.artist ?? '',
-                    t.song.album ?? '',
-                  ].any((v) => v.toLowerCase().contains(needle)),
-            )
+            .where((t) => needle.isEmpty || t.matchesSearch(needle))
             .toList();
     _sortTracks(rows, sort, descending);
     return _visibleCache = List.unmodifiable(rows);
@@ -313,16 +301,7 @@ class LibraryController extends ChangeNotifier {
     final key = (needle, order, descending);
     if (_searchResults[key] case final cached?) return cached;
     final rows = availableTracks
-        .where(
-          (t) =>
-              needle.isEmpty ||
-              [
-                t.title,
-                t.song.name,
-                t.song.artist ?? '',
-                t.song.album ?? '',
-              ].any((v) => v.toLowerCase().contains(needle)),
-        )
+        .where((t) => needle.isEmpty || t.matchesSearch(needle))
         .toList();
     _sortTracks(rows, order, descending);
     if (_searchResults.length >= 8) {

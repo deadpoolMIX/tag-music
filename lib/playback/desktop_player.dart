@@ -10,7 +10,7 @@ import '../library/playlist_actions.dart';
 import '../library/song_selection.dart';
 import '../library/track_cover.dart';
 import 'cover_viewer.dart';
-import 'full_player.dart' show ImmersiveLyrics, PlayerSeek;
+import 'full_player.dart' show ImmersiveLyrics, PlayerArtistLine, PlayerSeek;
 import 'playback_bar_gestures.dart';
 import 'playback_controller.dart';
 import 'playback_status.dart';
@@ -469,6 +469,7 @@ class _DesktopPlayerLayer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playback = ref.watch(playbackProvider);
+    final library = ref.watch(libraryProvider);
     if (playback == null) {
       return const Material(child: Center(child: Text('播放器尚未就绪')));
     }
@@ -505,13 +506,46 @@ class _DesktopPlayerLayer extends ConsumerWidget {
                         children: [
                           Expanded(
                             flex: 5,
-                            child: LayoutBuilder(
-                              builder: (context, space) => Center(
-                                child: _cover(
-                                  context,
-                                  playback,
-                                  math.min(560.0, space.biggest.shortestSide),
-                                ),
+                            child: Material(
+                              type: MaterialType.transparency,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: LayoutBuilder(
+                                      builder: (context, space) => _cover(
+                                        context,
+                                        playback,
+                                        math.min(
+                                          560.0,
+                                          space.biggest.shortestSide,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    playbackTitle(playback),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          color: lyricsColor,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                  ),
+                                  PlayerArtistLine(
+                                    playback: playback,
+                                    library: library,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(color: lyricsColor),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
