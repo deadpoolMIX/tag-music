@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import '../library/track_cover.dart';
 import 'documents.dart';
 
+const coverViewerRouteName = '/player/cover';
+
 Object playerCoverHeroTag(ProbeTrack track) =>
     ('player-cover', track.location, track.size, track.modified);
 
@@ -20,7 +22,7 @@ Future<void> showCoverViewer(
   final reduceMotion = MediaQuery.disableAnimationsOf(context);
   await Navigator.of(context).push<void>(
     PageRouteBuilder(
-      settings: const RouteSettings(name: '/player/cover'),
+      settings: const RouteSettings(name: coverViewerRouteName),
       transitionDuration: reduceMotion
           ? Duration.zero
           : const Duration(milliseconds: 240),
@@ -104,51 +106,56 @@ class _CoverViewerState extends State<_CoverViewer> {
       autofocus: true,
       child: FutureBuilder<Uint8List?>(
         future: _original,
-        builder: (context, snapshot) => Scaffold(
-          backgroundColor: Colors.black,
-          body: SafeArea(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                LayoutBuilder(
-                  builder: (context, constraints) => InteractiveViewer(
-                    maxScale: 5,
-                    child: Center(
-                      child: Hero(
-                        tag: playerCoverHeroTag(widget.track),
-                        flightShuttleBuilder: (_, _, direction, from, to) =>
-                            ((direction == HeroFlightDirection.push ? from : to)
-                                        .widget
-                                    as Hero)
-                                .child,
-                        child: SizedBox.square(
-                          dimension: math.min(
-                            constraints.maxWidth,
-                            constraints.maxHeight,
+        builder: (context, snapshot) => AnnotatedRegion<SystemUiOverlayStyle>(
+          value: SystemUiOverlayStyle.light,
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            body: SafeArea(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  LayoutBuilder(
+                    builder: (context, constraints) => InteractiveViewer(
+                      maxScale: 5,
+                      child: Center(
+                        child: Hero(
+                          tag: playerCoverHeroTag(widget.track),
+                          flightShuttleBuilder: (_, _, direction, from, to) =>
+                              ((direction == HeroFlightDirection.push
+                                              ? from
+                                              : to)
+                                          .widget
+                                      as Hero)
+                                  .child,
+                          child: SizedBox.square(
+                            dimension: math.min(
+                              constraints.maxWidth,
+                              constraints.maxHeight,
+                            ),
+                            child: _preview(snapshot),
                           ),
-                          child: _preview(snapshot),
                         ),
                       ),
                     ),
                   ),
-                ),
-                const PositionedDirectional(
-                  top: 8,
-                  start: 8,
-                  child: BackButton(color: Colors.white),
-                ),
-                PositionedDirectional(
-                  bottom: 16,
-                  end: 16,
-                  child: FilledButton.icon(
-                    onPressed: snapshot.data == null || _saving
-                        ? null
-                        : () => _save(snapshot.data!),
-                    icon: const Icon(Icons.download),
-                    label: Text(_saving ? '保存中…' : '保存'),
+                  const PositionedDirectional(
+                    top: 8,
+                    start: 8,
+                    child: BackButton(color: Colors.white),
                   ),
-                ),
-              ],
+                  PositionedDirectional(
+                    bottom: 16,
+                    end: 16,
+                    child: FilledButton.icon(
+                      onPressed: snapshot.data == null || _saving
+                          ? null
+                          : () => _save(snapshot.data!),
+                      icon: const Icon(Icons.download),
+                      label: Text(_saving ? '保存中…' : '保存'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
