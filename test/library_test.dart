@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tag_music/library/database.dart';
 import 'package:tag_music/library/library_backup.dart';
 import 'package:tag_music/library/library_controller.dart';
+import 'package:tag_music/library/song_file_editor.dart';
 import 'package:tag_music/playback/documents.dart';
 
 class FakeDocuments extends DocumentAccess {
@@ -75,6 +76,50 @@ void main() {
     );
   });
   tearDown(() => library.shutdown());
+
+  test('editing a SAF song updates overlapping roots and preserves its identity history', () async {
+    const authority = 'content://local.documents';
+    const oldId = 'main:子目录/旧.mp3';
+    const newId = 'main:子目录/新歌-歌手.mp3';
+    String location(String root, String id) =>
+        '$authority/tree/${Uri.encodeComponent(root)}/document/${Uri.encodeComponent(id)}';
+    for (final root in ['main:', 'main:子目录']) {
+      access.files[root] = [entry('旧', location: location(root, oldId))];
+    }
+    await library.initialize();
+    await library.scan();
+    final original = library.tracks.single.song;
+    await library.recordCompletedPlay(original.id);
+    final saved = SavedSongFile(
+      SongFileDraft(
+        EditableSongFile(
+          location('main:子目录', newId),
+          '新歌-歌手.mp3',
+          'local.documents:$newId',
+        ),
+        const SongFileMetadata(title: '新歌', artist: '歌手', album: '专辑'),
+        'updated-digest',
+      ),
+      documentId: newId,
+      size: 501,
+      modified: 2,
+    );
+    final (_, synced) = await library.editSongFile(
+      const EditableSongFile('$authority/document/fake', '旧.mp3', '旧'),
+      () async => saved,
+    );
+    expect(synced, isTrue);
+    final updated = library.tracks.single;
+    expect(updated.song.id, original.id);
+    expect(updated.song.title, '新歌');
+    expect(updated.song.fileSha256, 'updated-digest');
+    expect(library.playCount(original.id), 1);
+    final rows = await library.db.select(library.db.songLocations).get();
+    for (final row in rows) {
+      expect(row.location, location(row.root, newId));
+      expect(row.relativePath, '子目录/新歌-歌手.mp3');
+    }
+  });
 
   test('overlapping roots share UUID, repeat scan is incremental, bad file does not abort', () async {
     access.files['a'] = [entry('好'), entry('坏')];

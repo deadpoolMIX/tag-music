@@ -15,7 +15,17 @@ import 'settings_test.dart' show MemorySettings;
 import 'library_test.dart' show FakeDocuments, entry;
 import 'playlists_page_test.dart' show PlaylistPlayback;
 
-const _destinations = ['歌曲', '播放次数', '筛选', '歌单', '专辑', '歌手', '标签', '设置'];
+const _destinations = [
+  '歌曲',
+  '播放次数',
+  '筛选',
+  '歌单',
+  '专辑',
+  '歌手',
+  '标签',
+  '编辑歌曲',
+  '设置',
+];
 
 void main() {
   setUp(() {

@@ -77,6 +77,17 @@ Future<void> main() async {
         ], await rootBundle.loadString('assets/licenses/native/$name'));
       }
     });
+    LicenseRegistry.addLicense(() async* {
+      for (final (name, component) in [
+        ('flutter_taglib-LICENSE.txt', 'flutter_taglib'),
+        ('TagLib-MPL-1.1.txt', 'TagLib'),
+        ('utfcpp-LICENSE.txt', 'utfcpp'),
+      ]) {
+        yield LicenseEntryWithLineBreaks([
+          component,
+        ], await rootBundle.loadString('assets/licenses/native/$name'));
+      }
+    });
   }
   final store = PreferencesSettingsStore();
   var mode = ThemeMode.system;

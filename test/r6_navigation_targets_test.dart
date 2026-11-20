@@ -12,6 +12,7 @@ import 'package:tag_music/library/library_controller.dart';
 import 'package:tag_music/library/library_page.dart';
 import 'package:tag_music/library/play_counts_page.dart';
 import 'package:tag_music/library/playlists_page.dart';
+import 'package:tag_music/library/song_editor_page.dart';
 import 'package:tag_music/library/tags_page.dart';
 import 'package:tag_music/playback/playback_controller.dart';
 
@@ -27,6 +28,7 @@ const _targets = [
   (AppDestination.albums, '专辑'),
   (AppDestination.artists, '歌手'),
   (AppDestination.tags, '标签'),
+  (AppDestination.songEditor, '编辑歌曲'),
   (AppDestination.settings, '设置'),
 ];
 const _query = 'synthetic-kept';
@@ -154,6 +156,7 @@ void _expectDestination(WidgetTester tester, AppDestination destination) {
       find.byKey(const ValueKey('artists-heading')),
     ),
     AppDestination.tags => (TagsPage, find.byKey(const ValueKey('create-tag'))),
+    AppDestination.songEditor => (SongEditorPage, find.text('选择歌曲')),
     AppDestination.settings => (
       SettingsPage,
       find.byKey(const ValueKey('theme-system')),

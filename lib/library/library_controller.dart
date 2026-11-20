@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 import '../playback/documents.dart';
@@ -15,6 +16,7 @@ import 'filter_rule.dart';
 import 'filter_repository.dart';
 import 'playlist_repository.dart';
 import 'scheduled_backup.dart';
+import 'song_file_editor.dart';
 import '../playback/playback_queue.dart';
 
 export 'filter_rule.dart' show LibrarySort;
@@ -189,6 +191,7 @@ class LibraryController extends ChangeNotifier {
       restoringBackup ||
       relocating ||
       hashingBaselines ||
+      _fileEditTask != null ||
       _removeTask != null;
   bool _cancelled = false;
   bool _closed = false;
@@ -204,6 +207,7 @@ class LibraryController extends ChangeNotifier {
   Future<void>? _relocationTask;
   Future<void>? _baselineTask;
   Future<void>? _baselineCancellation;
+  Future<(SavedSongFile, bool)>? _fileEditTask;
   List<LibraryTrack>? _visibleCache;
 
   void _setMessage(String? value, {bool transient = false}) {
@@ -795,6 +799,108 @@ class LibraryController extends ChangeNotifier {
     if (publish) _publish();
   }
 
+  Future<(SavedSongFile, bool)> editSongFile(
+    EditableSongFile original,
+    Future<SavedSongFile> Function() save,
+  ) {
+    if (_closed || directoryBusy) {
+      throw const SongEditorException('请等待当前曲库操作结束后再保存');
+    }
+    final task = _fileEditTask = _editSongFile(original, save).whenComplete(() {
+      _fileEditTask = null;
+      _publish();
+    });
+    _publish();
+    return task;
+  }
+
+  Future<(SavedSongFile, bool)> _editSongFile(
+    EditableSongFile original,
+    Future<SavedSongFile> Function() save,
+  ) async {
+    final song = await (db.select(
+      db.songs,
+    )..where((r) => r.identity.equals(original.identity))).getSingleOrNull();
+    final saved = await save();
+    if (song == null) return (saved, true);
+
+    final draft = saved.draft;
+    final file = draft.file;
+    try {
+      await db.transaction(() async {
+        // A previously removed file may still have its own history in the
+        // library. Free the reused path without transferring that history.
+        if (file.identity != original.identity) {
+          final previous = await (db.select(
+            db.songs,
+          )..where((r) => r.identity.equals(file.identity))).getSingleOrNull();
+          if (previous != null) {
+            await (db.update(
+              db.songs,
+            )..where((r) => r.id.equals(previous.id))).write(
+              SongsCompanion(identity: Value('missing:${previous.id}')),
+            );
+            await (db.update(db.songLocations)
+                  ..where((r) => r.songId.equals(previous.id)))
+                .write(const SongLocationsCompanion(available: Value(false)));
+          }
+        }
+
+        final locations = await (db.select(
+          db.songLocations,
+        )..where((r) => r.songId.equals(song.id))).get();
+        String updatedLocation(String location) {
+          final documentId = saved.documentId;
+          if (documentId == null) return file.location;
+          final marker = location.indexOf('/document/');
+          if (marker == -1) return file.location;
+          return '${location.substring(0, marker)}/document/'
+              '${Uri.encodeComponent(documentId)}';
+        }
+
+        for (final row in locations) {
+          final relative = saved.documentId == null ? p.context : p.posix;
+          final folder = relative.dirname(row.relativePath);
+          await (db.update(db.songLocations)..where(
+                (r) => r.songId.equals(song.id) & r.root.equals(row.root),
+              ))
+              .write(
+                SongLocationsCompanion(
+                  location: Value(updatedLocation(row.location)),
+                  relativePath: Value(
+                    folder == '.'
+                        ? file.name
+                        : relative.join(folder, file.name),
+                  ),
+                ),
+              );
+        }
+        await (db.update(db.songs)..where((r) => r.id.equals(song.id))).write(
+          SongsCompanion(
+            identity: Value(file.identity),
+            location: Value(updatedLocation(song.location)),
+            name: Value(file.name),
+            size: Value(saved.size),
+            modified: Value(saved.modified),
+            title: Value(draft.metadata.title),
+            artist: Value(draft.metadata.artist),
+            album: Value(draft.metadata.album),
+            durationMs: Value(
+              draft.metadata.duration?.inMilliseconds ?? song.durationMs,
+            ),
+            metadataError: const Value(null),
+            fileSha256: Value(draft.digest),
+          ),
+        );
+      });
+      await reload();
+      return (saved, true);
+    } catch (error) {
+      debugPrint('已保存歌曲文件，曲库同步失败：$error');
+      return (saved, false);
+    }
+  }
+
   Map<String, int> _countTags(Map<String, Set<String>> bySong) {
     final counts = <String, int>{};
     for (final songId in _availableTracksById.keys) {
@@ -1036,6 +1142,7 @@ class LibraryController extends ChangeNotifier {
     _messageTimer?.cancel();
     cancelBaselines();
     await _scanTask;
+    await _fileEditTask?.then<void>((_) {}, onError: (Object error) {});
     await _removeTask;
     await _restoreTask;
     await _relocationTask;

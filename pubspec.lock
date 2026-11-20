@@ -400,6 +400,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.4.3"
+  flutter_taglib:
+    dependency: "direct main"
+    description:
+      name: flutter_taglib
+      sha256: a596bdb13853dea8741cc0b58fc2ed1698fe14d4c9fbe37b99dd68dbd3e853d6
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.6.0"
   flutter_test:
     dependency: "direct dev"
     description: flutter
@@ -464,7 +472,7 @@ packages:
     source: hosted
     version: "4.1.2"
   image:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: image
       sha256: "89ed75b2f8231fe676808c5564f9590d728024ded7ac782a7ed8474f1c95b72a"

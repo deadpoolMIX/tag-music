@@ -26,6 +26,7 @@ import 'library/tags_page.dart';
 import 'library/group_pages.dart';
 import 'library/library_header.dart';
 import 'library/song_list.dart' show SongListPageActivity;
+import 'library/song_editor_page.dart';
 import 'library/song_selection.dart';
 
 class TagMusicApp extends ConsumerStatefulWidget {
@@ -329,6 +330,7 @@ enum AppDestination {
   albums,
   artists,
   tags,
+  songEditor,
   settings,
 }
 
@@ -340,6 +342,7 @@ const _destinations = [
   (Icons.album_outlined, '专辑'),
   (Icons.person_outline, '歌手'),
   (Icons.sell_outlined, '标签'),
+  (Icons.edit_note_outlined, '编辑歌曲'),
   (Icons.settings_outlined, '设置'),
 ];
 
@@ -561,6 +564,11 @@ class _AppShellState extends ConsumerState<AppShell>
                       active: _selected == AppDestination.tags,
                       menuButton: menuButton,
                     ),
+            AppDestination.songEditor => SongEditorPage(
+              library: library,
+              playback: playback,
+              menuButton: menuButton,
+            ),
             AppDestination.settings => SettingsPage(menuButton: menuButton),
             AppDestination.albums || AppDestination.artists =>
               library == null || playback == null
@@ -610,6 +618,7 @@ class _AppShellState extends ConsumerState<AppShell>
                           children: [
                             if (!desktop &&
                                 _selected != AppDestination.settings &&
+                                _selected != AppDestination.songEditor &&
                                 !libraryReady)
                               Align(
                                 alignment: Alignment.centerLeft,
