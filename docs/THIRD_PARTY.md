@@ -30,3 +30,9 @@ R0 尚未引入 media_kit、libmpv 或 FFmpeg。R1 必须核对实际原生二�
 新增精确直接依赖 Drift 2.35.3、drift_flutter 0.3.1、path_provider 2.1.6、path 1.9.1、uuid 4.6.0；生成工具 drift_dev 2.35.2 / build_runner 2.17.1。SQLite Dart 包实际锁定 sqlite3 3.5.2，使用默认普通SQLite原生资产，不配置SQLCipher或加密。传递依赖中的 sqlite3_flutter_libs / sqlcipher_flutter_libs 为 eol 占位包，不能据包名声称打包了SQLCipher。
 
 Drift / sqlite3 Dart绑定的许可文本以锁定包内LICENSE及应用“开源许可”为准（MIT）；SQLite源码的许可声明见[SQLite官方版权说明](https://www.sqlite.org/copyright.html)。预编译原生资产来源是 [sqlite3.dart sqlite3-3.5.2 release](https://github.com/simolus3/sqlite3.dart/releases/tag/sqlite3-3.5.2)，下载钩子按包内asset_hashes.dart核对SHA256。R2包内实际原生资产哈希与版本另存artifacts/R2，不将Dart包版本当SQLite引擎版本。既有音频原生库的LGPL及R9再分发缺口保持。
+
+## R9 个人使用版
+
+完整依赖版本见仓库根目录的 `pubspec.lock`。备份校验使用 `crypto 3.0.8`，FFI 使用 `ffi 2.2.0`，两者均按锁定包的 BSD 三条款许可保留署名和条款。文件选择器的 Windows、Android 实现同样使用 BSD 三条款许可。Dart 依赖许可可在「设置 → 开源许可」查看。
+
+Windows 便携包附带原创 MIT 许可、Flutter 运行时许可和原生音频库许可。两个 Android 变体通过同一应用入口提供原生音频库许可。Windows 音频库的完整对应源码及静态子组件通知、Android 构建引用的 helper 精确版本仍需核全。个人使用版保留这些公开发行前的待办项。

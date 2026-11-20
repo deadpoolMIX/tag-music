@@ -7,6 +7,7 @@ import 'package:tag_music/app.dart';
 import 'package:tag_music/core/settings.dart';
 import 'package:tag_music/library/database.dart';
 import 'package:tag_music/library/filter_page.dart';
+import 'package:tag_music/library/filter_rule.dart';
 import 'package:tag_music/library/library_controller.dart';
 import 'package:tag_music/library/library_page.dart';
 import 'package:tag_music/library/playlists_page.dart';
@@ -135,7 +136,7 @@ void _expectDestination(WidgetTester tester, AppDestination destination) {
     AppDestination.songs => (LibraryPage, find.text('歌曲 synthetic-kept.mp3')),
     AppDestination.filter => (
       FilterPage,
-      find.byKey(const ValueKey('filter-search')),
+      find.byKey(const ValueKey('save-smart-playlist')),
     ),
     AppDestination.playlists => (
       PlaylistsPage,
@@ -304,19 +305,26 @@ void main() {
           await tester.tap(action);
           await tester.pumpAndSettle();
           _expectDestination(tester, AppDestination.settings);
-          final version = _within(
-            AppDestination.settings,
-            find.text('版本 0.1.0+1'),
-          );
-          await tester.ensureVisible(version);
-          await tester.pumpAndSettle();
-          expect(version.hitTestable(), findsOneWidget);
           final diagnostics = _within(
             AppDestination.settings,
             find.byKey(const ValueKey('copy-diagnostics')),
           );
-          await tester.ensureVisible(diagnostics);
+          await tester.scrollUntilVisible(
+            diagnostics,
+            150,
+            scrollable: _within(
+              AppDestination.settings,
+              find.byType(Scrollable),
+            ).first,
+          );
           await tester.pumpAndSettle();
+          expect(
+            _within(
+              AppDestination.settings,
+              find.text('Tag Music · 0.1.0+1', findRichText: true),
+            ),
+            findsOneWidget,
+          );
           expect(diagnostics.hitTestable(), findsOneWidget);
           expect(tester.widget<TextButton>(diagnostics).onPressed, isNotNull);
           if (platform == TargetPlatform.windows) {
@@ -336,28 +344,31 @@ void main() {
       await _openNavigation(tester, TargetPlatform.windows);
       _expectNavigationOrder(tester, compact: false);
       await _select(tester, TargetPlatform.windows, AppDestination.filter);
-      final input = _within(
-        AppDestination.filter,
-        find.byKey(const ValueKey('filter-search')),
-      );
-      await tester.ensureVisible(input);
-      await tester.enterText(input, _query);
+      const tagName = '导航测试标签';
+      final tagId = (await tester.runAsync(() async {
+        await library.createTag(tagName);
+        final tag = library.tags.single;
+        await library.changeSongTags(tag.id, [
+          library.tracks.single.song.id,
+        ], add: true);
+        await library.updateFilter(rule: FilterRule(allTagIds: [tag.id]));
+        return tag.id;
+      }))!;
       await tester.pumpAndSettle();
+      final tagChip = _within(
+        AppDestination.filter,
+        find.byKey(ValueKey('filter-chip-0-$tagId')),
+      );
       final filter = _within(AppDestination.filter, find.byType(FilterPage));
-      final originalState = tester.state<State<FilterPage>>(filter);
-      final originalController = tester.widget<TextField>(input).controller!;
+      final originalElement = tester.element(filter);
       final originalShellState = tester.state(find.byType(AppShell));
 
       void expectSession() {
         _expectDestination(tester, AppDestination.filter);
         expect(tester.state(find.byType(AppShell)), same(originalShellState));
-        expect(tester.state<State<FilterPage>>(filter), same(originalState));
-        expect(
-          tester.widget<TextField>(input).controller,
-          same(originalController),
-        );
-        expect(originalController.text, _query);
-        expect(library.filterQuery, _query);
+        expect(tester.element(filter), same(originalElement));
+        expect(tagChip, findsOneWidget);
+        expect(library.filterPreferences.rule.allTagIds, {tagId});
         _expectDesktopNavigation();
       }
 
