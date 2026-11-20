@@ -587,7 +587,8 @@ class PlaybackController extends ChangeNotifier {
 
   Future<void> _advance({bool natural = false}) async {
     if (await _sleepBlocksSwitch()) return;
-    if (queue.next(natural: natural) != null) {
+    final entry = natural ? queue.next(natural: true) : queue.nextManual();
+    if (entry != null) {
       await _openCurrent(play: true);
     } else if (natural) {
       _playIntent = false;

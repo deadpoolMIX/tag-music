@@ -27,12 +27,13 @@ class PlaybackControls extends StatelessWidget {
     required this.playback,
     this.onToggleLayout,
     this.large = false,
-    this.immersive = false,
+    this.immersiveColor,
     super.key,
   });
   final PlaybackController playback;
   final VoidCallback? onToggleLayout;
-  final bool large, immersive;
+  final bool large;
+  final Color? immersiveColor;
 
   @override
   Widget build(BuildContext context) => Wrap(
@@ -42,8 +43,8 @@ class PlaybackControls extends StatelessWidget {
     children: [
       IconButton(
         tooltip: '上一首',
-        color: immersive ? Colors.white : null,
-        disabledColor: immersive ? Colors.white38 : null,
+        color: immersiveColor,
+        disabledColor: immersiveColor?.withValues(alpha: .38),
         iconSize: large ? 32 : null,
         onPressed: playback.canPrevious ? playback.previous : null,
         icon: const Icon(Icons.skip_previous),
@@ -52,12 +53,13 @@ class PlaybackControls extends StatelessWidget {
         playback: playback,
         onToggleLayout: onToggleLayout,
         large: large,
-        filled: !immersive,
+        filled: immersiveColor == null,
+        unfilledColor: immersiveColor,
       ),
       IconButton(
         tooltip: '下一首',
-        color: immersive ? Colors.white : null,
-        disabledColor: immersive ? Colors.white38 : null,
+        color: immersiveColor,
+        disabledColor: immersiveColor?.withValues(alpha: .38),
         iconSize: large ? 32 : null,
         onPressed: playback.canNext ? playback.next : null,
         icon: const Icon(Icons.skip_next),

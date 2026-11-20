@@ -27,7 +27,7 @@ String playbackActivityLabel(PlaybackController playback) {
   return playback.playing ? '正在播放' : '已暂停';
 }
 
-/// One transport button across the minibar, full player, lyrics and queue.
+/// The shared transport button for the minibar and playback controls.
 class PlaybackToggleButton extends StatelessWidget {
   const PlaybackToggleButton({
     required this.playback,
@@ -35,11 +35,13 @@ class PlaybackToggleButton extends StatelessWidget {
     this.enabled = true,
     this.onToggleLayout,
     this.large = false,
+    this.unfilledColor,
     super.key,
   });
   final PlaybackController playback;
   final bool filled, enabled;
   final bool large;
+  final Color? unfilledColor;
   final VoidCallback? onToggleLayout;
 
   @override
@@ -83,7 +85,9 @@ class PlaybackToggleButton extends StatelessWidget {
         },
         child: Material(
           shape: const CircleBorder(),
-          color: filled ? scheme.primary : Colors.white12,
+          color: filled
+              ? scheme.primary
+              : (unfilledColor ?? scheme.onSurface).withValues(alpha: .12),
           child: InkWell(
             key: const ValueKey('play-pause'),
             customBorder: const CircleBorder(),
@@ -95,7 +99,9 @@ class PlaybackToggleButton extends StatelessWidget {
               child: Center(
                 child: IconTheme.merge(
                   data: IconThemeData(
-                    color: filled ? scheme.onPrimary : Colors.white,
+                    color: filled
+                        ? scheme.onPrimary
+                        : unfilledColor ?? scheme.onSurface,
                   ),
                   child: icon,
                 ),

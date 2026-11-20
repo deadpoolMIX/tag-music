@@ -391,51 +391,97 @@ class _SongListState extends State<SongList> {
               children: [
                 if (_selecting) _toolbar(constraints.maxHeight * .45),
                 Expanded(
-                  child: Stack(
-                    children: [
-                      if (widget.rows.isEmpty)
-                        Center(child: Text(widget.emptyText))
-                      else if (widget.reordering &&
+                  child: LayoutBuilder(
+                    builder: (context, listConstraints) {
+                      final longList =
+                          widget.rows.length * extent >
+                          listConstraints.maxHeight * 1.75;
+                      final gutter = longList ? 22.0 : 0.0;
+                      final scheme = Theme.of(context).colorScheme;
+                      final reordering =
+                          widget.reordering &&
                           !_selecting &&
-                          widget.onReorder != null)
-                        ReorderableListView.builder(
-                          key: PageStorageKey((widget.scope, widget.key)),
-                          scrollController: _scroll,
-                          keyboardDismissBehavior:
-                              widget.keyboardDismissBehavior,
-                          itemExtent: extent,
-                          buildDefaultDragHandles: false,
-                          itemCount: widget.rows.length,
-                          itemBuilder: row,
-                          onReorderItem: widget.onReorder!,
-                        )
-                      else
-                        ListView.builder(
-                          key: PageStorageKey((widget.scope, widget.key)),
-                          controller: _scroll,
-                          keyboardDismissBehavior:
-                              widget.keyboardDismissBehavior,
-                          itemExtent: extent,
-                          itemCount: widget.rows.length,
-                          padding: const EdgeInsets.only(bottom: 64),
-                          itemBuilder: row,
-                        ),
-                      Positioned(
-                        right: 12,
-                        bottom: 12,
-                        child: Opacity(
-                          opacity: .85,
-                          child: IconButton.filledTonal(
-                            key: const ValueKey('locate-current-song'),
-                            tooltip: '定位当前歌曲',
-                            onPressed: canLocate
-                                ? () => _locate(current, extent)
-                                : null,
-                            icon: const Icon(Icons.my_location),
+                          widget.onReorder != null;
+                      final scrollKey = PageStorageKey((
+                        widget.scope,
+                        widget.key,
+                      ));
+
+                      return Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          if (widget.rows.isEmpty)
+                            Center(child: Text(widget.emptyText))
+                          else
+                            RawScrollbar(
+                              controller: _scroll,
+                              thumbVisibility: longList,
+                              trackVisibility: longList,
+                              interactive: longList,
+                              notificationPredicate: (notification) =>
+                                  longList && notification.depth == 0,
+                              scrollbarOrientation: ScrollbarOrientation.right,
+                              thickness: 6,
+                              radius: const Radius.circular(3),
+                              trackRadius: const Radius.circular(3),
+                              thumbColor: scheme.primary.withValues(alpha: .75),
+                              trackColor: scheme.outlineVariant.withValues(
+                                alpha: .38,
+                              ),
+                              trackBorderColor: Colors.transparent,
+                              minThumbLength: 36,
+                              crossAxisMargin: 7,
+                              mainAxisMargin: 6,
+                              padding: EdgeInsets.zero,
+                              child: ScrollConfiguration(
+                                behavior: ScrollConfiguration.of(context)
+                                    .copyWith(scrollbars: false),
+                                child: reordering
+                                    ? ReorderableListView.builder(
+                                        key: scrollKey,
+                                        scrollController: _scroll,
+                                        keyboardDismissBehavior:
+                                            widget.keyboardDismissBehavior,
+                                        itemExtent: extent,
+                                        buildDefaultDragHandles: false,
+                                        itemCount: widget.rows.length,
+                                        padding: EdgeInsets.only(right: gutter),
+                                        itemBuilder: row,
+                                        onReorderItem: widget.onReorder!,
+                                      )
+                                    : ListView.builder(
+                                        key: scrollKey,
+                                        controller: _scroll,
+                                        keyboardDismissBehavior:
+                                            widget.keyboardDismissBehavior,
+                                        itemExtent: extent,
+                                        itemCount: widget.rows.length,
+                                        padding: EdgeInsets.only(
+                                          right: gutter,
+                                          bottom: 64,
+                                        ),
+                                        itemBuilder: row,
+                                      ),
+                              ),
+                            ),
+                          Positioned(
+                            right: 12 + gutter,
+                            bottom: 12,
+                            child: Opacity(
+                              opacity: .85,
+                              child: IconButton.filledTonal(
+                                key: const ValueKey('locate-current-song'),
+                                tooltip: '定位当前歌曲',
+                                onPressed: canLocate
+                                    ? () => _locate(current, extent)
+                                    : null,
+                                icon: const Icon(Icons.my_location),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ],
+                        ],
+                      );
+                    },
                   ),
                 ),
               ],

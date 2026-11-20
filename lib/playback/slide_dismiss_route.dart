@@ -12,10 +12,10 @@ class SlideDismissRoute extends PageRouteBuilder<void> {
          opaque: false,
          transitionDuration: reduceMotion
              ? Duration.zero
-             : const Duration(milliseconds: 280),
+             : const Duration(milliseconds: 190),
          reverseTransitionDuration: reduceMotion
              ? Duration.zero
-             : const Duration(milliseconds: 240),
+             : const Duration(milliseconds: 155),
          pageBuilder: (context, _, _) => builder(context),
          transitionsBuilder: (_, animation, _, child) => SlideTransition(
            position: animation.drive(
@@ -44,8 +44,11 @@ class SlideDismissRoute extends PageRouteBuilder<void> {
     _dragging = false;
     if (!isCurrent) return;
     final movement = controller!;
-    if (!cancelled &&
-        (movement.value <= .78 || (movement.value < .96 && velocity >= 680))) {
+    final flicked = movement.value < .98 && velocity >= 540;
+    if (!cancelled && (movement.value <= .78 || flicked)) {
+      if (flicked && !reduceMotion) {
+        movement.reverseDuration = const Duration(milliseconds: 105);
+      }
       navigator?.pop();
     } else if (reduceMotion) {
       movement.value = 1;
@@ -53,7 +56,7 @@ class SlideDismissRoute extends PageRouteBuilder<void> {
       unawaited(
         movement.animateTo(
           1,
-          duration: const Duration(milliseconds: 180),
+          duration: const Duration(milliseconds: 120),
           curve: Curves.easeOutCubic,
         ),
       );

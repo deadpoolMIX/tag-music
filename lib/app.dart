@@ -86,6 +86,9 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
     final generated = ColorScheme.fromSeed(
       seedColor: color.seed,
       brightness: brightness,
+      dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
+      primary: brightness == Brightness.light ? color.seed : null,
+      onPrimary: brightness == Brightness.light ? Colors.white : null,
     );
     final scheme = brightness == Brightness.light
         ? generated.copyWith(

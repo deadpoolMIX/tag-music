@@ -25,10 +25,10 @@ class PreferencesSettingsStore implements SettingsStore {
 }
 
 enum ThemeColor {
-  blue('海蓝', Color(0xFF2679BF)),
-  purple('紫色', Color(0xFF7858B9)),
-  rose('玫红', Color(0xFFC14872)),
-  amber('琥珀', Color(0xFFAD6B18));
+  blue('海蓝', Color(0xFF006CCA)),
+  purple('紫色', Color(0xFF6941CC)),
+  rose('玫红', Color(0xFFB72960)),
+  amber('琥珀', Color(0xFFA45B00));
 
   const ThemeColor(this.label, this.seed);
   final String label;

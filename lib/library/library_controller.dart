@@ -152,10 +152,23 @@ class LibraryController extends ChangeNotifier {
   int discovered = 0;
   int metadataReads = 0;
   String? scanningRoot;
-  String? message;
+  String? _message;
+  String? get message => _message;
+  Timer? _messageTimer;
   Future<void>? _scanTask;
   Future<bool>? _removeTask;
   List<LibraryTrack>? _visibleCache;
+
+  void _setMessage(String? value, {bool transient = false}) {
+    _messageTimer?.cancel();
+    _message = value;
+    if (value != null && transient && !_closed) {
+      _messageTimer = Timer(const Duration(seconds: 4), () {
+        _message = null;
+        _publish();
+      });
+    }
+  }
 
   List<LibraryTrack> get visible {
     if (_visibleCache != null) return _visibleCache!;
@@ -539,7 +552,7 @@ class LibraryController extends ChangeNotifier {
         await reload();
       }
     } catch (e) {
-      message = '目录选择失败：$e';
+      _setMessage('目录选择失败：$e', transient: true);
     } finally {
       choosing = false;
       _publish();
@@ -572,11 +585,11 @@ class LibraryController extends ChangeNotifier {
           db.libraryRoots,
         )..where((row) => row.location.equals(root))).go();
       });
-      message = null;
+      _setMessage(null);
       await reload();
       return true;
     } catch (_) {
-      message = '目录列表更新失败，请重试。';
+      _setMessage('目录列表更新失败，请重试。', transient: true);
       return false;
     } finally {
       _removeTask = null;
@@ -587,7 +600,7 @@ class LibraryController extends ChangeNotifier {
   void cancelScan() {
     if (scanning) {
       _cancelled = true;
-      message = '正在取消，已提交的目录仍保留…';
+      _setMessage('正在取消，已提交的目录仍保留…');
       _publish();
     }
   }
@@ -602,9 +615,10 @@ class LibraryController extends ChangeNotifier {
     _cancelled = false;
     discovered = 0;
     metadataReads = 0;
-    message = null;
+    _setMessage(null);
     _publish();
     var failures = 0;
+    String? result;
     try {
       for (final root in selected) {
         if (_cancelled) break;
@@ -711,19 +725,20 @@ class LibraryController extends ChangeNotifier {
           );
         }
       }
-      message = _cancelled
+      result = _cancelled
           ? '扫描已取消；未完成目录的原曲库保持不变。'
           : '扫描结束：发现 $discovered 首，读取元数据 $metadataReads 首，失败目录 $failures 个。';
     } catch (e) {
-      message = '扫描失败，已保留原曲库：$e';
+      result = '扫描失败，已保留原曲库：$e';
     } finally {
       scanningRoot = null;
       try {
         await reload();
       } catch (e) {
-        message = '曲库读取失败，扫描已停止：$e';
+        result = '曲库读取失败，扫描已停止：$e';
       }
       scanning = false;
+      _setMessage(result, transient: true);
       _publish();
     }
   }
@@ -731,6 +746,7 @@ class LibraryController extends ChangeNotifier {
   Future<void> shutdown() async {
     _closed = true;
     _cancelled = true;
+    _messageTimer?.cancel();
     await _scanTask;
     await _removeTask;
     await _filterWrites;

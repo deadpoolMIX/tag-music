@@ -38,12 +38,8 @@ class PlaybackQueue {
   PlaybackMode get mode => _mode;
   int get index => _entries.indexWhere((e) => e.entryId == _currentId);
   QueueEntry? get current => index < 0 ? null : _entries[index];
-  bool get canPrevious => index > 0 || (_wraps && _entries.isNotEmpty);
-  bool get canNext =>
-      _entries.isNotEmpty &&
-      (_mode != PlaybackMode.sequential ||
-          _priority.isNotEmpty ||
-          _linearCandidates(const {}).isNotEmpty);
+  bool get canPrevious => _entries.isNotEmpty;
+  bool get canNext => _entries.isNotEmpty;
   bool get _wraps =>
       _mode == PlaybackMode.repeatAll || _mode == PlaybackMode.repeatOne;
 
@@ -173,9 +169,14 @@ class PlaybackQueue {
     return candidates.isEmpty ? null : _choose(candidates.first, base: true);
   }
 
-  QueueEntry? previous() {
-    if (!canPrevious) return null;
-    final target = index > 0 ? index - 1 : _entries.length - 1;
+  // The transport buttons follow the displayed order, including its seam.
+  QueueEntry? nextManual() => _step(1);
+
+  QueueEntry? previous() => _step(-1);
+
+  QueueEntry? _step(int direction) {
+    if (_entries.isEmpty) return null;
+    final target = (index + direction) % _entries.length;
     return _choose(_entries[target].entryId, base: true);
   }
 

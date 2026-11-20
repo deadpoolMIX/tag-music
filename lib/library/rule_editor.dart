@@ -266,7 +266,11 @@ class _RuleTagPickerState extends State<_RuleTagPicker> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               shape: const StadiumBorder(),
-                              side: BorderSide.none,
+                              side: BorderSide(
+                                color: scheme.primary,
+                                width: 1.5,
+                                strokeAlign: BorderSide.strokeAlignInside,
+                              ),
                               backgroundColor: scheme.primaryContainer,
                               labelStyle: TextStyle(
                                 color: scheme.onPrimaryContainer,

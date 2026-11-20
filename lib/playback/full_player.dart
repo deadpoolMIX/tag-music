@@ -13,6 +13,7 @@ import '../library/group_pages.dart';
 import '../library/library_controller.dart';
 import '../library/track_cover.dart';
 import 'playback_controller.dart';
+import 'player_background.dart';
 import 'playback_page.dart' show formatPosition;
 import 'queue_page.dart';
 import 'player_actions.dart';
@@ -30,100 +31,6 @@ Future<void> openFullPlayer(BuildContext context) => Navigator.of(context).push(
     builder: (_) => const FullPlayer(),
   ),
 );
-
-class PlayerBackground extends StatefulWidget {
-  const PlayerBackground({
-    required this.playback,
-    required this.child,
-    this.immersive = false,
-    super.key,
-  });
-  final PlaybackController playback;
-  final Widget child;
-  final bool immersive;
-  @override
-  State<PlayerBackground> createState() => _PlayerBackgroundState();
-}
-
-class _PlayerBackgroundState extends State<PlayerBackground> {
-  String? _key;
-  Future<Uint8List?>? _cover;
-  @override
-  Widget build(BuildContext context) {
-    final track = widget.playback.current;
-    final key = track == null
-        ? null
-        : '${track.location}|${track.size}|${track.modified}';
-    if (key != _key) {
-      _key = key;
-      _cover = track == null
-          ? null
-          : widget.playback.documents.cachedCover(track);
-    }
-    final scheme = Theme.of(context).colorScheme;
-    final immersive = widget.immersive;
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: immersive
-                  ? [
-                      const Color(0xFF17212D),
-                      const Color(0xFF101725),
-                      Color.lerp(const Color(0xFF142038), scheme.primary, .35)!,
-                    ]
-                  : [
-                      scheme.secondaryContainer,
-                      scheme.surface,
-                      scheme.primaryContainer,
-                    ],
-            ),
-          ),
-        ),
-        FutureBuilder<Uint8List?>(
-          key: ValueKey(_key),
-          future: _cover,
-          builder: (_, snapshot) => snapshot.data == null
-              ? const SizedBox.shrink()
-              : ExcludeSemantics(
-                  child: ClipRect(
-                    child: ImageFiltered(
-                      imageFilter: ui.ImageFilter.blur(sigmaX: 36, sigmaY: 36),
-                      child: Opacity(
-                        opacity: immersive ? .72 : .25,
-                        child: Image.memory(
-                          snapshot.data!,
-                          fit: BoxFit.cover,
-                          gaplessPlayback: false,
-                          errorBuilder: (_, error, stack) =>
-                              const SizedBox.shrink(),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-        ),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: immersive
-                ? const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0x33101725), Color(0xB5101725)],
-                  )
-                : null,
-            color: immersive ? null : scheme.surface.withValues(alpha: .60),
-          ),
-        ),
-        widget.child,
-      ],
-    );
-  }
-}
 
 class PlayerSeek extends StatefulWidget {
   const PlayerSeek({required this.playback, this.onSeek, super.key});
@@ -291,112 +198,107 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
           bindings: {const SingleActivator(LogicalKeyboardKey.escape): _back},
           child: Focus(
             autofocus: true,
-            child: AnnotatedRegion<SystemUiOverlayStyle>(
-              value: simple || Theme.of(context).brightness == Brightness.dark
-                  ? SystemUiOverlayStyle.light
-                  : SystemUiOverlayStyle.dark,
-              child: Scaffold(
-                body: Semantics(
-                  customSemanticsActions: {
-                    CustomSemanticsAction(
-                      label: _showLyrics ? '返回播放器' : '关闭播放页',
-                    ): _back,
-                  },
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onVerticalDragStart: dismissRoute == null
-                        ? null
-                        : (_) => dismissRoute.startDrag(),
-                    onVerticalDragUpdate: dismissRoute == null
-                        ? null
-                        : (details) => dismissRoute.moveDrag(
-                            details.primaryDelta ?? 0,
-                            MediaQuery.sizeOf(context).height,
+            child: Scaffold(
+              body: Semantics(
+                customSemanticsActions: {
+                  CustomSemanticsAction(label: _showLyrics ? '返回播放器' : '关闭播放页'):
+                      _back,
+                },
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onVerticalDragStart: dismissRoute == null
+                      ? null
+                      : (_) => dismissRoute.startDrag(),
+                  onVerticalDragUpdate: dismissRoute == null
+                      ? null
+                      : (details) => dismissRoute.moveDrag(
+                          details.primaryDelta ?? 0,
+                          MediaQuery.sizeOf(context).height,
+                        ),
+                  onVerticalDragEnd: dismissRoute == null
+                      ? null
+                      : (details) => dismissRoute.finishDrag(
+                          velocity: details.primaryVelocity ?? 0,
+                        ),
+                  onVerticalDragCancel: dismissRoute == null
+                      ? null
+                      : () => dismissRoute.finishDrag(cancelled: true),
+                  onSecondaryTapUp: simple || _showLyrics
+                      ? null
+                      : (details) => unawaited(
+                          actions.show(
+                            context,
+                            globalPosition: details.globalPosition,
                           ),
-                    onVerticalDragEnd: dismissRoute == null
-                        ? null
-                        : (details) => dismissRoute.finishDrag(
-                            velocity: details.primaryVelocity ?? 0,
-                          ),
-                    onVerticalDragCancel: dismissRoute == null
-                        ? null
-                        : () => dismissRoute.finishDrag(cancelled: true),
-                    onSecondaryTapUp: simple || _showLyrics
-                        ? null
-                        : (details) => unawaited(
-                            actions.show(
-                              context,
-                              globalPosition: details.globalPosition,
-                            ),
-                          ),
-                    child: PlayerBackground(
-                      playback: playback,
-                      immersive: simple,
-                      child: SafeArea(
-                        child: AnimatedSwitcher(
-                          duration:
-                              simple && !MediaQuery.disableAnimationsOf(context)
-                              ? const Duration(milliseconds: 240)
-                              : Duration.zero,
-                          layoutBuilder: (active, previous) => Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              for (final child in [...previous, ?active])
-                                ExcludeSemantics(
-                                  key: child.key,
+                        ),
+                  child: PlayerBackground(
+                    playback: playback,
+                    immersive: simple,
+                    lyricsVisible: _showLyrics,
+                    builder: (context, controlColor, lyricsColor) => SafeArea(
+                      child: AnimatedSwitcher(
+                        duration:
+                            simple && !MediaQuery.disableAnimationsOf(context)
+                            ? const Duration(milliseconds: 240)
+                            : Duration.zero,
+                        layoutBuilder: (active, previous) => Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            for (final child in [...previous, ?active])
+                              ExcludeSemantics(
+                                key: child.key,
+                                excluding: child != active,
+                                child: ExcludeFocus(
                                   excluding: child != active,
-                                  child: ExcludeFocus(
-                                    excluding: child != active,
-                                    child: IgnorePointer(
-                                      ignoring: child != active,
-                                      child: child,
-                                    ),
+                                  child: IgnorePointer(
+                                    ignoring: child != active,
+                                    child: child,
                                   ),
                                 ),
-                            ],
-                          ),
-                          child: _showLyrics
-                              ? ImmersiveLyrics(
-                                  playback: playback,
-                                  onBack: _back,
-                                )
-                              : Column(
-                                  children: [
-                                    if (!simple)
-                                      Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                          20,
-                                          6,
-                                          8,
-                                          0,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Expanded(
-                                              child: playback.current == null
-                                                  ? const SizedBox.shrink()
-                                                  : _PlayerHeading(
-                                                      playback: playback,
-                                                      library: library,
-                                                    ),
-                                            ),
-                                            PlayerActionsButton(
-                                              actions: actions,
-                                            ),
-                                          ],
-                                        ),
+                              ),
+                          ],
+                        ),
+                        child: _showLyrics
+                            ? ImmersiveLyrics(
+                                playback: playback,
+                                onBack: _back,
+                                foreground: lyricsColor,
+                              )
+                            : Column(
+                                children: [
+                                  if (!simple)
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        20,
+                                        6,
+                                        8,
+                                        0,
                                       ),
-                                    Expanded(
-                                      child: _PlayerBody(
-                                        playback: playback,
-                                        library: library,
-                                        simple: simple,
-                                        openLyrics: _openLyrics,
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: playback.current == null
+                                                ? const SizedBox.shrink()
+                                                : _PlayerHeading(
+                                                    playback: playback,
+                                                    library: library,
+                                                  ),
+                                          ),
+                                          PlayerActionsButton(actions: actions),
+                                        ],
                                       ),
                                     ),
-                                  ],
-                                ),
-                        ),
+                                  Expanded(
+                                    child: _PlayerBody(
+                                      playback: playback,
+                                      library: library,
+                                      simple: simple,
+                                      openLyrics: _openLyrics,
+                                      controlColor: controlColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
                       ),
                     ),
                   ),
@@ -594,7 +496,9 @@ class _PlayerBody extends StatelessWidget {
     required this.library,
     required this.simple,
     required this.openLyrics,
+    required this.controlColor,
   });
+  final Color? controlColor;
   final PlaybackController playback;
   final LibraryController? library;
   final bool simple;
@@ -683,7 +587,7 @@ class _PlayerBody extends StatelessWidget {
         playback: playback,
         onToggleLayout: playback.toggleLayout,
         large: true,
-        immersive: simple,
+        immersiveColor: controlColor,
       ),
       if (!simple) ...[
         const SizedBox(height: 10),
@@ -785,11 +689,13 @@ class ImmersiveLyrics extends ConsumerStatefulWidget {
   const ImmersiveLyrics({
     required this.playback,
     required this.onBack,
+    required this.foreground,
     super.key,
   });
 
   final PlaybackController playback;
   final VoidCallback onBack;
+  final Color foreground;
   @override
   ConsumerState<ImmersiveLyrics> createState() => _ImmersiveLyricsState();
 }
@@ -1037,12 +943,12 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
 
                 final distance = (index - active).abs();
                 final alpha = active < 0
-                    ? .65
+                    ? .84
                     : switch (distance) {
                         0 => 1.0,
-                        1 => .65,
-                        2 => .45,
-                        _ => .30,
+                        1 => .84,
+                        2 => .73,
+                        _ => .63,
                       };
                 return Semantics(
                   selected: index == active,
@@ -1082,11 +988,8 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
                                       textAlign: TextAlign.start,
                                       textHeightBehavior:
                                           const ui.TextHeightBehavior(),
-                                      style: _lineStyle(i).copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface,
-                                      ),
+                                      style: _lineStyle(i)
+                                          .copyWith(color: widget.foreground),
                                     ),
                                   ),
                               ],
@@ -1140,15 +1043,16 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (loading && !MediaQuery.disableAnimationsOf(context))
-                const SizedBox(
+                SizedBox(
                   width: 28,
                   height: 28,
-                  child: CircularProgressIndicator(),
+                  child: CircularProgressIndicator(color: widget.foreground),
                 )
               else
                 Icon(
                   loading ? Icons.hourglass_empty : Icons.lyrics_outlined,
                   size: 36,
+                  color: widget.foreground,
                 ),
               const SizedBox(height: 16),
               Semantics(
@@ -1157,7 +1061,8 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
                 child: Text(
                   title,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleLarge,
+                  style: Theme.of(context).textTheme.titleLarge
+                      ?.copyWith(color: widget.foreground),
                 ),
               ),
               if (hasSong) ...[
@@ -1186,6 +1091,9 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
                   if (lyrics.status == LyricsStatus.unreadable &&
                       lyrics.message != null)
                     TextButton.icon(
+                      style: TextButton.styleFrom(
+                        foregroundColor: widget.foreground,
+                      ),
                       onPressed: () => showDialog<void>(
                         context: context,
                         builder: (dialog) => CompactAlertDialog(
@@ -1233,7 +1141,10 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
           onPointerDown: (_) => _pointers++,
           onPointerUp: _releasePointer,
           onPointerCancel: _releasePointer,
-          child: LayoutBuilder(builder: _lines),
+          child: DefaultTextStyle.merge(
+            style: TextStyle(color: widget.foreground),
+            child: LayoutBuilder(builder: _lines),
+          ),
         ),
       ),
     ),
