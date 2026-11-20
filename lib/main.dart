@@ -92,6 +92,7 @@ Future<void> main() async {
   final store = PreferencesSettingsStore();
   var mode = ThemeMode.system;
   var themeColor = ThemeColor.blue;
+  var desktopScale = defaultDesktopScale;
   String? warning;
   PlaybackController? playback;
   LibraryController? library;
@@ -126,6 +127,16 @@ Future<void> main() async {
   } catch (_) {
     warning = '${warning == null ? '' : '$warning\n'}无法读取主题色，当前使用海蓝。';
   }
+  if (Platform.isWindows) {
+    try {
+      final saved = await store.readDesktopScale();
+      if (saved != null && desktopScaleOptions.contains(saved)) {
+        desktopScale = saved;
+      }
+    } catch (_) {
+      warning = '${warning == null ? '' : '$warning\n'}无法读取界面缩放，当前使用 100%。';
+    }
+  }
   runApp(
     ProviderScope(
       overrides: [
@@ -133,6 +144,8 @@ Future<void> main() async {
         initialThemeProvider.overrideWithValue(mode),
         themeColorStoreProvider.overrideWithValue(store),
         initialThemeColorProvider.overrideWithValue(themeColor),
+        desktopScaleStoreProvider.overrideWithValue(store),
+        initialDesktopScaleProvider.overrideWithValue(desktopScale),
         startupWarningProvider.overrideWithValue(warning),
         playbackProvider.overrideWithValue(playback),
         libraryProvider.overrideWithValue(library),

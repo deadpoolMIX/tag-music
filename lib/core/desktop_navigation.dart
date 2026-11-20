@@ -132,37 +132,19 @@ class DesktopNavigation extends RouteObserver<PageRoute<dynamic>> {
 class PageNavigationScope extends InheritedWidget {
   const PageNavigationScope({
     required this.observer,
-    this.openMenu,
     required super.child,
     super.key,
   });
 
   final RouteObserver<PageRoute<dynamic>> observer;
-  final VoidCallback? openMenu;
 
   static RouteObserver<PageRoute<dynamic>>? of(BuildContext context) => context
       .dependOnInheritedWidgetOfExactType<PageNavigationScope>()
       ?.observer;
 
-  static VoidCallback? openMenuOf(BuildContext context) => context
-      .dependOnInheritedWidgetOfExactType<PageNavigationScope>()
-      ?.openMenu;
-
   @override
   bool updateShouldNotify(PageNavigationScope oldWidget) =>
-      observer != oldWidget.observer || openMenu != oldWidget.openMenu;
-}
-
-class AppNavigationButton extends StatelessWidget {
-  const AppNavigationButton({super.key});
-
-  @override
-  Widget build(BuildContext context) => IconButton(
-    key: const ValueKey('open-navigation'),
-    tooltip: '打开导航菜单',
-    onPressed: PageNavigationScope.openMenuOf(context),
-    icon: const Icon(Icons.menu),
-  );
+      observer != oldWidget.observer;
 }
 
 class DesktopNavigationScope extends InheritedWidget {
@@ -176,4 +158,17 @@ class DesktopNavigationScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(DesktopNavigationScope oldWidget) => false;
+}
+
+class PageActivity extends InheritedWidget {
+  const PageActivity({required this.active, required super.child, super.key});
+
+  final bool active;
+
+  static bool isActiveOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<PageActivity>()?.active ??
+      true;
+
+  @override
+  bool updateShouldNotify(PageActivity oldWidget) => active != oldWidget.active;
 }

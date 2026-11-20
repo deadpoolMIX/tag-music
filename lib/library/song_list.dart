@@ -18,24 +18,23 @@ import 'playlist_actions.dart';
 import 'song_selection.dart';
 import 'tags_page.dart';
 
-class SongListPageActivity extends InheritedWidget {
-  const SongListPageActivity({
-    required this.active,
-    required super.child,
-    super.key,
-  });
+double songRowExtent(BuildContext context) {
+  double height(double size) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: '歌曲Ag',
+        style: DefaultTextStyle.of(context).style.copyWith(fontSize: size),
+      ),
+      textScaler: MediaQuery.textScalerOf(context),
+      textDirection: Directionality.of(context),
+      maxLines: 1,
+    )..layout();
+    final result = painter.height;
+    painter.dispose();
+    return result;
+  }
 
-  final bool active;
-
-  static bool isActiveOf(BuildContext context) =>
-      context
-          .dependOnInheritedWidgetOfExactType<SongListPageActivity>()
-          ?.active ??
-      true;
-
-  @override
-  bool updateShouldNotify(SongListPageActivity oldWidget) =>
-      active != oldWidget.active;
+  return math.max(60, math.max(48, height(16) + height(12) + 12));
 }
 
 class PlayAllButton extends StatelessWidget {
@@ -139,7 +138,7 @@ class _SongListState extends State<SongList> with RouteAware {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _selection = SongSelectionScope.of(context);
-    _active = SongListPageActivity.isActiveOf(context);
+    _active = PageActivity.isActiveOf(context);
     if (!_active && _selecting) _clearSelection();
     final observer = PageNavigationScope.of(context);
     final route = ModalRoute.of(context);
@@ -227,25 +226,6 @@ class _SongListState extends State<SongList> with RouteAware {
   List<LibraryTrack> _snapshot() => List.unmodifiable(
     widget.source.where((t) => _selected.contains(t.song.id)),
   );
-
-  double _extent(BuildContext context) {
-    double height(double size) {
-      final painter = TextPainter(
-        text: TextSpan(
-          text: '歌曲Ag',
-          style: DefaultTextStyle.of(context).style.copyWith(fontSize: size),
-        ),
-        textScaler: MediaQuery.textScalerOf(context),
-        textDirection: Directionality.of(context),
-        maxLines: 1,
-      )..layout();
-      final result = painter.height;
-      painter.dispose();
-      return result;
-    }
-
-    return math.max(60, math.max(48, height(16) + height(12) + 12));
-  }
 
   Future<void> _locate(String id, double extent) async {
     final index = _indices[id];
@@ -356,7 +336,7 @@ class _SongListState extends State<SongList> with RouteAware {
         _invalidateLocate();
         _currentId = current;
       }
-      final extent = _extent(context);
+      final extent = songRowExtent(context);
       final canLocate = current != null && _indices.containsKey(current);
       Widget row(BuildContext context, int index) {
         final track = widget.rows[index];

@@ -98,31 +98,12 @@ class SongFileEditor {
   static const _channel = MethodChannel('app.tagmusic.player/song_editor');
   static const _tempPrefix = 'tag-music-edit-';
 
-  Future<SongFileDraft?> pickSong() async {
-    final EditableSongFile selected;
-    if (Platform.isAndroid) {
-      final values = await _channel.invokeMapMethod<String, Object?>(
-        'pickSong',
-      );
-      if (values == null) return null;
-      selected = EditableSongFile.fromPlatform(values);
-    } else {
-      final picked = await openFile(
-        acceptedTypeGroups: const [
-          XTypeGroup(label: '歌曲', extensions: _editableExtensions),
-        ],
-      );
-      if (picked == null) return null;
-      final location = p.normalize(p.absolute(picked.path));
-      selected = EditableSongFile(
-        location,
-        p.basename(location),
-        Platform.isWindows ? location.toLowerCase() : location,
-      );
-    }
-    if (!_editableExtensions.contains(
-      selected.extension.toLowerCase().replaceFirst('.', ''),
-    )) {
+  static bool supportsFileName(String name) => _editableExtensions.contains(
+    p.extension(name).toLowerCase().replaceFirst('.', ''),
+  );
+
+  Future<SongFileDraft> readSong(EditableSongFile selected) async {
+    if (!supportsFileName(selected.name)) {
       throw const SongEditorException('请选择 MP3、FLAC、M4A、WAV、OGG 或 Opus 文件');
     }
     return _withCopy(selected, (copy, _) async {

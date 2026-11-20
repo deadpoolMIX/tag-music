@@ -7,6 +7,7 @@ class CompactAlertDialog extends AlertDialog {
     super.actions,
     super.scrollable,
     super.insetPadding,
+    super.alignment,
     super.key,
   }) : super(
          titlePadding: const EdgeInsets.fromLTRB(16, 12, 16, 4),

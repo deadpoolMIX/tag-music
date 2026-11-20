@@ -125,7 +125,6 @@ class _PlaylistsPageState extends State<PlaylistsPage> {
         header: Column(
           children: [
             LibraryHeader(
-              menuButton: widget.menuButton ?? const AppNavigationButton(),
               heading: Text(
                 list.name,
                 maxLines: 1,

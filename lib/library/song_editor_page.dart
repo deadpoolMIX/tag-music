@@ -4,8 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../playback/playback_controller.dart';
+import '../core/fast_scrollbar.dart';
 import 'library_controller.dart';
+import 'library_header.dart';
+import 'library_search.dart';
 import 'song_file_editor.dart';
+import 'song_list.dart' show songRowExtent;
 
 class SongEditorPage extends StatefulWidget {
   const SongEditorPage({
@@ -30,6 +34,7 @@ class _SongEditorPageState extends State<SongEditorPage> {
   final _title = TextEditingController();
   final _artist = TextEditingController();
   final _album = TextEditingController();
+  String? _songId;
   SongFileDraft? _draft;
   Uint8List? _cover;
   String? _parent;
@@ -69,18 +74,55 @@ class _SongEditorPageState extends State<SongEditorPage> {
     }
   }
 
-  Future<void> _chooseSong() => _run('正在读取歌曲…', () async {
-    final result = await widget.editor.pickSong();
-    if (result == null || !mounted) return;
+  EditableSongFile? _libraryFile(String? songId) {
+    if (songId == null) return null;
+    final track = widget.library?.availableTrack(songId);
+    final location = track?.location;
+    if (track == null || location == null) return null;
+    return EditableSongFile(location, track.song.name, track.song.identity);
+  }
+
+  Future<void> _chooseSong() async {
+    final library = widget.library;
+    if (library == null || _pending != null) return;
+    final id = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _SongPicker(library: library, selectedId: _songId),
+      ),
+    );
+    if (id == null || !mounted) return;
+    await _run('正在读取歌曲…', () async {
+      final file = _libraryFile(id);
+      if (file == null) throw const SongEditorException('歌曲已移动或不可访问');
+      final result = await widget.editor.readSong(file);
+      if (!mounted) return;
+      setState(() {
+        _songId = id;
+        _draft = result;
+        _parent = null;
+        _cover = null;
+        _title.text = result.metadata.title ?? '';
+        _artist.text = result.metadata.artist ?? '';
+        _album.text = result.metadata.album ?? '';
+      });
+    });
+  }
+
+  void _clear() {
+    FocusScope.of(context).unfocus();
     setState(() {
-      _draft = result;
+      _songId = null;
+      _draft = null;
       _parent = null;
       _cover = null;
-      _title.text = result.metadata.title ?? '';
-      _artist.text = result.metadata.artist ?? '';
-      _album.text = result.metadata.album ?? '';
+      _title.clear();
+      _artist.clear();
+      _album.clear();
+      _notice = null;
+      _failed = false;
     });
-  });
+  }
 
   Future<void> _chooseCover() => _run('正在压缩封面…', () async {
     final result = await widget.editor.pickCover();
@@ -101,6 +143,8 @@ class _SongEditorPageState extends State<SongEditorPage> {
   }
 
   Future<void> _save(SongFileDraft draft) async {
+    final library = widget.library;
+    if (library == null) return;
     if (_form.currentState?.validate() != true) return;
     FocusScope.of(context).unfocus();
     final edits = (
@@ -111,29 +155,29 @@ class _SongEditorPageState extends State<SongEditorPage> {
     );
     await _run('正在保存歌曲…', () async {
       editedSongName(edits.title, edits.artist, draft.file.extension);
-      if (_isCurrentSong(draft.file)) {
-        throw const SongEditorException('播放器正在使用这首歌，请切换到其他歌曲后再保存');
-      }
+      _checkFile(draft.file);
       if (Platform.isAndroid && _parent == null) {
         final parent = await widget.editor.pickParent(draft.file);
         if (parent == null || !mounted) return;
         _parent = parent;
       }
       Future<SavedSongFile> save() {
-        if (_isCurrentSong(draft.file)) {
-          throw const SongEditorException('播放器正在使用这首歌，请切换到其他歌曲后再保存');
-        }
+        _checkFile(draft.file);
         return widget.editor.save(draft, edits, parent: _parent);
       }
 
       try {
-        final library = widget.library;
-        final (saved, synced) = library == null
-            ? (await save(), true)
-            : await library.editSongFile(draft.file, save);
+        final (saved, synced) = await library.editSongFile(draft.file, save);
         if (!mounted) return;
+        final updated = synced ? _libraryFile(_songId) : null;
         setState(() {
-          _draft = saved.draft;
+          _draft = updated == null
+              ? saved.draft
+              : SongFileDraft(
+                  updated,
+                  saved.draft.metadata,
+                  saved.draft.digest,
+                );
           _cover = null;
           _notice = [
             '已保存 ${saved.draft.file.name}',
@@ -149,8 +193,20 @@ class _SongEditorPageState extends State<SongEditorPage> {
     });
   }
 
+  void _checkFile(EditableSongFile file) {
+    final current = _libraryFile(_songId);
+    if (current?.location != file.location ||
+        current?.identity != file.identity) {
+      throw const SongEditorException('曲库中的歌曲位置已变更，请重新选择');
+    }
+    if (_isCurrentSong(file)) {
+      throw const SongEditorException('播放器正在使用这首歌，请切换到其他歌曲后再保存');
+    }
+  }
+
   bool _isCurrentSong(EditableSongFile file) {
     final playback = widget.playback;
+    if (_songId != null && playback?.currentSongId == _songId) return true;
     final location = playback?.current?.location;
     if (location == null) return false;
     if (Platform.isAndroid) {
@@ -176,21 +232,21 @@ class _SongEditorPageState extends State<SongEditorPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 6, 12, 6),
-          child: Row(
-            children: [
-              ?widget.menuButton,
-              const SizedBox(width: 16),
-              Expanded(child: Text('编辑歌曲', style: theme.textTheme.titleLarge)),
-              if (draft != null)
-                IconButton(
-                  onPressed: enabled ? _chooseSong : null,
-                  tooltip: '选择另一首歌曲',
-                  icon: const Icon(Icons.add),
-                ),
-            ],
-          ),
+        LibraryHeader(
+          menuButton: widget.menuButton,
+          heading: Text('编辑歌曲', style: theme.textTheme.titleLarge),
+          actions: [
+            if (draft != null)
+              IconButton(
+                onPressed: enabled ? _chooseSong : null,
+                tooltip: '选择另一首歌曲',
+                icon: const Icon(Icons.add),
+              ),
+            TextButton(
+              onPressed: enabled && draft != null ? _clear : null,
+              child: const Text('清除'),
+            ),
+          ],
         ),
         const Divider(height: 1),
         if (!enabled) const LinearProgressIndicator(),
@@ -198,7 +254,9 @@ class _SongEditorPageState extends State<SongEditorPage> {
           child: draft == null
               ? Center(
                   child: FilledButton.tonalIcon(
-                    onPressed: enabled ? _chooseSong : null,
+                    onPressed: enabled && widget.library != null
+                        ? _chooseSong
+                        : null,
                     icon: const Icon(Icons.add),
                     label: const Text('选择歌曲'),
                   ),
@@ -348,4 +406,117 @@ class _SongEditorPageState extends State<SongEditorPage> {
         : null,
     onChanged: (_) => setState(() {}),
   );
+}
+
+class _SongPicker extends StatefulWidget {
+  const _SongPicker({required this.library, this.selectedId});
+
+  final LibraryController library;
+  final String? selectedId;
+
+  @override
+  State<_SongPicker> createState() => _SongPickerState();
+}
+
+class _SongPickerState extends State<_SongPicker> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final library = widget.library;
+    return Scaffold(
+      body: SafeArea(
+        child: ListenableBuilder(
+          listenable: library,
+          builder: (context, _) => LibrarySearch(
+            hintText: '搜索曲库歌曲',
+            heading: Text(
+              '选择歌曲',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            onQueryChanged: () {
+              if (_scroll.hasClients) _scroll.jumpTo(0);
+            },
+            builder: (context, query, heading, searchButton) {
+              final rows = library.searchTracks(
+                query,
+                order: library.sort,
+                descending: library.descending,
+              );
+              return Column(
+                children: [
+                  LibraryHeader(
+                    menuButton: const BackButton(),
+                    heading: heading,
+                    actions: [searchButton],
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: rows.isEmpty
+                        ? Center(
+                            child: Text(
+                              query.isEmpty ? '曲库中没有可用歌曲' : '没有匹配的歌曲',
+                            ),
+                          )
+                        : FastScrollbar(
+                            controller: _scroll,
+                            child: ListView.builder(
+                              controller: _scroll,
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              itemCount: rows.length,
+                              itemExtent: songRowExtent(context),
+                              padding: const EdgeInsets.only(
+                                right: FastScrollbar.gutter,
+                              ),
+                              itemBuilder: (context, index) {
+                                final track = rows[index];
+                                final id = track.song.id;
+                                final editable =
+                                    SongFileEditor.supportsFileName(
+                                      track.song.name,
+                                    );
+                                final chosen = widget.selectedId == id;
+                                return ListTile(
+                                  key: ValueKey('edit-song-$id'),
+                                  dense: true,
+                                  enabled: editable,
+                                  selected: chosen,
+                                  trailing: chosen
+                                      ? const Icon(Icons.check)
+                                      : null,
+                                  title: Text(
+                                    track.title,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                  subtitle: Text(
+                                    editable
+                                        ? track.song.artist ?? track.song.name
+                                        : '此格式暂不支持编辑',
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                  onTap: editable
+                                      ? () => Navigator.pop(context, id)
+                                      : null,
+                                );
+                              },
+                            ),
+                          ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
 }

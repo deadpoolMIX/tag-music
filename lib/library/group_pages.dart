@@ -54,7 +54,6 @@ class _GroupSongs extends StatelessWidget {
     required this.library,
     required this.playback,
     required this.rows,
-    this.menuButton,
     this.onBack,
   });
 
@@ -63,7 +62,6 @@ class _GroupSongs extends StatelessWidget {
   final LibraryController library;
   final PlaybackController playback;
   final List<LibraryTrack> rows;
-  final Widget? menuButton;
   final VoidCallback? onBack;
 
   @override
@@ -77,7 +75,6 @@ class _GroupSongs extends StatelessWidget {
     emptyText: '没有歌曲',
     header: SongGroupHeader(
       name: name ?? (albums ? '未知专辑' : '未知歌手'),
-      menuButton: menuButton,
       tracks: rows,
       playback: playback,
     ),
@@ -197,6 +194,9 @@ class _GroupListState<T> extends State<GroupList<T>> {
         controller: _scroll,
         padding: const EdgeInsets.only(right: FastScrollbar.gutter),
         itemCount: items.length,
+        itemExtent: Theme.of(context).platform == TargetPlatform.windows
+            ? songRowExtent(context)
+            : null,
         itemBuilder: (context, index) =>
             widget.itemBuilder(context, items[index]),
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -271,7 +271,6 @@ class _MetadataGroupsPageState extends State<MetadataGroupsPage> {
         final rows = groups[selected] ?? <LibraryTrack>[];
         final desktop = DesktopNavigation.maybeOf(context) != null;
         return _GroupSongs(
-          menuButton: widget.menuButton,
           onBack: desktop || !widget.active
               ? null
               : () => _viewGroup(false, selected),

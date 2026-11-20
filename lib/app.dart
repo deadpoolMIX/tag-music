@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/diagnostics.dart';
 import 'core/desktop_navigation.dart';
+import 'core/desktop_ui_scale.dart';
 import 'core/settings.dart';
 import 'playback/cover_viewer.dart' show coverViewerRouteName;
 import 'playback/desktop_player.dart';
@@ -25,7 +26,6 @@ import 'library/library_controller.dart';
 import 'library/tags_page.dart';
 import 'library/group_pages.dart';
 import 'library/library_header.dart';
-import 'library/song_list.dart' show SongListPageActivity;
 import 'library/song_editor_page.dart';
 import 'library/song_selection.dart';
 
@@ -82,8 +82,8 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
   }
 
   bool _allowsNavigationSwipe(Route<dynamic>? route) =>
-      !_songSelection.isSelecting &&
       route is PageRoute &&
+      !route.fullscreenDialog &&
       route.settings.name != fullPlayerRouteName &&
       route.settings.name != coverViewerRouteName &&
       route.settings.name != playbackQueueRouteName;
@@ -124,6 +124,9 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
   Widget build(BuildContext context) {
     final color = ref.watch(themeColorProvider);
     final desktop = _desktop;
+    final scale = desktop
+        ? ref.watch(desktopScaleProvider)
+        : defaultDesktopScale;
     final lightTheme = _theme(Brightness.light, color);
     final darkTheme = _theme(Brightness.dark, color);
     final shell = AppShell(key: _shell);
@@ -134,7 +137,6 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
       builder: (context, child) {
         final navigation = PageNavigationScope(
           observer: _routes,
-          openMenu: () => _shell.currentState?._openNavigation(),
           child: CallbackShortcuts(
             bindings: {
               const SingleActivator(LogicalKeyboardKey.escape): desktop
@@ -190,7 +192,13 @@ class _TagMusicAppState extends ConsumerState<TagMusicApp> {
                   ),
           ),
         );
-        return SongSelectionScope(notifier: _songSelection, child: navigation);
+        final content = SongSelectionScope(
+          notifier: _songSelection,
+          child: navigation,
+        );
+        return desktop
+            ? DesktopUiScale(factor: scale / 100, child: content)
+            : content;
       },
       title: 'Tag Music',
       debugShowCheckedModeBanner: false,
@@ -324,26 +332,26 @@ class _TagMusicScrollBehavior extends MaterialScrollBehavior {
 }
 
 enum AppDestination {
-  songs,
-  playCounts,
-  filter,
-  playlists,
-  albums,
-  artists,
-  tags,
   songEditor,
+  playCounts,
+  albums,
+  tags,
+  artists,
+  playlists,
+  filter,
+  songs,
   settings,
 }
 
 const _destinations = [
-  (Icons.library_music_outlined, '歌曲'),
-  (Icons.bar_chart, '播放次数'),
-  (Icons.filter_alt_outlined, '筛选'),
-  (Icons.queue_music_outlined, '歌单'),
-  (Icons.album_outlined, '专辑'),
-  (Icons.person_outline, '歌手'),
-  (Icons.sell_outlined, '标签'),
   (Icons.edit_note_outlined, '编辑歌曲'),
+  (Icons.bar_chart, '播放次数'),
+  (Icons.album_outlined, '专辑'),
+  (Icons.sell_outlined, '标签'),
+  (Icons.person_outline, '歌手'),
+  (Icons.queue_music_outlined, '歌单'),
+  (Icons.filter_alt_outlined, '筛选'),
+  (Icons.library_music_outlined, '歌曲'),
   (Icons.settings_outlined, '设置'),
 ];
 
@@ -364,9 +372,7 @@ class _AppShellState extends ConsumerState<AppShell>
       scaffold.openDrawer();
       return;
     }
-    final history = DesktopNavigation.maybeOf(context);
-    final navigator =
-        history?.navigator ?? Navigator.of(context, rootNavigator: true);
+    final navigator = Navigator.of(context, rootNavigator: true);
     var swipeStartX = 0.0;
     final destination = await showGeneralDialog<AppDestination>(
       context: context,
@@ -385,10 +391,7 @@ class _AppShellState extends ConsumerState<AppShell>
             }
           },
           child: Drawer(
-            width: (MediaQuery.sizeOf(drawerContext).width * .52).clamp(
-              0.0,
-              history == null ? double.infinity : 280.0,
-            ),
+            width: MediaQuery.sizeOf(drawerContext).width * .52,
             child: _navigation(
               false,
               (destination) => Navigator.of(drawerContext).pop(destination),
@@ -527,7 +530,7 @@ class _AppShellState extends ConsumerState<AppShell>
           enabled: _selected == destination,
           child: ExcludeFocus(
             excluding: _selected != destination,
-            child: SongListPageActivity(
+            child: PageActivity(
               active: _selected == destination,
               child: switch (destination) {
                 AppDestination.songs =>
@@ -601,23 +604,21 @@ class _AppShellState extends ConsumerState<AppShell>
             Expanded(
               child: Scaffold(
                 key: _scaffold,
-                drawerEnableOpenDragGesture: !desktop,
-                drawer: Drawer(
-                  width: (constraints.maxWidth * .52).clamp(
-                    0.0,
-                    desktop ? 280.0 : double.infinity,
-                  ),
-                  child: _navigation(false, (destination) {
-                    _select(destination);
-                    _scaffold.currentState?.closeDrawer();
-                  }),
-                ),
+                drawer: desktop
+                    ? null
+                    : Drawer(
+                        width: constraints.maxWidth * .52,
+                        child: _navigation(false, (destination) {
+                          _select(destination);
+                          _scaffold.currentState?.closeDrawer();
+                        }),
+                      ),
                 drawerScrimColor: Colors.black26,
                 body: SafeArea(
                   bottom: false,
                   child: Row(
                     children: [
-                      if (desktop && !selecting)
+                      if (desktop)
                         SizedBox(
                           width: constraints.maxWidth >= 1000 ? 190 : 72,
                           child: _navigation(
@@ -625,8 +626,7 @@ class _AppShellState extends ConsumerState<AppShell>
                             _select,
                           ),
                         ),
-                      if (desktop && !selecting)
-                        const VerticalDivider(width: 1),
+                      if (desktop) const VerticalDivider(width: 1),
                       Expanded(
                         child: Column(
                           children: [
@@ -717,7 +717,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('主题保存失败，请检查存储空间后重试。')));
+            .showSnackBar(const SnackBar(content: Text('设置保存失败，请检查存储空间后重试。')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -728,6 +728,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final mode = ref.watch(themeProvider);
     final color = ref.watch(themeColorProvider);
+    final scale = ref.watch(desktopScaleProvider);
     final package = ref.watch(packageInfoProvider);
     final playback = ref.watch(playbackProvider);
     final theme = Theme.of(context);
@@ -812,6 +813,40 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         ),
                     ],
                   ),
+                  if (theme.platform == TargetPlatform.windows)
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: PopupMenuButton<int>(
+                        key: const ValueKey('desktop-ui-scale'),
+                        tooltip: '更改界面缩放',
+                        enabled: !_saving,
+                        initialValue: scale,
+                        onSelected: (value) => _save(
+                          () => ref
+                              .read(desktopScaleProvider.notifier)
+                              .select(value),
+                        ),
+                        itemBuilder: (_) => [
+                          for (final scale in desktopScaleOptions)
+                            PopupMenuItem(value: scale, child: Text('$scale%')),
+                        ],
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            spacing: 8,
+                            children: [
+                              const Icon(Icons.zoom_in, size: 20),
+                              Text('界面缩放 $scale%'),
+                              const Icon(Icons.arrow_drop_down),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   if (playback?.documents.android == true) ...[
                     Align(
                       alignment: AlignmentDirectional.centerStart,

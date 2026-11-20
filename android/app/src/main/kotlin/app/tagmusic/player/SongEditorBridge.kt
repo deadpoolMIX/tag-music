@@ -19,19 +19,12 @@ import java.util.concurrent.Executors
 class SongEditorBridge(private val activity: Activity, messenger: BinaryMessenger) {
     private val resolver = activity.contentResolver
     private val main = Handler(Looper.getMainLooper())
-    private var pending: Pair<Int, MethodChannel.Result>? = null
+    private var pending: MethodChannel.Result? = null
 
     init {
         MethodChannel(messenger, "app.tagmusic.player/song_editor").setMethodCallHandler { call, result ->
             when (call.method) {
-                "pickSong" -> pick(PICK_SONG, result) {
-                    Intent(Intent.ACTION_OPEN_DOCUMENT)
-                        .addCategory(Intent.CATEGORY_OPENABLE)
-                        .setType("audio/*")
-                        .putExtra(Intent.EXTRA_LOCAL_ONLY, true)
-                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                "pickParent" -> pick(PICK_PARENT, result) {
+                "pickParent" -> pickParent(result) {
                     Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
                         .putExtra(Intent.EXTRA_LOCAL_ONLY, true)
                         .putExtra(DocumentsContract.EXTRA_INITIAL_URI, uri(call.argument("uri")))
@@ -64,14 +57,14 @@ class SongEditorBridge(private val activity: Activity, messenger: BinaryMessenge
         }
     }
 
-    private fun pick(request: Int, result: MethodChannel.Result, intent: () -> Intent) {
+    private fun pickParent(result: MethodChannel.Result, intent: () -> Intent) {
         if (pending != null) {
             result.error("busy", "文件选择器已打开", null)
             return
         }
-        pending = request to result
+        pending = result
         try {
-            activity.startActivityForResult(intent(), request)
+            activity.startActivityForResult(intent(), PICK_PARENT)
         } catch (e: Exception) {
             pending = null
             result.error("picker", e.message, null)
@@ -79,27 +72,16 @@ class SongEditorBridge(private val activity: Activity, messenger: BinaryMessenge
     }
 
     fun onActivityResult(request: Int, result: Int, data: Intent?): Boolean {
-        if (request != PICK_SONG && request != PICK_PARENT) return false
-        val callback = pending?.takeIf { it.first == request }?.second ?: return true
+        if (request != PICK_PARENT) return false
+        val callback = pending ?: return true
         pending = null
         val selected = data?.data
         if (result != Activity.RESULT_OK || selected == null) {
             callback.success(null)
-        } else if (request == PICK_PARENT) {
+        } else {
             val writable = (requireNotNull(data).flags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0
             if (writable) callback.success(selected.toString())
             else callback.error("permission", "系统未授予文件夹写入权限", null)
-        } else worker.execute {
-            try {
-                check(DocumentsContract.isDocumentUri(activity, selected)) { "请选择本地存储里的歌曲文件" }
-                val info = info(selected)
-                val identity = "${selected.authority}:${DocumentsContract.getDocumentId(selected)}"
-                main.post {
-                    callback.success(mapOf("location" to selected.toString(), "name" to info.name, "identity" to identity))
-                }
-            } catch (e: Exception) {
-                main.post { callback.error("picker", e.message, null) }
-            }
         }
         return true
     }
@@ -148,7 +130,7 @@ class SongEditorBridge(private val activity: Activity, messenger: BinaryMessenge
             "请选择歌曲所在的文件夹"
         }
         require(tree.authority == selected.authority) {
-            "请从系统文件选择器的内部存储或 SD 卡重新选择这首歌曲，再授权所在文件夹"
+            "请授权这首歌曲所在的文件夹"
         }
         val parentId = DocumentsContract.getTreeDocumentId(tree)
         val oldId = DocumentsContract.getDocumentId(selected)
@@ -212,7 +194,6 @@ class SongEditorBridge(private val activity: Activity, messenger: BinaryMessenge
         runCatching { DocumentsContract.deleteDocument(resolver, uri) }.getOrDefault(false)
 
     companion object {
-        private const val PICK_SONG = 4021
         private const val PICK_PARENT = 4022
         private val worker = Executors.newSingleThreadExecutor()
     }

@@ -185,7 +185,6 @@ class _TagsPageState extends State<TagsPage> {
           name: tag.name,
           tracks: rows,
           playback: widget.playback,
-          menuButton: widget.menuButton,
         );
         final playback = widget.playback;
         if (playback == null) {

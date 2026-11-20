@@ -2,21 +2,30 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as image;
+import 'package:tag_music/library/database.dart';
+import 'package:tag_music/library/library_controller.dart';
 import 'package:tag_music/library/song_editor_page.dart';
 import 'package:tag_music/library/song_file_editor.dart';
 
+import 'library_test.dart' show FakeDocuments, entry;
+
 class _Editor extends SongFileEditor {
+  EditableSongFile? chosen;
   SongEdits? edits;
 
   @override
-  Future<SongFileDraft> pickSong() async => SongFileDraft(
-    const EditableSongFile('旧名字.mp3', '旧名字.mp3', 'old'),
-    const SongFileMetadata(title: '旧歌名', artist: '旧歌手', album: '旧专辑'),
-    'checksum',
-  );
+  Future<SongFileDraft> readSong(EditableSongFile file) async {
+    chosen = file;
+    return SongFileDraft(
+      file,
+      const SongFileMetadata(title: '旧歌名', artist: '旧歌手', album: '旧专辑'),
+      'checksum',
+    );
+  }
 
   @override
   Future<SavedSongFile> save(
@@ -45,35 +54,57 @@ class _Editor extends SongFileEditor {
 }
 
 void main() {
-  testWidgets('starts empty, requires a title and saves one prefilled song', (
-    tester,
-  ) async {
-    final editor = _Editor();
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(body: SongEditorPage(editor: editor)),
-      ),
-    );
-    expect(find.byType(TextFormField), findsNothing);
-    await tester.tap(find.text('选择歌曲'));
-    await tester.pumpAndSettle();
-    expect(find.text('旧歌名'), findsOneWidget);
-    expect(find.text('旧歌手'), findsOneWidget);
-    expect(find.text('旧专辑'), findsOneWidget);
+  testWidgets(
+    'picks one library song, saves its metadata, and clears the editor',
+    (tester) async {
+      final editor = _Editor();
+      final documents = FakeDocuments()..files['曲库'] = [entry('旧名字')];
+      final library = LibraryController(
+        LibraryDatabase(NativeDatabase.memory()),
+        documents,
+      );
+      addTearDown(library.shutdown);
+      await tester.runAsync(() async {
+        await library.initialize();
+        await library.scan();
+      });
+      final songId = library.tracks.single.song.id;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SongEditorPage(library: library, editor: editor),
+          ),
+        ),
+      );
+      expect(find.byType(TextFormField), findsNothing);
+      await tester.tap(find.text('选择歌曲'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey('edit-song-$songId')));
+      await tester.pumpAndSettle();
+      expect(editor.chosen?.location, '/music/旧名字');
+      expect(find.text('旧歌名'), findsOneWidget);
+      expect(find.text('旧歌手'), findsOneWidget);
+      expect(find.text('旧专辑'), findsOneWidget);
 
-    final title = find.byType(TextFormField).first;
-    await tester.enterText(title, '');
-    await tester.tap(find.text('保存'));
-    await tester.pumpAndSettle();
-    expect(find.text('请输入歌名'), findsOneWidget);
-    expect(editor.edits, isNull);
+      final title = find.byType(TextFormField).first;
+      await tester.enterText(title, '');
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      expect(find.text('请输入歌名'), findsOneWidget);
+      expect(editor.edits, isNull);
 
-    await tester.enterText(title, '新歌名');
-    await tester.tap(find.text('保存'));
-    await tester.pumpAndSettle();
-    expect(editor.edits?.title, '新歌名');
-    expect(find.text('已保存 新歌名-旧歌手.mp3'), findsOneWidget);
-  });
+      await tester.enterText(title, '新歌名');
+      await tester.tap(find.text('保存'));
+      await tester.pumpAndSettle();
+      expect(editor.edits?.title, '新歌名');
+      expect(library.tracks.single.song.id, songId);
+      expect(library.tracks.single.song.title, '新歌名');
+      expect(find.text('已保存 新歌名-旧歌手.mp3'), findsOneWidget);
+      await tester.tap(find.text('清除'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TextFormField), findsNothing);
+    },
+  );
 
   test(
     'file name preserves the extension and replaces forbidden characters',

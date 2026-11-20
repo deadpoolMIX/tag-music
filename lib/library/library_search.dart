@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/desktop_navigation.dart';
 import 'library_controller.dart';
 
 List<LibraryTrack> searchSongRows(List<LibraryTrack> tracks, String query) =>
@@ -37,27 +38,51 @@ class LibrarySearch extends StatefulWidget {
   State<LibrarySearch> createState() => _LibrarySearchState();
 }
 
-class _LibrarySearchState extends State<LibrarySearch> {
+class _LibrarySearchState extends State<LibrarySearch> with RouteAware {
   final _editing = TextEditingController();
   final _focus = FocusNode();
   bool _open = false;
+  RouteObserver<PageRoute<dynamic>>? _observer;
+  PageRoute<dynamic>? _page;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!PageActivity.isActiveOf(context)) _clear();
+    final observer = PageNavigationScope.of(context);
+    final route = ModalRoute.of(context);
+    final page = route is PageRoute<dynamic> ? route : null;
+    if (identical(observer, _observer) && identical(page, _page)) return;
+    _observer?.unsubscribe(this);
+    _observer = observer;
+    _page = page;
+    if (page != null) observer?.subscribe(this, page);
+  }
+
+  @override
+  void didPushNext() => _close();
 
   void _start() {
     setState(() => _open = true);
     _focus.requestFocus();
   }
 
-  void _close() {
+  void _clear() {
+    if (!_open) return;
+    _open = false;
+    _editing.clear();
     _focus.unfocus();
-    setState(() {
-      _open = false;
-      _editing.clear();
-    });
+  }
+
+  void _close() {
+    if (!_open) return;
+    setState(_clear);
     widget.onQueryChanged?.call();
   }
 
   @override
   void dispose() {
+    _observer?.unsubscribe(this);
     _focus.dispose();
     _editing.dispose();
     super.dispose();
@@ -87,15 +112,21 @@ class _LibrarySearchState extends State<LibrarySearch> {
             ),
           )
         : widget.heading;
-    return widget.builder(
-      context,
-      _editing.text.trim().toLowerCase(),
-      field,
-      IconButton(
-        key: widget.buttonKey,
-        tooltip: _open ? '关闭搜索' : widget.hintText,
-        onPressed: _open ? _close : _start,
-        icon: Icon(_open ? Icons.close : Icons.search),
+    return PopScope<Object?>(
+      canPop: !_open,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _close();
+      },
+      child: widget.builder(
+        context,
+        _editing.text.trim().toLowerCase(),
+        field,
+        IconButton(
+          key: widget.buttonKey,
+          tooltip: _open ? '关闭搜索' : widget.hintText,
+          onPressed: _open ? _close : _start,
+          icon: Icon(_open ? Icons.close : Icons.search),
+        ),
       ),
     );
   }

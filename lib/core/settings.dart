@@ -28,6 +28,12 @@ class PreferencesSettingsStore implements SettingsStore {
 
   Future<void> writeDesktopVolume(double value) =>
       _preferences.setDouble('settings.v1.desktopVolume', value);
+
+  Future<int?> readDesktopScale() =>
+      _preferences.getInt('settings.v1.desktopScale');
+
+  Future<void> writeDesktopScale(int value) =>
+      _preferences.setInt('settings.v1.desktopScale', value);
 }
 
 enum ThemeColor {
@@ -81,5 +87,23 @@ class ThemeColorController extends Notifier<ThemeColor> {
   Future<void> select(ThemeColor color) async {
     await ref.read(themeColorStoreProvider).writeThemeColor(color.name);
     state = color;
+  }
+}
+
+const desktopScaleOptions = [80, 90, 100, 110, 125, 150];
+const defaultDesktopScale = 100;
+final desktopScaleStoreProvider = Provider((ref) => PreferencesSettingsStore());
+final initialDesktopScaleProvider = Provider((ref) => defaultDesktopScale);
+final desktopScaleProvider = NotifierProvider<DesktopScaleController, int>(
+  DesktopScaleController.new,
+);
+
+class DesktopScaleController extends Notifier<int> {
+  @override
+  int build() => ref.watch(initialDesktopScaleProvider);
+
+  Future<void> select(int scale) async {
+    await ref.read(desktopScaleStoreProvider).writeDesktopScale(scale);
+    state = scale;
   }
 }
