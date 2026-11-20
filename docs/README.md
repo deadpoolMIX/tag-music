@@ -6,6 +6,7 @@
 
 | 任务 | 最小入口；扩大读取的条件 |
 |---|---|
+| 恢复 R7 | [范围、实现与体验入口](rounds/R7.md) |
 | 回查 R6 | [实现进度](rounds/R6.md)及[验收结论和保留版本](rounds/R6-ACCEPTANCE.md) |
 | 新阶段/产品行为决策 | [PLAN](PLAN.md)对应阶段/产品语义；需要操作Goal才读[细则](WORKFLOW.md#goal-状态) |
 | 定位实现/改公共接口 | [模块定位](ARCHITECTURE.md#架构与代码定位)，涉及持久/播放语义才补[长期接口](ARCHITECTURE.md#长期有效的接口与约束)及调用方 |
