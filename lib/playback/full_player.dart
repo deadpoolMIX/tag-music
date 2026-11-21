@@ -231,6 +231,7 @@ class FullPlayer extends ConsumerStatefulWidget {
 
 class _FullPlayerState extends ConsumerState<FullPlayer> {
   bool _showLyrics = false;
+  double _swipeStartX = 0;
 
   Future<void> _openLyrics() async {
     final route = ModalRoute.of(context);
@@ -264,6 +265,8 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
       listenable: playback,
       builder: (context, _) {
         final simple = playback.simpleLayout;
+        final canOpenLyrics = playback.current != null;
+        final canSwipe = showLyrics || canOpenLyrics;
         final actions = PlayerActions(
           playback: playback,
           library: library,
@@ -279,6 +282,8 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                 customSemanticsActions: {
                   CustomSemanticsAction(label: showLyrics ? '返回播放器' : '关闭播放页'):
                       _back,
+                  if (!showLyrics && canOpenLyrics)
+                    const CustomSemanticsAction(label: '查看歌词'): _openLyrics,
                 },
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
@@ -311,74 +316,96 @@ class _FullPlayerState extends ConsumerState<FullPlayer> {
                     playback: playback,
                     immersive: simple,
                     lyricsVisible: showLyrics,
-                    builder: (context, controlColor, lyricsColor) => SafeArea(
-                      child: AnimatedSwitcher(
-                        duration:
-                            simple && !MediaQuery.disableAnimationsOf(context)
-                            ? const Duration(milliseconds: 240)
-                            : Duration.zero,
-                        layoutBuilder: (active, previous) => Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            for (final child in [...previous, ?active])
-                              ExcludeSemantics(
-                                key: child.key,
-                                excluding: child != active,
-                                child: ExcludeFocus(
-                                  excluding: child != active,
-                                  child: IgnorePointer(
-                                    ignoring: child != active,
-                                    child: child,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        child: showLyrics
-                            ? ImmersiveLyrics(
-                                playback: playback,
-                                onBack: _back,
-                                foreground: lyricsColor,
-                              )
-                            : Column(
+                    builder: (context, controlColor, lyricsColor) =>
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          excludeFromSemantics: true,
+                          dragStartBehavior: DragStartBehavior.down,
+                          onHorizontalDragStart: canSwipe
+                              ? (details) =>
+                                    _swipeStartX = details.globalPosition.dx
+                              : null,
+                          onHorizontalDragEnd: canSwipe
+                              ? (details) {
+                                  if (route?.isCurrent != true) return;
+                                  final distance =
+                                      details.globalPosition.dx - _swipeStartX;
+                                  if (showLyrics && distance >= 56) {
+                                    _back();
+                                  } else if (!showLyrics && distance <= -56) {
+                                    unawaited(_openLyrics());
+                                  }
+                                }
+                              : null,
+                          child: SafeArea(
+                            child: AnimatedSwitcher(
+                              duration: !MediaQuery.disableAnimationsOf(context)
+                                  ? const Duration(milliseconds: 240)
+                                  : Duration.zero,
+                              layoutBuilder: (active, previous) => Stack(
+                                fit: StackFit.expand,
                                 children: [
-                                  _StandardPlayerControl(
-                                    visible: !simple,
-                                    child: Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        20,
-                                        6,
-                                        8,
-                                        0,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            child: playback.current == null
-                                                ? const SizedBox.shrink()
-                                                : _PlayerHeading(
-                                                    playback: playback,
-                                                    library: library,
-                                                  ),
-                                          ),
-                                          PlayerActionsButton(actions: actions),
-                                        ],
+                                  for (final child in [...previous, ?active])
+                                    ExcludeSemantics(
+                                      key: child.key,
+                                      excluding: child != active,
+                                      child: ExcludeFocus(
+                                        excluding: child != active,
+                                        child: IgnorePointer(
+                                          ignoring: child != active,
+                                          child: child,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  Expanded(
-                                    child: _PlayerBody(
-                                      playback: playback,
-                                      library: library,
-                                      simple: simple,
-                                      openLyrics: _openLyrics,
-                                      controlColor: controlColor,
-                                    ),
-                                  ),
                                 ],
                               ),
-                      ),
-                    ),
+                              child: showLyrics
+                                  ? ImmersiveLyrics(
+                                      playback: playback,
+                                      foreground: lyricsColor,
+                                    )
+                                  : Column(
+                                      children: [
+                                        _StandardPlayerControl(
+                                          visible: !simple,
+                                          child: Padding(
+                                            padding: const EdgeInsets.fromLTRB(
+                                              20,
+                                              6,
+                                              8,
+                                              0,
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Expanded(
+                                                  child:
+                                                      playback.current == null
+                                                      ? const SizedBox.shrink()
+                                                      : _PlayerHeading(
+                                                          playback: playback,
+                                                          library: library,
+                                                        ),
+                                                ),
+                                                PlayerActionsButton(
+                                                  actions: actions,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: _PlayerBody(
+                                            playback: playback,
+                                            library: library,
+                                            simple: simple,
+                                            controlColor: controlColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                            ),
+                          ),
+                        ),
                   ),
                 ),
               ),
@@ -502,14 +529,12 @@ class _PlayerBody extends StatelessWidget {
     required this.playback,
     required this.library,
     required this.simple,
-    required this.openLyrics,
     required this.controlColor,
   });
   final Color? controlColor;
   final PlaybackController playback;
   final LibraryController? library;
   final bool simple;
-  final Future<void> Function() openLyrics;
 
   Widget _artwork(BuildContext context, double size) {
     final current = playback.current;
@@ -535,10 +560,9 @@ class _PlayerBody extends StatelessWidget {
       button: true,
       enabled: current != null,
       label: '歌曲封面',
-      hint: '点按查看歌词，长按查看原图',
+      hint: '长按查看原图',
       child: InkWell(
         borderRadius: BorderRadius.circular(28),
-        onTap: current == null ? null : openLyrics,
         onLongPress: current == null
             ? null
             : () => showCoverViewer(
@@ -767,12 +791,10 @@ class ImmersiveLyrics extends ConsumerStatefulWidget {
   const ImmersiveLyrics({
     required this.playback,
     required this.foreground,
-    this.onBack,
     super.key,
   });
 
   final PlaybackController playback;
-  final VoidCallback? onBack;
   final Color foreground;
   @override
   ConsumerState<ImmersiveLyrics> createState() => _ImmersiveLyricsState();
@@ -785,7 +807,6 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
   bool _follow = true;
   int _pointers = 0, _followGeneration = 0;
   int _last = -2;
-  double _swipeStartX = 0;
   Lyrics? _lyrics;
   List<double> _offsets = [], _heights = [];
   double _width = 0, _viewportHeight = 0;
@@ -1214,31 +1235,16 @@ class _ImmersiveLyricsState extends ConsumerState<ImmersiveLyrics> {
   Widget build(BuildContext context) => Focus(
     focusNode: _pageFocus,
     autofocus: true,
-    child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      excludeFromSemantics: true,
-      dragStartBehavior: DragStartBehavior.down,
-      onHorizontalDragStart: widget.onBack == null
-          ? null
-          : (details) => _swipeStartX = details.globalPosition.dx,
-      onHorizontalDragEnd: widget.onBack == null
-          ? null
-          : (details) {
-              if (details.globalPosition.dx - _swipeStartX >= 56) {
-                widget.onBack?.call();
-              }
-            },
-      child: Material(
-        type: MaterialType.transparency,
-        child: Listener(
-          behavior: HitTestBehavior.opaque,
-          onPointerDown: (_) => _pointers++,
-          onPointerUp: _releasePointer,
-          onPointerCancel: _releasePointer,
-          child: DefaultTextStyle.merge(
-            style: TextStyle(color: widget.foreground),
-            child: LayoutBuilder(builder: _lines),
-          ),
+    child: Material(
+      type: MaterialType.transparency,
+      child: Listener(
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: (_) => _pointers++,
+        onPointerUp: _releasePointer,
+        onPointerCancel: _releasePointer,
+        child: DefaultTextStyle.merge(
+          style: TextStyle(color: widget.foreground),
+          child: LayoutBuilder(builder: _lines),
         ),
       ),
     ),
