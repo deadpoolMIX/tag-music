@@ -1,7 +1,7 @@
 # Tag Music native audio components
 
-The original Tag Music application code is MIT licensed. The bundled audio
-binaries have separate licenses. Dart package MIT licenses do not replace them.
+The original Tag Music application code is licensed under 0BSD.
+The bundled audio binaries are subject to the licenses listed below.
 
 Windows: media_kit_libs_windows_audio 1.0.9 downloads
 mpv-dev-x86_64-20230924-git-652a1dd.7z from:

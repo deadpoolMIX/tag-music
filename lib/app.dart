@@ -689,7 +689,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _saving = false;
 
   void _showLicenses(BuildContext context, String version) {
-    const legalese = '原创代码采用 MIT 许可；第三方组件保留各自许可。';
+    const legalese = '原创代码采用 0BSD 许可，第三方组件适用各自的许可。';
     if (DesktopNavigation.maybeOf(context) != null) {
       pushAppPage(
         context,

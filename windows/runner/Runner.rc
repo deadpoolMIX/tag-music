@@ -93,7 +93,7 @@ BEGIN
             VALUE "FileDescription", "Tag Music" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "tag_music" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 Tag Music contributors. MIT License." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Tag Music contributors. 0BSD License." "\0"
             VALUE "OriginalFilename", "tag_music.exe" "\0"
             VALUE "ProductName", "Tag Music" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

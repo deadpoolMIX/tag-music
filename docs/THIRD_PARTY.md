@@ -1,6 +1,6 @@
 # 第三方组件与许可
 
-原创代码 MIT；不复制 Harmonoid 源码、设计素材或许可受限实现。
+当前分支的原创代码采用 [0BSD 许可](../LICENSE)。第三方组件适用各自的许可。
 
 R0 使用 Flutter / Dart、flutter_localizations、flutter_riverpod、shared_preferences 和 package_info_plus。实际依赖及版本见 `pubspec.lock`，组件许可由 Flutter 构建收集并在应用“设置 → 开源许可”中显示。打包交付须保留该入口与此说明；Flutter SDK 自带的 `LICENSE` 和 `bin/cache/LICENSE.*` 为运行时许可资料。
 
@@ -19,7 +19,7 @@ R0 尚未引入 media_kit、libmpv 或 FFmpeg。R1 必须核对实际原生二�
 
 证据：`artifacts/R1/native-{windows,android}-audit.json`、`android-native-jar-sha256.txt`、`libmpv-*-release.json`、`libmpv-android-audio-build-*`。Windows 查询脚本为 `scripts/audit-native.py`。
 
-原生库包含 LGPL 组件，整个安装包不能统称 MIT；原创应用代码仍为 MIT。`assets/licenses/native/` 保存 LGPL 2.1、LGPL 3、后者引用的 GPL 3、mpv Copyright、FFmpeg License、mbedTLS 和 libxml2 文本；GPL 文本被 LGPL 引用不表示启用了 GPL 编解码器。应用不添加阻止调试 LGPL 修改所需逆向分析的限制。
+原生库包含 LGPL 组件。`assets/licenses/native/` 保存 LGPL 2.1、LGPL 3、后者引用的 GPL 3、mpv Copyright、FFmpeg License、mbedTLS 和 libxml2 文本。上述原生库构建关闭了 GPL 编解码器。应用允许为调试 LGPL 组件改动而进行逆向分析。
 
 来源：[Windows 发行包](https://github.com/media-kit/libmpv-win32-audio-build/releases/tag/2023-09-24)、[Windows mpv 精确源码](https://github.com/mpv-player/mpv/tree/652a1dd90711839acdccc08004056d25514ef2d8)、[FFmpeg n6.0](https://github.com/FFmpeg/FFmpeg/tree/n6.0)、[Android 构建标签](https://github.com/media-kit/libmpv-android-audio-build/tree/87744be8b337c50ed54961249b7a97c5e8cc37c9)、[mpv 许可](https://github.com/mpv-player/mpv/blob/652a1dd90711839acdccc08004056d25514ef2d8/Copyright)、[FFmpeg 许可](https://github.com/FFmpeg/FFmpeg/blob/n6.0/LICENSE.md)。
 
@@ -37,6 +37,6 @@ Drift / sqlite3 Dart绑定的许可文本以锁定包内LICENSE及应用“开�
 
 完整依赖版本见仓库根目录的 `pubspec.lock`。备份校验使用 `crypto 3.0.8`，FFI 使用 `ffi 2.2.0`，两者均按锁定包的 BSD 三条款许可保留署名和条款。文件选择器的 Windows、Android 实现同样使用 BSD 三条款许可。Dart 依赖许可可在「设置 → 开源许可」查看。
 
-Windows 便携包附带原创 MIT 许可、Flutter 运行时许可和原生音频库许可。两个 Android 变体通过同一应用入口提供原生音频库许可。Windows 音频库的完整对应源码及静态子组件通知、Android 构建引用的 helper 精确版本仍需核全。个人使用版保留这些公开发行前的待办项。
+此前构建的 Windows 个人版附带当时的原创 MIT 许可、Flutter 运行时许可和原生音频库许可。两个 Android 变体通过同一应用入口提供原生音频库许可。Windows 音频库的完整对应源码及静态子组件通知、Android 构建引用的 helper 精确版本仍需核全。公开 Release 提供源码，个人版安装包保存在 GitHub 草稿中。
 
 「编辑歌曲」使用 flutter_taglib 1.6.0（Apache-2.0）和 image 4.12.0。Windows 和 Android 的 TagLib 桥接库取自插件的预编译发行版。插件构建配方使用 TagLib 2.3（MPL-1.1 或 LGPL-2.1）与 utfcpp 4.0.9（BSL-1.0）。许可文本随包提供，实际预编译文件及包内副本的哈希留在 `artifacts/R9/`。 [flutter_taglib 二进制与源码入口](https://github.com/axel10/flutter_taglib/releases/tag/desktop-binaries-v1.6.0) · [TagLib 源码](https://github.com/taglib/taglib/tree/v2.3) · [utfcpp 源码](https://github.com/nemtrif/utfcpp/tree/v4.0.9)
