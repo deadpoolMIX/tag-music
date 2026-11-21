@@ -28,6 +28,8 @@ Flutter + Material 3 共用 UI/业务，Riverpod 组织状态，Drift/SQLite 存
 
 ## 局域网同步与备份匹配
 
+入口为「设置 → 局域网同步」。电脑在同一局域网内等待连接，手机输入连接码后点击「立即同步」。如有多个码，可用 `ipconfig` 查连接同一路由器的 WLAN 或以太网 IPv4 地址，再选对应的码。同步范围包括标签、收藏、普通与智能歌单、筛选规则和主题设置。
+
 - 电脑打开同步窗口并开始等待时监听局域网 TCP 端口。连接码包含电脑的局域网地址和配对密钥，手机用它直连电脑，双方通过 AES-GCM 加密交换管理数据。关闭同步窗口即停止监听。 [连接实现](../lib/library/lan_sync_connection.dart)
 - 首次匹配按目录名、相对路径和文件大小查找，已有的 SHA-256 指纹也可用于匹配。仅接受唯一对应关系。配对后，`sync_records` 保存本机歌曲 UUID 到同步 UUID 的对应关系和上一次同步的快照。电脑对照快照合并两端新增、修改和删除，有冲突时在电脑上选择。两端分别以 SQLite 事务应用管理数据，保留各自文件位置。 [匹配](../lib/library/portable_paths.dart) · [合并](../lib/library/lan_sync_merge.dart) · [存储](../lib/library/lan_sync_store.dart)
 - 恢复备份时，同名目录先按逐首匹配结果判断是否可复用。恢复前展示匹配数量，应用后记住目录对应关系。缺失歌曲保留标签和歌单关联，定位或补扫后可找回。 [恢复匹配](../lib/library/backup_matching.dart)
