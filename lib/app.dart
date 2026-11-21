@@ -19,6 +19,7 @@ import 'playback/queue_page.dart' show playbackQueueRouteName;
 import 'library/library_page.dart';
 import 'library/play_counts_page.dart';
 import 'library/backup_dialog.dart';
+import 'library/lan_sync_dialog.dart';
 import 'library/filter_page.dart';
 import 'library/playlists_page.dart';
 import 'playback/playback_controller.dart';
@@ -860,6 +861,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   if (ref.watch(libraryProvider) case final library?) ...[
                     const SizedBox(height: 4),
                     DirectorySettings(library: library),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton.icon(
+                        onPressed: () => showLanSync(context, library),
+                        icon: const Icon(Icons.sync),
+                        label: const Text('局域网同步'),
+                      ),
+                    ),
                     Align(
                       alignment: AlignmentDirectional.centerStart,
                       child: TextButton.icon(

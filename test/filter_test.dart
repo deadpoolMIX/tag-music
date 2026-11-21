@@ -97,7 +97,7 @@ void main() {
 
   for (final version in [1, 2]) {
     test(
-      'v$version file migrates to v5 and reopens with all old data intact',
+      'v$version file migrates and reopens with all old data intact',
       () async {
         final dir = await Directory.systemTemp.createTemp('filter-migration-');
         final file = File('${dir.path}/library.sqlite');
@@ -160,7 +160,7 @@ void main() {
           expect(
             (await db.customSelect('PRAGMA user_version').getSingle())
                 .read<int>('user_version'),
-            6,
+            7,
           );
           final repository = FilterRepository(db);
           expect((await repository.load()).rule.isEmpty, isTrue);

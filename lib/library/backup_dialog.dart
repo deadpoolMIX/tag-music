@@ -32,6 +32,7 @@ class _BackupDialogState extends State<_BackupDialog> {
   bool _local = false;
   String? _status;
   LibraryBackup? _preview;
+  BackupMatch? _matching;
 
   Future<void> _run(Future<void> Function() action, String failure) async {
     setState(() {
@@ -98,9 +99,11 @@ class _BackupDialogState extends State<_BackupDialog> {
     );
     if (index == null) return;
     final choice = choices[index];
-    _preview = await LibraryBackup.decode(
+    final backup = await LibraryBackup.decode(
       await choice.folder.readSnapshot(choice.file.name),
     );
+    _matching = await previewBackupMatch(backup, widget.library.db);
+    _preview = backup;
     _local = false;
   }, '无法读取备份文件夹，请检查授权和备份记录。');
 
@@ -130,7 +133,11 @@ class _BackupDialogState extends State<_BackupDialog> {
       bytes = await _pick();
     }
     if (bytes == null) return;
-    _preview = await LibraryBackup.decode(bytes);
+    final backup = await LibraryBackup.decode(bytes);
+    _matching = local
+        ? null
+        : await previewBackupMatch(backup, widget.library.db);
+    _preview = backup;
     _local = local;
   }, '无法读取备份，请检查文件是否可以访问。');
 
@@ -214,7 +221,15 @@ class _BackupDialogState extends State<_BackupDialog> {
                   const Text(
                     '恢复会替换当前曲库、标签、歌单、筛选和备份中有记录的播放次数，并清空播放队列。应用会先保存当前管理数据。',
                   ),
-                  if (!_local) const Text('当前曲库中没有的音乐位置需要重新定位。'),
+                  if (_matching case final matching?) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      '已匹配 ${matching.directories.length} 个目录，'
+                      '${matching.matchedSongs} 首歌'
+                      ' · ${preview.songs.length - matching.matchedSongs} 首待匹配',
+                    ),
+                    const Text('未匹配的歌曲会保留标签和歌单记录，可在管理目录中重新定位。'),
+                  ],
                 ],
                 if (_busy) const LinearProgressIndicator(),
                 if (_status case final status?) Text(status),
@@ -231,6 +246,7 @@ class _BackupDialogState extends State<_BackupDialog> {
                       } else {
                         setState(() {
                           _preview = null;
+                          _matching = null;
                           _status = null;
                         });
                       }

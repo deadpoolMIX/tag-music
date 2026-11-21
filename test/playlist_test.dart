@@ -208,7 +208,7 @@ void main() {
     });
   });
 
-  for (final version in [1, 2, 3, 4, 5]) {
+  for (final version in [1, 2, 3, 4, 5, 6]) {
     test(
       'v$version migration preserves exact old rows, reopens and supports playlists',
       () async {
@@ -263,6 +263,11 @@ void main() {
               "INSERT INTO playlist_songs(playlist_id,song_id,position) VALUES ('old-list','stable',0)",
             );
           }
+          if (version >= 6) {
+            old.execute(
+              "INSERT INTO song_play_counts(song_id,play_count) VALUES ('stable',7)",
+            );
+          }
           for (final name in [
             'songs',
             'library_roots',
@@ -270,6 +275,7 @@ void main() {
             if (version >= 2) ...['tags', 'song_tags'],
             if (version >= 3) 'current_filters',
             if (version >= 4) ...['playlists', 'playlist_songs'],
+            if (version >= 6) 'song_play_counts',
           ]) {
             before[name] = old
                 .select('SELECT * FROM $name')
@@ -294,9 +300,12 @@ void main() {
           expect(
             (await migrated.customSelect('PRAGMA user_version').getSingle())
                 .read<int>('user_version'),
-            6,
+            7,
           );
-          expect(await migrated.select(migrated.songPlayCounts).get(), isEmpty);
+          if (version < 6) {
+            expect(await migrated.select(migrated.songPlayCounts).get(), isEmpty);
+          }
+          expect(await migrated.select(migrated.syncRecords).get(), isEmpty);
           expect(
             await migrated.customSelect('PRAGMA foreign_key_check').get(),
             isEmpty,

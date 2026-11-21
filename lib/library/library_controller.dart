@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
@@ -11,6 +12,7 @@ import '../playback/documents.dart';
 import 'database.dart';
 import 'library_backup.dart';
 import 'library_relocation.dart';
+import 'portable_paths.dart';
 import 'tag_repository.dart';
 import 'filter_rule.dart';
 import 'filter_repository.dart';
@@ -178,6 +180,8 @@ class LibraryController extends ChangeNotifier {
   bool scanning = false;
   bool choosing = false;
   bool restoringBackup = false;
+  Future<Object?>? _syncTask;
+  bool get syncing => _syncTask != null;
   bool relocating = false;
   bool hashingBaselines = false;
   bool baselineCancelling = false;
@@ -186,6 +190,7 @@ class LibraryController extends ChangeNotifier {
       scanning ||
       choosing ||
       restoringBackup ||
+      _syncTask != null ||
       relocating ||
       hashingBaselines ||
       _fileEditTask != null ||
@@ -399,6 +404,29 @@ class LibraryController extends ChangeNotifier {
     _restoreTask = task;
     _publish();
     return task;
+  }
+
+  Future<T> syncLibrary<T>(Future<T> Function() transfer) async {
+    if (_closed || directoryBusy || filterDeletingTag) {
+      throw StateError('请等待当前曲库操作结束');
+    }
+    final task = Future<T>(() async {
+      await _filterWrites;
+      try {
+        return await transfer();
+      } finally {
+        await reload(publish: false);
+        await _loadFilter();
+      }
+    });
+    _syncTask = task;
+    _publish();
+    try {
+      return await task;
+    } finally {
+      _syncTask = null;
+      _publish();
+    }
   }
 
   Future<bool> _restoreBackup(
@@ -1044,6 +1072,40 @@ class LibraryController extends ChangeNotifier {
             if (discovered % 10 == 0) _publish();
           }
           if (_cancelled) break;
+          final pendingRows =
+              await (db.select(db.songLocations)..where(
+                    (row) =>
+                        row.root.equals(root) & row.available.equals(false),
+                  ))
+                  .get();
+          final pending = {
+            for (final track in tracks)
+              if (track.song.identity == 'pending:${track.song.id}')
+                track.song.id: track.song,
+          };
+          Set<String> pathKey(String path, int? size) => {
+            jsonEncode([portableRelativePath(root, path), size]),
+          };
+          final recovered = uniqueMusicMatches(
+            {
+              for (final row in pendingRows)
+                if (pending.containsKey(row.songId))
+                  row.songId: pathKey(
+                    row.relativePath,
+                    pending[row.songId]!.size,
+                  ),
+            },
+            {
+              for (final (file, _) in staged.values)
+                if (!existing.containsKey(file.identity))
+                  file.identity: pathKey(file.relativePath, file.size),
+            },
+          );
+          for (final MapEntry(key: id, value: identity) in recovered.entries) {
+            final (file, song) = staged[identity]!;
+            staged[identity] = (file, song.copyWith(id: id));
+          }
+          if (_cancelled) break;
           // Atomic per root: interrupted enumeration never marks unseen files missing.
           await db.transaction(() async {
             await (db.update(db.songLocations)
@@ -1124,6 +1186,7 @@ class LibraryController extends ChangeNotifier {
     await _fileEditTask?.then<void>((_) {}, onError: (Object error) {});
     await _removeTask;
     await _restoreTask;
+    await _syncTask?.then<void>((_) {}, onError: (Object error) {});
     await _relocationTask;
     await _baselineTask;
     await _filterWrites;

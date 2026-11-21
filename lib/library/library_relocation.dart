@@ -323,6 +323,11 @@ class LibraryRelocation {
               ..where((row) => row.root.equals(old)))
             .write(const SongLocationsCompanion(available: Value(false)));
         if (old != root) {
+          await db
+              .into(db.syncRecords)
+              .insertOnConflictUpdate(
+                SyncRecord(key: 'restore-root:$old', value: root),
+              );
           await db.batch((batch) {
             for (final match in matches) {
               batch.deleteWhere(

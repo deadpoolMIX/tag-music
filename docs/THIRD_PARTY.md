@@ -33,6 +33,8 @@ Drift / sqlite3 Dart绑定的许可文本以锁定包内LICENSE及应用“开�
 
 ## R9 个人使用版
 
+局域网同步使用 cryptography 2.9.0 的 AES-GCM 实现（Apache-2.0）。许可由 Flutter 收录至应用的「开源许可」。 [cryptography 锁定版本](https://pub.dev/packages/cryptography/versions/2.9.0)
+
 完整依赖版本见仓库根目录的 `pubspec.lock`。备份校验使用 `crypto 3.0.8`，FFI 使用 `ffi 2.2.0`，两者均按锁定包的 BSD 三条款许可保留署名和条款。文件选择器的 Windows、Android 实现同样使用 BSD 三条款许可。Dart 依赖许可可在「设置 → 开源许可」查看。
 
 Windows 便携包附带原创 MIT 许可、Flutter 运行时许可和原生音频库许可。两个 Android 变体通过同一应用入口提供原生音频库许可。Windows 音频库的完整对应源码及静态子组件通知、Android 构建引用的 helper 精确版本仍需核全。个人使用版保留这些公开发行前的待办项。

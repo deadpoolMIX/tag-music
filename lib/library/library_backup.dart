@@ -12,8 +12,10 @@ import 'package:uuid/uuid.dart';
 import 'database.dart';
 import 'filter_rule.dart';
 import 'playlist_repository.dart';
+import 'portable_paths.dart';
 
 part 'backup_delta.dart';
+part 'backup_matching.dart';
 
 const backupByteLimit = 64 * 1024 * 1024;
 const _format = 'tag-music-library';
@@ -75,18 +77,10 @@ class LibraryBackup {
     required bool trustedLocations,
   }) => db.transaction(() async {
     final current = await _capture(db);
-    final localRoots = {
-      for (final root in current.roots)
-        if (!root.requiresReselection) root.location: root,
-    };
-    final localPositions = {
-      for (final row in current.locations)
-        (row.root, row.location, row.relativePath): row,
-    };
-    final currentIdentities = {
-      for (final row in current.songs) row.id: row.identity,
-    };
-    final importedIdentities = {for (final row in songs) row.id: row.identity};
+    final match = trustedLocations
+        ? null
+        : await matchBackup(this, current, db);
+    final restored = match?.backup ?? this;
     final restoredCounts = <SongPlayCount>[];
     for (final song in songs) {
       final count = playCounts[song.id] ?? current.playCounts[song.id] ?? 0;
@@ -105,45 +99,29 @@ class LibraryBackup {
     await db.delete(db.songs).go();
 
     await db.batch((batch) {
-      batch.insertAll(db.songs, songs);
+      batch.insertAll(db.songs, restored.songs);
       batch.insertAll(db.songPlayCounts, restoredCounts);
-      batch.insertAll(
-        db.libraryRoots,
-        trustedLocations
-            ? roots
-            : roots.map(
-                (row) =>
-                    localRoots[row.location] ??
-                    row.copyWith(
-                      accessible: false,
-                      requiresReselection: true,
-                      status: '等待重新定位',
-                      scannedAt: const Value(null),
-                    ),
-              ),
-      );
-      batch.insertAll(
-        db.songLocations,
-        trustedLocations
-            ? locations
-            : locations.map((row) {
-                final local =
-                    localPositions[(row.root, row.location, row.relativePath)];
-                return row.copyWith(
-                  available:
-                      localRoots.containsKey(row.root) &&
-                      local?.available == true &&
-                      currentIdentities[local!.songId] ==
-                          importedIdentities[row.songId],
-                );
-              }),
-      );
+      batch.insertAll(db.libraryRoots, restored.roots);
+      batch.insertAll(db.songLocations, restored.locations);
       batch.insertAll(db.tags, tags);
       batch.insertAll(db.songTags, songTags);
       batch.insertAll(db.currentFilters, filters);
       batch.insertAll(db.playlists, playlists);
       batch.insertAll(db.playlistSongs, playlistSongs);
     });
+    if (match != null) {
+      await db.batch((batch) {
+        for (final entry in match.directories.entries) {
+          if (entry.key != entry.value) {
+            batch.insert(
+              db.syncRecords,
+              SyncRecord(key: 'restore-root:${entry.key}', value: entry.value),
+              mode: InsertMode.insertOrReplace,
+            );
+          }
+        }
+      });
+    }
     if (!trustedLocations) await PlaylistRepository(db).ensureFavorites();
     // Write the recovery file before SQLite commits. A storage failure rolls
     // back all SQL changes and leaves the previous recovery file intact.

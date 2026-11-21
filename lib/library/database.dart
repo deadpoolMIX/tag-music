@@ -107,6 +107,13 @@ class PlaylistSongs extends Table {
   ];
 }
 
+class SyncRecords extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+  @override
+  Set<Column> get primaryKey => {key};
+}
+
 @DriftDatabase(
   tables: [
     Songs,
@@ -118,6 +125,7 @@ class PlaylistSongs extends Table {
     CurrentFilters,
     Playlists,
     PlaylistSongs,
+    SyncRecords,
   ],
 )
 class LibraryDatabase extends _$LibraryDatabase {
@@ -132,7 +140,7 @@ class LibraryDatabase extends _$LibraryDatabase {
             ),
       );
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
@@ -142,7 +150,10 @@ class LibraryDatabase extends _$LibraryDatabase {
       );
     },
     onUpgrade: (m, from, to) => transaction(() async {
-      if (from >= 1 && from < 5) {
+      if (from < 1 || from >= to || to != 7) {
+        throw StateError('不支持的数据库升级 $from → $to');
+      }
+      if (from < 5) {
         if (from < 2) {
           await m.createTable(tags);
           await m.createTable(songTags);
@@ -158,11 +169,8 @@ class LibraryDatabase extends _$LibraryDatabase {
         await m.addColumn(songs, songs.fileSha256);
         await m.addColumn(libraryRoots, libraryRoots.requiresReselection);
       }
-      if (from >= 1 && from < 6 && to == 6) {
-        await m.createTable(songPlayCounts);
-        return;
-      }
-      throw StateError('不支持的数据库升级 $from → $to');
+      if (from < 6) await m.createTable(songPlayCounts);
+      await m.createTable(syncRecords);
     }),
     beforeOpen: (_) => customStatement('PRAGMA foreign_keys = ON'),
   );
